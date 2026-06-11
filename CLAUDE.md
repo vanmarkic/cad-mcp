@@ -20,16 +20,22 @@ originals untouched, and contested values are flagged "à confirmer" for the gé
 
 Surface-label corrections are **applied and packaged**; the project is **awaiting géomètre/architect
 sign-off (round 2)**. A *separate* design-vs-as-built **geometry** reconciliation is documented but
-**not executed** (see `FINDINGS_design_vs_asbuilt.md`). See `WORKLOG.md` for the full narrative.
+**not executed** (see `docs/FINDINGS_design_vs_asbuilt.md`). See `WORKLOG.md` for the full narrative.
+
+**Folder layout (since 2026-06-11):** `sources/` (originals received — never edit),
+`deliverables/` (corrected DXFs to send), `docs/` (analysis & correspondence MDs),
+`navvis_export/` (scan extraction + scripts), `reference/` (rendered evidence),
+`plan_de_division_2026_06_10/` (architects' division-plan delivery). Root keeps only
+CLAUDE.md / WORKLOG.md.
 
 ## Source files & authority
 
 | File / dir | Role | Notes |
 |---|---|---|
-| `260608_FermeduTemple.dwg` | **TARGET** (architect, *design*) | AutoCAD 2018 (AC1032), units = **cm**. Lot labels on layer `Tekst-ruimtelabel` (MTEXT); lot areas also drawn as HATCH/SOLID on layer `0` + `_Nieuw-4 massa` walls. |
+| `sources/260608_FermeduTemple.dwg` | **TARGET** (architect, *design*) | AutoCAD 2018 (AC1032), units = **cm**. Lot labels on layer `Tekst-ruimtelabel` (MTEXT); lot areas also drawn as HATCH/SOLID on layer `0` + `_Nieuw-4 massa` walls. |
 | `navvis_export/` | **NavVis 3D as-built scan** (ImmoPass) | Highest-precision *existing* state. Building footprints, georeferenced **orthophotos** (floor plans), **façades/coupes**, per-room areas in `areas/`. |
-| `6190 plan de division (2).dwg` | Surveyor measured rooms (Immo-Géo) | 45 `Aire:` rooms; **no per-lot table, no copropriété division**. Useful as envelope cross-check. |
-| `260512_presentation_light.pdf` | Architect layout (*design*, approx) | **page idx 6 = plan +0, idx 7 = plan +1, idx 8 = surface table**. Vector; lot label positions extractable. |
+| `sources/6190 plan de division (2).dwg` | Surveyor measured rooms (Immo-Géo) | 45 `Aire:` rooms; **no per-lot table, no copropriété division**. Useful as envelope cross-check. |
+| `sources/260512_presentation_light.pdf` | Architect layout (*design*, approx) | **page idx 6 = plan +0, idx 7 = plan +1, idx 8 = surface table**. Vector; lot label positions extractable. |
 
 **Authority hierarchy** (`navvis_export/REFERENCE_SOURCES.md`): NavVis as-built > 6190 > architect
 PDF/DWG. **But it's a renovation**: `260608`/PDF = **PROJET** (design); NavVis/6190 = **EXISTANT**
@@ -37,7 +43,10 @@ PDF/DWG. **But it's a renovation**: `260608`/PDF = **PROJET** (design); NavVis/6
 
 ## Unifying coordinate frame (the key that makes cross-checks work)
 
-- Common frame = **Belgian Lambert 2008**. `6190 = NavVis-local + (117027.344, 121045.953)`.
+- Common frame = **Belgian Lambert 2008**. `6190 = NavVis-local + (117027.344, 121045.953)` *nominal*;
+  precise per-sheet placement (6190→NavVis) = **ICP refit 2026-06-11**, rms ~0.5 m:
+  `navvis_export/areas/transform_sheet_refit_icp.json` (+ sidecar). The 2026-06-09 fit (in
+  `/tmp/cadwork/transform_refined.json`, baked into `areas_6190_rooms.json` nx/ny) was ~2.5–3 m off.
 - `260608` is **cm** in a *separate* CAD frame (≈100 m offset; needs a similarity fit, not exact).
 - PDF = page points; lot label centres via `fitz; doc[6|7].get_text("words")` (tokens `L\d+`).
 - Orthophotos = **georeferenced GeoTIFFs in NavVis-local m**; transforms in
@@ -76,21 +85,27 @@ option but is 3D-first with lossy 2D DWG handling. **Decision: headless LibreDWG
   L8+0→94, L5+1→60, L6+1→58).
 - `Correction-L13-AVERIFIER` — red, **5 provisional** "à confirmer" labels (L7+1=62, L8+1=94,
   L10=79 *(weakest)*, L12=63, L13=78), reconstructed from the PDF +1 plan.
-- Outputs: `…_FINAL.dxf` (pristine), `…_FINAL_xcheck.dxf` (cleaned: original layer frozen/off, stale
+- Outputs in `deliverables/`: `…_FINAL.dxf` (pristine), `…_FINAL_xcheck.dxf` (cleaned: original layer frozen/off, stale
   +1 labels removed — **the one to send**), `…_corrige.dxf`.
 
 ## Document map
 
-- `WORKLOG.md` — full narrative + decisions. `CORRECTION_applied.md` — exactly what's in the DXF.
-- `CORRECTION_PROPOSAL.md` — per-label before/after (source-cited). `CROSSCHECK_lots.md` — multi-source
-  lot cross-check. `XCHECK_REPORT.md` — verification + cleanup (F0/F1/F6). `STRATEGY_contested.md` —
-  strategy for the contested upper lots. `FINDINGS_design_vs_asbuilt.md` — handoff for the geometry
-  pass (L1 elbow, design vs existing). `EMAIL_geometres_architectes_FR.md` — client email (FR, humble).
+- `WORKLOG.md` — full narrative + decisions. `docs/CORRECTION_applied.md` — exactly what's in the DXF.
+- `docs/CORRECTION_PROPOSAL.md` — per-label before/after (source-cited). `docs/CROSSCHECK_lots.md` —
+  multi-source lot cross-check. `docs/XCHECK_REPORT.md` — verification + cleanup (F0/F1/F6).
+  `docs/STRATEGY_contested.md` — strategy for the contested upper lots. `docs/FINDINGS_design_vs_asbuilt.md`
+  — handoff for the geometry pass (L1 elbow, design vs existing). `docs/EMAIL_geometres_architectes_FR.md`
+  — client email (FR, humble).
 - `reference/` — `plan_corrige_RDC.pdf`/`plan_corrige_etage.pdf` (corrected plans on architect base),
-  `facades_coupes_aligned.pdf`, comparison/overlay PNGs.
-- `navvis_export/` — the as-built extraction: `areas/` (6190 rooms, QA_REPORT, consolidated),
-  `orthophotos/` (+ `georef.json`, `underlay/`, `plans_measure/`), `facades_coupes_aligned/`,
-  `ACCESS.md`/`STATUS.md`/`REFERENCE_SOURCES.md`/`HANDOFF_to_correction_agent.md`.
+  `facades_coupes_aligned.pdf`, comparison/overlay PNGs (`overlay_6190_navvis_N{0,1}.png`,
+  transform-refit diagnostics; sidecar `overlay_6190_navvis_README.md`).
+- `navvis_export/` — the as-built extraction: `areas/` (6190 rooms, QA_REPORT, consolidated,
+  `transform_sheet_refit_icp.json` + sidecar), `orthophotos/` (+ `georef.json`, `underlay/`,
+  `plans_measure/`), `facades_coupes_aligned/`, deliverable DXFs each with a sidecar
+  `*_README.md` (`ASBUILT_N0_N1`, `OVERLAY_6190_navvis`, `PLAN_N0_navvis_only`), `scripts/`
+  (all rerunnable), `ACCESS.md`/`STATUS.md`/`REFERENCE_SOURCES.md`/`HANDOFF_to_correction_agent.md`.
+  **Convention: every new deliverable gets a sidecar `*_README.md` with method + validation +
+  regenerate command.**
 
 ## Held for géomètre/architect (round 2)
 
@@ -98,7 +113,7 @@ option but is 3D-first with lossy 2D DWG handling. **Decision: headless LibreDWG
 - Split the dual-coded labels `L2/L10`, `L4/L11`, `L9/L12`.
 - Terrace convention (L5 +44, L6 +42 excluded from totals).
 - Space labels (Part B: salle commune, ateliers incl. the 91-vs-145 conflict, bare numbers).
-- Design-vs-as-built geometry (the L1 elbow et al.) — `FINDINGS_design_vs_asbuilt.md`.
+- Design-vs-as-built geometry (the L1 elbow et al.) — `docs/FINDINGS_design_vs_asbuilt.md`.
 - The actual `.dwg` (ODA / their CAD).
 
 ## Editing conventions (standing)

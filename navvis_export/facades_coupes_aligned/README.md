@@ -13,3 +13,15 @@ the long axis) / `_longit` (along it). **Aile Sud-Est** (L-shape) gets two per-a
 `facade_heights_aligned.csv` — eaves(P60)/ridge(P98) per elevation. ⚠️ Aile Ouest & Maison principale
 eaves are tree/ceiling-inflated; trust the others (Aile Sud-Est ≈11 m, Atelier ≈10.4 m, Chapelle ≈12 m)
 and read exact ridges off the metric images. Placed at true z-scale in `../ferme_du_temple_ELEVATIONS_m.dxf`.
+
+## Added 2026-06-11 — measured set + persisted specs
+- `measured/` — annotated exports **with measurements** (H égout/faîtage/H max, largeurs, TN);
+  methodology in `measured/README.md`. DXF twin with DIMENSION entities:
+  `../ferme_du_temple_FACADES_COUPES_mesures.dxf` (sidecar `../FACADES_COUPES_mesures_README.md`).
+- `aligned_specs.json` — the per-image px↔m georeferencing key (was only in /tmp; now persisted).
+  Field reference: `aligned_specs_README.md`. Regenerate it together with any re-rendered TIFF.
+
+## ⚠ 2026-06-12 — heights verification (protocol v2)
+`facade_heights_aligned.csv` **eaves values are RETRACTED** (full-depth envelope ≠ façade; P98
+vegetation bias — Chapelle faîtage was +2.10 m off). Verified values: `facade_heights_verified.csv`;
+protocol + human sign-off: `VERIF_hauteurs.md`; per-image evidence: `measured/verif/`.

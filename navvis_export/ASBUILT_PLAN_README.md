@@ -31,7 +31,7 @@ toggleable layers, measured areas, georeferenced, provenance note + north arrow 
   To get **EPSG:8370 (Belgian Lambert 2008)** metres: `/100`, then add `(500000, 500000)` →
   i.e. local + (617027.344, 621045.953) m (NavVis SITE affine). Z is relative (local ×100).
 - Exact overlay on `260608` (design) still needs a **similarity fit** (260608 is a rotated CAD frame;
-  see `../FINDINGS_design_vs_asbuilt.md`).
+  see `../docs/FINDINGS_design_vs_asbuilt.md`).
 
 ## Layers
 | Layer | Content |

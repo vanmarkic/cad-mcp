@@ -248,5 +248,78 @@ User asked for a NavVis-vs-surveyor overlay (DXF + bitmaps) viewable locally (�
   Areas/ids are untouched; only *positions/assignments near building edges* deserve a re-check
   with the ICP transform before round-2 conclusions. Aire-label id-matching in the overlay was done
   in the old frame on purpose (consistent with the json), placement in the new.
-- Scripts (rerunnable): `/tmp/poc/build_overlay_6190_navvis.py`, `render_overlay_png.py`,
-  `refit_6190_transforms.py`, `validate_new_transforms.py`, `diag_old_vs_new.py`.
+- Scripts (rerunnable): `navvis_export/scripts/{build_overlay_6190_navvis, render_overlay_png,
+  refit_6190_transforms, validate_new_transforms, diag_old_vs_new}.py` (persisted from /tmp/poc).
+
+## Update 2026-06-11 (later) — NavVis-only plan +0, coupes parked, organization pass
+
+- **`navvis_export/ferme_du_temple_PLAN_N0_navvis_only.dxf`** — floor plan +0 built from NavVis
+  ONLY (walls from the cloud, emprises from site model, ortho underlays; no 6190/architect/PDF).
+  NavVis-local m; stacks 1:1 with the overlay DXF. Sidecar: `PLAN_N0_navvis_only_README.md`.
+- **Coupes (Jordy)**: located his request (Gmail via collective mailbox, 2026-05-29, thread
+  "PL/6190/Ja: plan de division"): for the coupe Albert still had to produce he wants **two short
+  building sections instead of one long one**, locations marked in a mail attachment (image not
+  retrieved — gws OAuth went to the wrong account; user then parked the task). Albert's 6190
+  already contains 7 *terrain* profiles (layer `Coupe profil`, P1–P3 off-site, P4–P7 across the
+  farm). Building-section material exists in `facades_coupes_aligned/`; bespoke cuts from the
+  cloud are feasible via `scripts/decode_slices.py`. **Parked** — noted in `navvis_export/STATUS.md`.
+- **Organization pass**: every deliverable now has a **sidecar `*_README.md`** (method, frame,
+  layers, validation, regenerate command): `OVERLAY_6190_navvis_README.md`,
+  `PLAN_N0_navvis_only_README.md`, `areas/transform_sheet_refit_icp_README.md`,
+  `reference/overlay_6190_navvis_README.md` (+ pre-existing `ASBUILT_PLAN_README.md`).
+  Refit diagnostics persisted: `reference/diag_transform_refit_N{0,1}_old_vs_new.png`.
+  Indexes refreshed: `navvis_export/README.md` (geometry table incl. ASBUILT/OVERLAY/PLAN_N0,
+  frames, pending), `navvis_export/STATUS.md` (rewritten — was pre-point-cloud stale),
+  `CLAUDE.md` (frame section + document map + sidecar convention).
+
+## Update 2026-06-11 (later 2) — root folder reorganization
+
+Root was ~20 loose files; reorganized (git: all files were still untracked, plain `mv`):
+- `sources/` — originals received, never edit: `260608_FermeduTemple.dwg/.dxf`,
+  `6190 plan de division (2).dwg/.dxf`, `6190_clean.dxf`, `6190_r2000.dxf`,
+  `260512_presentation_light.pdf`, `Aanzicht - tegels grijs 10x10.pat`.
+- `deliverables/` — to send: `260608_FermeduTemple_{FINAL,FINAL_xcheck,corrige}.dxf`.
+- `docs/` — analysis & correspondence: `CORRECTION_{PROPOSAL,applied}.md`, `CROSSCHECK_lots.md`,
+  `XCHECK_REPORT.md`, `STRATEGY_contested.md`, `FINDINGS_design_vs_asbuilt.md`,
+  `EMAIL_geometres_architectes_FR.md`.
+- Root keeps `CLAUDE.md`, `WORKLOG.md` (+ gitignored `navvis_storage_probe.json`, per .gitignore path).
+- **Path updates**: 4 scripts (`{ROOT}/sources/6190_clean.dxf`), CLAUDE.md (table, outputs, document
+  map, layout note), `navvis_export/{REFERENCE_SOURCES,STATUS,ASBUILT_PLAN_README,OVERLAY…README}.md`
+  (`../docs/FINDINGS…`), `docs/CORRECTION_applied.md` file inventory. Historical WORKLOG/docs prose
+  (bare filenames) intentionally NOT rewritten.
+- **Verified**: overlay rebuild from new paths (45/45 labels, audit 0 errors); DXF↔orthophoto
+  relative paths unaffected (nothing inside `navvis_export/` moved).
+
+## Update 2026-06-11 (later 3) — façades & coupes MESURÉES
+
+User asked for a new DXF + exports **with measurements** from `facades_coupes_aligned/`.
+- `navvis_export/ferme_du_temple_FACADES_COUPES_mesures.dxf` — all 20 aligned images (10 élév.,
+  10 coupes) in one metric strip with **real DIMENSION entities**: H égout (P60) / H faîtage (P98)
+  per elevation, H max (P98, computed from TIFF alpha) per coupe, largeur de structure (content
+  extent × width_m/ppm), TN lines, 1 m grid (off), shared z-scale. Audit 0 errors.
+- Exports: `facades_coupes_aligned/measured/<Building>_mesures.png` ×5 + `CONTACT_mesures.png`.
+- Flags in labels: Aile Ouest/Maison principale égout ⚠ (végétation/plafond); faîtage ≥14.99 =
+  **tronqué par la fenêtre z** (vraie hauteur > 15; re-render avec fenêtre plus haute si besoin);
+  MP TN −2.71 sous fenêtre. Heights = site-z relative, P60/P98 statistics — indicative.
+- `/tmp/cadwork/aligned_specs.json` persisted → `facades_coupes_aligned/aligned_specs.json`.
+- Script: `navvis_export/scripts/build_measured_facades.py`. Sidecar:
+  `navvis_export/FACADES_COUPES_mesures_README.md`. Indexes updated (README, STATUS).
+- Side-note for the Albert dispute (grange 3.88 m shorter): the measured **largeur structure**
+  values on Aile Sud-Est élévations/coupes are now scan-derived evidence usable in that discussion.
+
+## Update 2026-06-11 (later 4) — heights verification protocol v2 (user caught bad égout/faîtage)
+
+User flagged Chapelle_short: égout 11.10 / faîtage 13.97 visibly wrong. Root causes found:
+(a) aligned renders are **full-depth** → top silhouette = roof ENVELOPE, so "P60 eaves" is
+conceptually invalid (any plateau is ridge-class); (b) raw column-tops catch floating vegetation
+→ P98 faîtage inflated (Chapelle: **13.97 → 11.87, −2.10 m**).
+- New `scripts/verify_facade_heights.py`: persistent-run top detection (≥5/7 px), 0.5 m rolling
+  median, faîtage = smoothed max (+ tronqué flag), plateau detection (flat-slope mode, support %),
+  cross-élévation consistency (0.02–0.27 m where un-clipped — strong internal validation),
+  per-image verification PNGs (v1 vs v2 lines over the render), **human sign-off** of plateau
+  semantics encoded in-script (AileSudEst_long 9.85 = faîtage grange; Chapelle_short 11.05 =
+  faîtage nef vu en bout; AileOuest_long 10.45 = crête de mur).
+- **All v1 «égout» values RETRACTED** — not measurable from envelopes. True égout ⇒ thin
+  façade-plane re-renders (NavVis crop API), parked.
+- Outputs: `facade_heights_verified.csv`, `VERIF_hauteurs.md`, `measured/verif/*_verif.png`;
+  measured DXF + PNGs rebuilt (rev. C) from verified values only. Sidecars updated.

@@ -1,0 +1,21 @@
+image,kind,ground_z,ridge_z,H_ridge,ridge_clipped,plateau_z,plateau_semantique,plateau_support_pct,egout,old_eaves_z,old_ridge_z,d_ridge_vs_old,building_ridge_spread
+bcoupe_AileOuest_longit,coupe,-1.58,14.81,16.39,False,7.65,indéterminé (voir verif PNG),38.2,NON MESURABLE (enveloppe pleine profondeur) — v1 RETIRÉ,,,,
+bcoupe_AileOuest_transv,coupe,-1.58,10.38,11.96,False,2.15,indéterminé (voir verif PNG),25.1,NON MESURABLE (enveloppe pleine profondeur) — v1 RETIRÉ,,,,
+bcoupe_AileSudEst_transv_arm1,coupe,-0.86,9.84,10.7,False,1.25,indéterminé (voir verif PNG),47.0,NON MESURABLE (enveloppe pleine profondeur) — v1 RETIRÉ,,,,0.27
+bcoupe_AileSudEst_transv_arm2,coupe,-0.86,9.87,10.73,False,1.05,indéterminé (voir verif PNG),46.3,NON MESURABLE (enveloppe pleine profondeur) — v1 RETIRÉ,,,,0.27
+bcoupe_Atelier_longit,coupe,-0.54,12.54,13.08,False,8.95,indéterminé (voir verif PNG),37.7,NON MESURABLE (enveloppe pleine profondeur) — v1 RETIRÉ,,,,0.02
+bcoupe_Atelier_transv,coupe,-0.54,8.91,9.45,False,4.35,indéterminé (voir verif PNG),46.2,NON MESURABLE (enveloppe pleine profondeur) — v1 RETIRÉ,,,,0.02
+bcoupe_Chapelle_longit,coupe,-0.78,10.84,11.62,False,9.55,indéterminé (voir verif PNG),40.7,NON MESURABLE (enveloppe pleine profondeur) — v1 RETIRÉ,,,,0.04
+bcoupe_Chapelle_transv,coupe,-0.78,11.54,12.32,False,,,18.1,NON MESURABLE (enveloppe pleine profondeur) — v1 RETIRÉ,,,,0.04
+bcoupe_Maisonprincipale_longit,coupe,-2.71,14.74,17.45,False,,,52.4,NON MESURABLE (enveloppe pleine profondeur) — v1 RETIRÉ,,,,
+bcoupe_Maisonprincipale_transv,coupe,-2.71,14.73,17.44,False,,,45.1,NON MESURABLE (enveloppe pleine profondeur) — v1 RETIRÉ,,,,
+belev_AileOuest_long,elev,-1.58,15.0,16.58,True,10.45,crête de mur (aile sans toiture),54.5,NON MESURABLE (enveloppe pleine profondeur) — v1 RETIRÉ,12.79,15.0,0.0,
+belev_AileOuest_short,elev,-1.58,15.0,16.58,True,,,46.7,NON MESURABLE (enveloppe pleine profondeur) — v1 RETIRÉ,14.86,14.99,0.01,
+belev_AileSudEst_long,elev,-0.86,12.9,13.76,False,9.85,faîtage corps principal grange (12.90 = faîtage croisillon),80.6,NON MESURABLE (enveloppe pleine profondeur) — v1 RETIRÉ,9.89,12.32,0.58,0.27
+belev_AileSudEst_short,elev,-0.86,13.17,14.03,False,,,22.8,NON MESURABLE (enveloppe pleine profondeur) — v1 RETIRÉ,10.77,12.7,0.47,0.27
+belev_Atelier_long,elev,-0.54,13.64,14.18,False,,,23.3,NON MESURABLE (enveloppe pleine profondeur) — v1 RETIRÉ,9.89,13.62,0.02,0.02
+belev_Atelier_short,elev,-0.54,13.66,14.2,False,,,31.7,NON MESURABLE (enveloppe pleine profondeur) — v1 RETIRÉ,12.94,13.63,0.03,0.02
+belev_Chapelle_long,elev,-0.78,11.83,12.61,False,,,75.3,NON MESURABLE (enveloppe pleine profondeur) — v1 RETIRÉ,11.73,13.31,-1.48,0.04
+belev_Chapelle_short,elev,-0.78,11.87,12.65,False,11.05,faîtage nef vu en bout (11.87 = sommets des pignons),35.0,NON MESURABLE (enveloppe pleine profondeur) — v1 RETIRÉ,11.1,13.97,-2.1,0.04
+belev_Maisonprincipale_long,elev,-2.71,15.0,17.71,True,,,38.0,NON MESURABLE (enveloppe pleine profondeur) — v1 RETIRÉ,14.57,15.0,0.0,
+belev_Maisonprincipale_short,elev,-2.71,15.0,17.71,True,,,41.6,NON MESURABLE (enveloppe pleine profondeur) — v1 RETIRÉ,14.63,14.99,0.01,

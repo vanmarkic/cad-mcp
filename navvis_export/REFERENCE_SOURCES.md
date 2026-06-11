@@ -10,9 +10,9 @@
 
 ## Reference files (do NOT treat as authoritative measures)
 - Architect DWG (approximate, used until now): https://www.swisstransfer.com/d/d4970b2f-a3e9-4770-8ab5-d024e221bebf
-- Architect presentation PDF: 260512_presentation_light.pdf (already in project; p7 plan+0, p8 plan+1, p9 surface table)
-- Géomètre ImmoGeo "plan de division" 6190: 6190 plan de division (2).dwg (already in project) — land division / parcels
-- Target DWG to update: 260608_FermeduTemple.dwg (cm)
+- Architect presentation PDF: sources/260512_presentation_light.pdf (already in project; p7 plan+0, p8 plan+1, p9 surface table)
+- Géomètre ImmoGeo "plan de division" 6190: sources/6190 plan de division (2).dwg (already in project) — land division / parcels
+- Target DWG to update: sources/260608_FermeduTemple.dwg (cm)
 
 ## Surveyors
 - Immo-Geo (Jonathan Albert), géomètre-expert — plan de division / parcels (6190)

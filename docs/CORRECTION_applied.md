@@ -5,10 +5,10 @@ _2026-06-09. Records exactly what was written to the corrected DXF files. Route 
 _Updated after the cross-check (`XCHECK_REPORT.md`): this file previously listed only L13 on the red
 layer — corrected below to the actual 5 labels, and the cleaned `_xcheck` candidate is now documented._
 
-## Files
-- `260608_FermeduTemple.dwg/.dxf` — **originals, untouched** (the surveyor/architect source).
-- `260608_FermeduTemple_FINAL.dxf` — **as-sent deliverable** (pristine; = `…_corrige.dxf` in content).
-- `260608_FermeduTemple_FINAL_xcheck.dxf` — **cleaned candidate** produced by the cross-check
+## Files *(paths updated 2026-06-11 — root was reorganized into `sources/` + `deliverables/`)*
+- `sources/260608_FermeduTemple.dwg/.dxf` — **originals, untouched** (the surveyor/architect source).
+- `deliverables/260608_FermeduTemple_FINAL.dxf` — **as-sent deliverable** (pristine; = `…_corrige.dxf` in content).
+- `deliverables/260608_FermeduTemple_FINAL_xcheck.dxf` — **cleaned candidate** produced by the cross-check
   (FINAL + fixes F0/F1/F6 below). `FINAL.dxf` itself is left byte-for-byte pristine.
 
 ## Layers (in both FINAL and _xcheck)
