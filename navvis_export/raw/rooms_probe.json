@@ -1,0 +1,977 @@
+{
+  "site_model": {
+    "status": 200,
+    "body": [
+      {
+        "id": 46914,
+        "type": "BUILDING",
+        "name": "Aile Ouest",
+        "scs_polygon": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [
+                -23.32038180718353,
+                12.12806956604807
+              ],
+              [
+                -9.680401115311728,
+                -34.30488575309847
+              ],
+              [
+                -8.338426083131623,
+                -34.137502119383825
+              ],
+              [
+                -7.179210667915787,
+                -38.17989433654675
+              ],
+              [
+                -8.04119136128141,
+                -38.47712905839696
+              ],
+              [
+                -7.087411315277538,
+                -41.452111042406784
+              ],
+              [
+                -29.617803231523848,
+                -48.1285299430712
+              ],
+              [
+                -31.7578932288454,
+                -40.99489661866603
+              ],
+              [
+                -15.945006026413953,
+                -36.14997065250753
+              ],
+              [
+                -28.5667618272949,
+                5.737710139411712
+              ],
+              [
+                -41.43702528340921,
+                2.705915976539518
+              ],
+              [
+                -42.180112088034754,
+                7.431948053957939
+              ],
+              [
+                -34.45200931992916,
+                8.888398191023992
+              ],
+              [
+                -23.32038180718353,
+                12.12806956604807
+              ]
+            ]
+          ]
+        },
+        "children": [
+          {
+            "id": 46915,
+            "type": "FLOOR",
+            "name": "-1",
+            "scs_polygon": null,
+            "children": [],
+            "scs_center": [
+              -21.229566426629724,
+              -19.298534833469947,
+              -0.6349999999999999
+            ],
+            "attributes": {},
+            "area": null,
+            "volume": 1066.4619285186852,
+            "validation_id": null,
+            "scs_geometry_hash": 948720402,
+            "scs_z_min": -1.5799999999999998,
+            "scs_z_max": 0.31000000000000005
+          },
+          {
+            "id": 46916,
+            "type": "FLOOR",
+            "name": "0",
+            "scs_polygon": null,
+            "children": [],
+            "scs_center": [
+              -21.229566426629724,
+              -19.298534833469947,
+              2.4599999999999995
+            ],
+            "attributes": {},
+            "area": null,
+            "volume": 2426.3419537726695,
+            "validation_id": null,
+            "scs_geometry_hash": -146681786,
+            "scs_z_min": 0.31000000000000005,
+            "scs_z_max": 4.609999999999999
+          },
+          {
+            "id": 46917,
+            "type": "FLOOR",
+            "name": "1",
+            "scs_polygon": null,
+            "children": [],
+            "scs_center": [
+              -21.229566426629724,
+              -19.298534833469947,
+              19.61
+            ],
+            "attributes": {},
+            "area": null,
+            "volume": 16927.96711934421,
+            "validation_id": null,
+            "scs_geometry_hash": 1759265174,
+            "scs_z_min": 4.609999999999999,
+            "scs_z_max": 34.61
+          }
+        ],
+        "scs_center": [
+          -21.229566426629724,
+          -19.298534833469947,
+          0
+        ],
+        "attributes": {},
+        "area": 564.265570644807,
+        "volume": null,
+        "validation_id": null,
+        "scs_geometry_hash": -213142403,
+        "scs_z_min": null,
+        "scs_z_max": null
+      },
+      {
+        "id": 46921,
+        "type": "BUILDING",
+        "name": "Aile Sud-Est",
+        "scs_polygon": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [
+                18.816687964142584,
+                -2.168598534438219
+              ],
+              [
+                25.30272653409385,
+                -24.0312692990317
+              ],
+              [
+                -3.2542398739979275,
+                -32.339996115987766
+              ],
+              [
+                -1.9936505449636543,
+                -36.420886994725834
+              ],
+              [
+                -0.5621338492806656,
+                -36.14313002392167
+              ],
+              [
+                0.3465059915224522,
+                -39.289604158069416
+              ],
+              [
+                34.67519982085145,
+                -29.215390447263985
+              ],
+              [
+                26.75185455191803,
+                -1.4632503944639383
+              ],
+              [
+                18.816687964142584,
+                -2.168598534438219
+              ]
+            ]
+          ]
+        },
+        "children": [
+          {
+            "id": 46922,
+            "type": "FLOOR",
+            "name": "0",
+            "scs_polygon": null,
+            "children": [],
+            "scs_center": [
+              19.70390549946347,
+              -23.755318814130074,
+              1.1749999999999998
+            ],
+            "attributes": {},
+            "area": null,
+            "volume": 1829.522470335773,
+            "validation_id": null,
+            "scs_geometry_hash": -537024192,
+            "scs_z_min": -0.8600000000000003,
+            "scs_z_max": 3.21
+          },
+          {
+            "id": 46923,
+            "type": "FLOOR",
+            "name": "1",
+            "scs_polygon": null,
+            "children": [],
+            "scs_center": [
+              19.70390549946347,
+              -23.755318814130074,
+              18.21
+            ],
+            "attributes": {},
+            "area": null,
+            "volume": 13485.423614268597,
+            "validation_id": null,
+            "scs_geometry_hash": 268813736,
+            "scs_z_min": 3.21,
+            "scs_z_max": 33.21
+          }
+        ],
+        "scs_center": [
+          19.70390549946347,
+          -23.755318814130074,
+          0
+        ],
+        "attributes": {},
+        "area": 449.5141204756199,
+        "volume": null,
+        "validation_id": null,
+        "scs_geometry_hash": -1661533351,
+        "scs_z_min": null,
+        "scs_z_max": null
+      },
+      {
+        "id": 46919,
+        "type": "BUILDING",
+        "name": "Atelier",
+        "scs_polygon": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [
+                -9.022596829276994,
+                22.754675979958442
+              ],
+              [
+                -9.170700073242188,
+                20.393207550048828
+              ],
+              [
+                -9.27173137664795,
+                18.865102767944336
+              ],
+              [
+                -10.623030662536621,
+                18.801958084106445
+              ],
+              [
+                -7.6925138038306855,
+                8.020002949532191
+              ],
+              [
+                4.997127929487705,
+                9.946214205866427
+              ],
+              [
+                28.39716352371402,
+                11.775994459308144
+              ],
+              [
+                28.010590230733374,
+                14.58509372163416
+              ],
+              [
+                25.188605191974673,
+                14.353149745845771
+              ],
+              [
+                24.594296169247162,
+                24.08034764570148
+              ],
+              [
+                11.824491724453218,
+                22.817541555298043
+              ],
+              [
+                -9.022596829276994,
+                22.754675979958442
+              ]
+            ]
+          ]
+        },
+        "children": [
+          {
+            "id": 46924,
+            "type": "FLOOR",
+            "name": "0",
+            "scs_polygon": null,
+            "children": [],
+            "scs_center": [
+              7.734751608919816,
+              16.446947906401835,
+              1.23
+            ],
+            "attributes": {},
+            "area": null,
+            "volume": 1610.679988088427,
+            "validation_id": null,
+            "scs_geometry_hash": 1584780174,
+            "scs_z_min": -0.54,
+            "scs_z_max": 3
+          },
+          {
+            "id": 46925,
+            "type": "FLOOR",
+            "name": "1",
+            "scs_polygon": null,
+            "children": [],
+            "scs_center": [
+              7.734751608919816,
+              16.446947906401835,
+              18
+            ],
+            "attributes": {},
+            "area": null,
+            "volume": 13649.830407529042,
+            "validation_id": null,
+            "scs_geometry_hash": -1494492528,
+            "scs_z_min": 3,
+            "scs_z_max": 33
+          }
+        ],
+        "scs_center": [
+          7.734751608919816,
+          16.446947906401835,
+          0
+        ],
+        "attributes": {},
+        "area": 454.99434691763474,
+        "volume": null,
+        "validation_id": null,
+        "scs_geometry_hash": 518309585,
+        "scs_z_min": null,
+        "scs_z_max": null
+      },
+      {
+        "id": 46920,
+        "type": "BUILDING",
+        "name": "Chapelle",
+        "scs_polygon": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [
+                10.102531664244264,
+                10.34543473825659
+              ],
+              [
+                11.160074538868674,
+                -2.8491864404055356
+              ],
+              [
+                29.261116175283114,
+                -1.2402049616131414
+              ],
+              [
+                28.39716339111328,
+                11.775994300842285
+              ],
+              [
+                10.102531664244264,
+                10.34543473825659
+              ]
+            ]
+          ]
+        },
+        "children": [
+          {
+            "id": 46926,
+            "type": "FLOOR",
+            "name": "0",
+            "scs_polygon": null,
+            "children": [],
+            "scs_center": [
+              19.70705231151662,
+              4.516907527081423,
+              1.355
+            ],
+            "attributes": {},
+            "area": null,
+            "volume": 1024.5874866628392,
+            "validation_id": null,
+            "scs_geometry_hash": -1894302935,
+            "scs_z_min": -0.7799999999999998,
+            "scs_z_max": 3.4899999999999998
+          },
+          {
+            "id": 46927,
+            "type": "FLOOR",
+            "name": "1",
+            "scs_polygon": null,
+            "children": [],
+            "scs_center": [
+              19.70705231151662,
+              4.516907527081423,
+              18.490000000000002
+            ],
+            "attributes": {},
+            "area": null,
+            "volume": 7198.50693205742,
+            "validation_id": null,
+            "scs_geometry_hash": -1088329476,
+            "scs_z_min": 3.4899999999999998,
+            "scs_z_max": 33.49
+          }
+        ],
+        "scs_center": [
+          19.70705231151662,
+          4.516907527081423,
+          0
+        ],
+        "attributes": {},
+        "area": 239.95023106858065,
+        "volume": null,
+        "validation_id": null,
+        "scs_geometry_hash": 1276192313,
+        "scs_z_min": null,
+        "scs_z_max": null
+      },
+      {
+        "id": 46918,
+        "type": "BUILDING",
+        "name": "Maison principale",
+        "scs_polygon": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [
+                -24.274937966983522,
+                15.922555048168377
+              ],
+              [
+                -23.32038116455078,
+                12.128069877624512
+              ],
+              [
+                -20.837715914333224,
+                3.676629112078249
+              ],
+              [
+                -7.455906925728616,
+                7.1494788213631715
+              ],
+              [
+                -10.623030463114143,
+                18.801958295978014
+              ],
+              [
+                -9.271731570501727,
+                18.865103104044014
+              ],
+              [
+                -9.170699877596125,
+                20.393207459241232
+              ],
+              [
+                -9.915808612774935,
+                21.049913463127645
+              ],
+              [
+                -10.875609695378149,
+                20.82259215409004
+              ],
+              [
+                -11.254478543774152,
+                20.07748341891123
+              ],
+              [
+                -11.22922062054775,
+                19.534438069543622
+              ],
+              [
+                -24.274937966983522,
+                15.922555048168377
+              ]
+            ]
+          ]
+        },
+        "children": [
+          {
+            "id": 46928,
+            "type": "FLOOR",
+            "name": "-1",
+            "scs_polygon": null,
+            "children": [],
+            "scs_center": [
+              -15.752019343452439,
+              11.768048955724918,
+              -0.8800000000000003
+            ],
+            "attributes": {},
+            "area": null,
+            "volume": 667.1541011381194,
+            "validation_id": null,
+            "scs_geometry_hash": -668954835,
+            "scs_z_min": -2.7100000000000004,
+            "scs_z_max": 0.9499999999999997
+          },
+          {
+            "id": 46929,
+            "type": "FLOOR",
+            "name": "0",
+            "scs_polygon": null,
+            "children": [],
+            "scs_center": [
+              -15.752019343452439,
+              11.768048955724918,
+              2.915
+            ],
+            "attributes": {},
+            "area": null,
+            "volume": 716.3703872876528,
+            "validation_id": null,
+            "scs_geometry_hash": -1804960564,
+            "scs_z_min": 0.9499999999999997,
+            "scs_z_max": 4.88
+          },
+          {
+            "id": 46930,
+            "type": "FLOOR",
+            "name": "1",
+            "scs_polygon": null,
+            "children": [],
+            "scs_center": [
+              -15.752019343452439,
+              11.768048955724918,
+              6.715
+            ],
+            "attributes": {},
+            "area": null,
+            "volume": 668.9769265510652,
+            "validation_id": null,
+            "scs_geometry_hash": -1637457864,
+            "scs_z_min": 4.88,
+            "scs_z_max": 8.55
+          },
+          {
+            "id": 46931,
+            "type": "FLOOR",
+            "name": "2",
+            "scs_polygon": null,
+            "children": [],
+            "scs_center": [
+              -15.752019343452439,
+              11.768048955724918,
+              23.549999999999997
+            ],
+            "attributes": {},
+            "area": null,
+            "volume": 5468.476238837043,
+            "validation_id": null,
+            "scs_geometry_hash": 268230355,
+            "scs_z_min": 8.55,
+            "scs_z_max": 38.55
+          }
+        ],
+        "scs_center": [
+          -15.752019343452439,
+          11.768048955724918,
+          0
+        ],
+        "attributes": {},
+        "area": 182.28254129456812,
+        "volume": null,
+        "validation_id": null,
+        "scs_geometry_hash": -1871683844,
+        "scs_z_min": null,
+        "scs_z_max": null
+      }
+    ]
+  },
+  "poi_types": {
+    "status": 200,
+    "body": [
+      {
+        "id": 17777,
+        "name": {
+          "de": "Eingang/Ausgang",
+          "en": "Entrance/Exit"
+        },
+        "icon": "img/poi_navvis/access_entrance_exit.png",
+        "visibility_zoom_min": null,
+        "visibility_zoom_max": null,
+        "poi_type_group_id": 6678
+      },
+      {
+        "id": 17778,
+        "name": {
+          "de": "Treppe",
+          "en": "Stairs"
+        },
+        "icon": "img/poi_navvis/access_steps.png",
+        "visibility_zoom_min": null,
+        "visibility_zoom_max": null,
+        "poi_type_group_id": 6678
+      },
+      {
+        "id": 17779,
+        "name": {
+          "de": "Aufzug",
+          "en": "Elevator"
+        },
+        "icon": "img/poi_navvis/access_elevator.png",
+        "visibility_zoom_min": null,
+        "visibility_zoom_max": null,
+        "poi_type_group_id": 6678
+      },
+      {
+        "id": 17780,
+        "name": {
+          "de": "Besprechungsraum",
+          "en": "Meeting Room"
+        },
+        "icon": "img/poi_navvis/office_meeting_room.png",
+        "visibility_zoom_min": null,
+        "visibility_zoom_max": null,
+        "poi_type_group_id": 6679
+      },
+      {
+        "id": 17781,
+        "name": {
+          "de": "Büro",
+          "en": "Office"
+        },
+        "icon": "img/poi_navvis/office_office.png",
+        "visibility_zoom_min": null,
+        "visibility_zoom_max": null,
+        "poi_type_group_id": 6679
+      },
+      {
+        "id": 17782,
+        "name": {
+          "de": "Taxi",
+          "en": "Taxi"
+        },
+        "icon": "img/poi_navvis/publictransport_taxi.png",
+        "visibility_zoom_min": null,
+        "visibility_zoom_max": null,
+        "poi_type_group_id": 6680
+      },
+      {
+        "id": 17783,
+        "name": {
+          "de": "Zug",
+          "en": "Train"
+        },
+        "icon": "img/poi_navvis/publictransport_train.png",
+        "visibility_zoom_min": null,
+        "visibility_zoom_max": null,
+        "poi_type_group_id": 6680
+      },
+      {
+        "id": 17784,
+        "name": {
+          "de": "Parkplatz",
+          "en": "Parking"
+        },
+        "icon": "img/poi_navvis/access_parking.png",
+        "visibility_zoom_min": null,
+        "visibility_zoom_max": null,
+        "poi_type_group_id": 6680
+      },
+      {
+        "id": 17785,
+        "name": {
+          "de": "Bus",
+          "en": "Bus"
+        },
+        "icon": "img/poi_navvis/publictransport_bus.png",
+        "visibility_zoom_min": null,
+        "visibility_zoom_max": null,
+        "poi_type_group_id": 6680
+      },
+      {
+        "id": 17786,
+        "name": {
+          "de": "WC (Männer)",
+          "en": "Restroom (Men)"
+        },
+        "icon": "img/poi_navvis/sanitary_toiletmen.png",
+        "visibility_zoom_min": null,
+        "visibility_zoom_max": null,
+        "poi_type_group_id": 6681
+      },
+      {
+        "id": 17787,
+        "name": {
+          "de": "WC (Barrierefrei)",
+          "en": "Restroom (Accessible)"
+        },
+        "icon": "img/poi_navvis/sanitary_toiletdisabled.png",
+        "visibility_zoom_min": null,
+        "visibility_zoom_max": null,
+        "poi_type_group_id": 6681
+      },
+      {
+        "id": 17788,
+        "name": {
+          "de": "WC (Frauen)",
+          "en": "Restroom (Women)"
+        },
+        "icon": "img/poi_navvis/sanitary_toiletwomen.png",
+        "visibility_zoom_min": null,
+        "visibility_zoom_max": null,
+        "poi_type_group_id": 6681
+      },
+      {
+        "id": 17789,
+        "name": {
+          "de": "Babypflege",
+          "en": "Babycare"
+        },
+        "icon": "img/poi_navvis/sanitary_babycare.png",
+        "visibility_zoom_min": null,
+        "visibility_zoom_max": null,
+        "poi_type_group_id": 6681
+      },
+      {
+        "id": 17790,
+        "name": {
+          "de": "Geschäft",
+          "en": "Store"
+        },
+        "icon": "img/poi_navvis/services_shops.png",
+        "visibility_zoom_min": null,
+        "visibility_zoom_max": null,
+        "poi_type_group_id": 6682
+      },
+      {
+        "id": 17791,
+        "name": {
+          "de": "Essen",
+          "en": "Food"
+        },
+        "icon": "img/poi_navvis/services_food.png",
+        "visibility_zoom_min": null,
+        "visibility_zoom_max": null,
+        "poi_type_group_id": 6682
+      },
+      {
+        "id": 17792,
+        "name": {
+          "de": "Information",
+          "en": "Information"
+        },
+        "icon": "img/poi_navvis/services_information.png",
+        "visibility_zoom_min": null,
+        "visibility_zoom_max": null,
+        "poi_type_group_id": 6682
+      },
+      {
+        "id": 17793,
+        "name": {
+          "de": "Allgemein",
+          "en": "Generic"
+        },
+        "icon": "img/poi_navvis/generic_poi.png",
+        "visibility_zoom_min": null,
+        "visibility_zoom_max": null,
+        "poi_type_group_id": 6683
+      },
+      {
+        "id": 17794,
+        "name": {
+          "de": "Instandhaltung",
+          "en": "Maintenance"
+        },
+        "icon": "img/poi_navvis/facility_mngmt_maintenance.png",
+        "visibility_zoom_min": null,
+        "visibility_zoom_max": null,
+        "poi_type_group_id": 6683
+      },
+      {
+        "id": 17795,
+        "name": {
+          "de": "Gesundheit",
+          "en": "Health"
+        },
+        "icon": "img/poi_navvis/safety_health.png",
+        "visibility_zoom_min": null,
+        "visibility_zoom_max": null,
+        "poi_type_group_id": 6684
+      },
+      {
+        "id": 17796,
+        "name": {
+          "de": "Feuer",
+          "en": "Fire"
+        },
+        "icon": "img/poi_navvis/safety_fire.png",
+        "visibility_zoom_min": null,
+        "visibility_zoom_max": null,
+        "poi_type_group_id": 6684
+      },
+      {
+        "id": 17797,
+        "name": {
+          "de": "Mangel",
+          "en": "Defect"
+        },
+        "icon": "img/poi_navvis/defect.png",
+        "visibility_zoom_min": null,
+        "visibility_zoom_max": null,
+        "poi_type_group_id": 6685
+      },
+      {
+        "id": 17798,
+        "name": {
+          "de": "RFI",
+          "en": "RFI"
+        },
+        "icon": "img/poi_navvis/rfi.png",
+        "visibility_zoom_min": null,
+        "visibility_zoom_max": null,
+        "poi_type_group_id": 6685
+      },
+      {
+        "id": 17799,
+        "name": {
+          "de": "Beobachtung",
+          "en": "Observation"
+        },
+        "icon": "img/poi_navvis/observation.png",
+        "visibility_zoom_min": null,
+        "visibility_zoom_max": null,
+        "poi_type_group_id": 6685
+      },
+      {
+        "id": 17800,
+        "name": {
+          "de": "Mängelliste",
+          "en": "Punch List"
+        },
+        "icon": "img/poi_navvis/punch_list.png",
+        "visibility_zoom_min": null,
+        "visibility_zoom_max": null,
+        "poi_type_group_id": 6685
+      },
+      {
+        "id": 17801,
+        "name": {
+          "de": "Detailbild",
+          "en": "Detail Image"
+        },
+        "icon": "img/poi_navvis/detail_image.png",
+        "visibility_zoom_min": null,
+        "visibility_zoom_max": null,
+        "poi_type_group_id": 6685
+      }
+    ]
+  },
+  "poi_type_groups": {
+    "status": 200,
+    "body": [
+      {
+        "security": {
+          "group_read": 0,
+          "group_write": 3754,
+          "can_write": false
+        },
+        "id": 6678,
+        "name": {
+          "de": "Zugang",
+          "en": "Access"
+        }
+      },
+      {
+        "security": {
+          "group_read": 0,
+          "group_write": 3754,
+          "can_write": false
+        },
+        "id": 6679,
+        "name": {
+          "de": "Büro",
+          "en": "Office"
+        }
+      },
+      {
+        "security": {
+          "group_read": 0,
+          "group_write": 3754,
+          "can_write": false
+        },
+        "id": 6680,
+        "name": {
+          "de": "Verkehr",
+          "en": "Transport"
+        }
+      },
+      {
+        "security": {
+          "group_read": 0,
+          "group_write": 3754,
+          "can_write": false
+        },
+        "id": 6681,
+        "name": {
+          "de": "Sanitär",
+          "en": "Restrooms"
+        }
+      },
+      {
+        "security": {
+          "group_read": 0,
+          "group_write": 3754,
+          "can_write": false
+        },
+        "id": 6682,
+        "name": {
+          "de": "Dienstleistungen",
+          "en": "Services"
+        }
+      },
+      {
+        "security": {
+          "group_read": 0,
+          "group_write": 3754,
+          "can_write": false
+        },
+        "id": 6683,
+        "name": {
+          "de": "Verschiedene",
+          "en": "Miscellaneous"
+        }
+      },
+      {
+        "security": {
+          "group_read": 0,
+          "group_write": 3754,
+          "can_write": false
+        },
+        "id": 6684,
+        "name": {
+          "de": "Sicherheit",
+          "en": "Safety"
+        }
+      },
+      {
+        "security": {
+          "group_read": 0,
+          "group_write": 3754,
+          "can_write": false
+        },
+        "id": 6685,
+        "name": {
+          "de": "Feldnotizen",
+          "en": "Field Notes"
+        }
+      }
+    ]
+  },
+  "pois_{}": {
+    "status": 200,
+    "body": []
+  }
+}

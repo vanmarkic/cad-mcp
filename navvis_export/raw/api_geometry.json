@@ -1,0 +1,1163 @@
+{
+  "site_model": {
+    "status": 200,
+    "content_type": "application/json",
+    "body": [
+      {
+        "id": 46914,
+        "type": "BUILDING",
+        "name": "Aile Ouest",
+        "scs_polygon": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [
+                -23.32038180718353,
+                12.12806956604807
+              ],
+              [
+                -9.680401115311728,
+                -34.30488575309847
+              ],
+              [
+                -8.338426083131623,
+                -34.137502119383825
+              ],
+              [
+                -7.179210667915787,
+                -38.17989433654675
+              ],
+              [
+                -8.04119136128141,
+                -38.47712905839696
+              ],
+              [
+                -7.087411315277538,
+                -41.452111042406784
+              ],
+              [
+                -29.617803231523848,
+                -48.1285299430712
+              ],
+              [
+                -31.7578932288454,
+                -40.99489661866603
+              ],
+              [
+                -15.945006026413953,
+                -36.14997065250753
+              ],
+              [
+                -28.5667618272949,
+                5.737710139411712
+              ],
+              [
+                -41.43702528340921,
+                2.705915976539518
+              ],
+              [
+                -42.180112088034754,
+                7.431948053957939
+              ],
+              [
+                -34.45200931992916,
+                8.888398191023992
+              ],
+              [
+                -23.32038180718353,
+                12.12806956604807
+              ]
+            ]
+          ]
+        },
+        "children": [
+          {
+            "id": 46915,
+            "type": "FLOOR",
+            "name": "-1",
+            "scs_polygon": null,
+            "children": [],
+            "scs_center": [
+              -21.229566426629724,
+              -19.298534833469947,
+              -0.6349999999999999
+            ],
+            "attributes": {},
+            "area": null,
+            "volume": 1066.4619285186852,
+            "validation_id": null,
+            "scs_geometry_hash": 948720402,
+            "scs_z_min": -1.5799999999999998,
+            "scs_z_max": 0.31000000000000005
+          },
+          {
+            "id": 46916,
+            "type": "FLOOR",
+            "name": "0",
+            "scs_polygon": null,
+            "children": [],
+            "scs_center": [
+              -21.229566426629724,
+              -19.298534833469947,
+              2.4599999999999995
+            ],
+            "attributes": {},
+            "area": null,
+            "volume": 2426.3419537726695,
+            "validation_id": null,
+            "scs_geometry_hash": -146681786,
+            "scs_z_min": 0.31000000000000005,
+            "scs_z_max": 4.609999999999999
+          },
+          {
+            "id": 46917,
+            "type": "FLOOR",
+            "name": "1",
+            "scs_polygon": null,
+            "children": [],
+            "scs_center": [
+              -21.229566426629724,
+              -19.298534833469947,
+              19.61
+            ],
+            "attributes": {},
+            "area": null,
+            "volume": 16927.96711934421,
+            "validation_id": null,
+            "scs_geometry_hash": 1759265174,
+            "scs_z_min": 4.609999999999999,
+            "scs_z_max": 34.61
+          }
+        ],
+        "scs_center": [
+          -21.229566426629724,
+          -19.298534833469947,
+          0
+        ],
+        "attributes": {},
+        "area": 564.265570644807,
+        "volume": null,
+        "validation_id": null,
+        "scs_geometry_hash": -213142403,
+        "scs_z_min": null,
+        "scs_z_max": null
+      },
+      {
+        "id": 46921,
+        "type": "BUILDING",
+        "name": "Aile Sud-Est",
+        "scs_polygon": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [
+                18.816687964142584,
+                -2.168598534438219
+              ],
+              [
+                25.30272653409385,
+                -24.0312692990317
+              ],
+              [
+                -3.2542398739979275,
+                -32.339996115987766
+              ],
+              [
+                -1.9936505449636543,
+                -36.420886994725834
+              ],
+              [
+                -0.5621338492806656,
+                -36.14313002392167
+              ],
+              [
+                0.3465059915224522,
+                -39.289604158069416
+              ],
+              [
+                34.67519982085145,
+                -29.215390447263985
+              ],
+              [
+                26.75185455191803,
+                -1.4632503944639383
+              ],
+              [
+                18.816687964142584,
+                -2.168598534438219
+              ]
+            ]
+          ]
+        },
+        "children": [
+          {
+            "id": 46922,
+            "type": "FLOOR",
+            "name": "0",
+            "scs_polygon": null,
+            "children": [],
+            "scs_center": [
+              19.70390549946347,
+              -23.755318814130074,
+              1.1749999999999998
+            ],
+            "attributes": {},
+            "area": null,
+            "volume": 1829.522470335773,
+            "validation_id": null,
+            "scs_geometry_hash": -537024192,
+            "scs_z_min": -0.8600000000000003,
+            "scs_z_max": 3.21
+          },
+          {
+            "id": 46923,
+            "type": "FLOOR",
+            "name": "1",
+            "scs_polygon": null,
+            "children": [],
+            "scs_center": [
+              19.70390549946347,
+              -23.755318814130074,
+              18.21
+            ],
+            "attributes": {},
+            "area": null,
+            "volume": 13485.423614268597,
+            "validation_id": null,
+            "scs_geometry_hash": 268813736,
+            "scs_z_min": 3.21,
+            "scs_z_max": 33.21
+          }
+        ],
+        "scs_center": [
+          19.70390549946347,
+          -23.755318814130074,
+          0
+        ],
+        "attributes": {},
+        "area": 449.5141204756199,
+        "volume": null,
+        "validation_id": null,
+        "scs_geometry_hash": -1661533351,
+        "scs_z_min": null,
+        "scs_z_max": null
+      },
+      {
+        "id": 46919,
+        "type": "BUILDING",
+        "name": "Atelier",
+        "scs_polygon": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [
+                -9.022596829276994,
+                22.754675979958442
+              ],
+              [
+                -9.170700073242188,
+                20.393207550048828
+              ],
+              [
+                -9.27173137664795,
+                18.865102767944336
+              ],
+              [
+                -10.623030662536621,
+                18.801958084106445
+              ],
+              [
+                -7.6925138038306855,
+                8.020002949532191
+              ],
+              [
+                4.997127929487705,
+                9.946214205866427
+              ],
+              [
+                28.39716352371402,
+                11.775994459308144
+              ],
+              [
+                28.010590230733374,
+                14.58509372163416
+              ],
+              [
+                25.188605191974673,
+                14.353149745845771
+              ],
+              [
+                24.594296169247162,
+                24.08034764570148
+              ],
+              [
+                11.824491724453218,
+                22.817541555298043
+              ],
+              [
+                -9.022596829276994,
+                22.754675979958442
+              ]
+            ]
+          ]
+        },
+        "children": [
+          {
+            "id": 46924,
+            "type": "FLOOR",
+            "name": "0",
+            "scs_polygon": null,
+            "children": [],
+            "scs_center": [
+              7.734751608919816,
+              16.446947906401835,
+              1.23
+            ],
+            "attributes": {},
+            "area": null,
+            "volume": 1610.679988088427,
+            "validation_id": null,
+            "scs_geometry_hash": 1584780174,
+            "scs_z_min": -0.54,
+            "scs_z_max": 3
+          },
+          {
+            "id": 46925,
+            "type": "FLOOR",
+            "name": "1",
+            "scs_polygon": null,
+            "children": [],
+            "scs_center": [
+              7.734751608919816,
+              16.446947906401835,
+              18
+            ],
+            "attributes": {},
+            "area": null,
+            "volume": 13649.830407529042,
+            "validation_id": null,
+            "scs_geometry_hash": -1494492528,
+            "scs_z_min": 3,
+            "scs_z_max": 33
+          }
+        ],
+        "scs_center": [
+          7.734751608919816,
+          16.446947906401835,
+          0
+        ],
+        "attributes": {},
+        "area": 454.99434691763474,
+        "volume": null,
+        "validation_id": null,
+        "scs_geometry_hash": 518309585,
+        "scs_z_min": null,
+        "scs_z_max": null
+      },
+      {
+        "id": 46920,
+        "type": "BUILDING",
+        "name": "Chapelle",
+        "scs_polygon": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [
+                10.102531664244264,
+                10.34543473825659
+              ],
+              [
+                11.160074538868674,
+                -2.8491864404055356
+              ],
+              [
+                29.261116175283114,
+                -1.2402049616131414
+              ],
+              [
+                28.39716339111328,
+                11.775994300842285
+              ],
+              [
+                10.102531664244264,
+                10.34543473825659
+              ]
+            ]
+          ]
+        },
+        "children": [
+          {
+            "id": 46926,
+            "type": "FLOOR",
+            "name": "0",
+            "scs_polygon": null,
+            "children": [],
+            "scs_center": [
+              19.70705231151662,
+              4.516907527081423,
+              1.355
+            ],
+            "attributes": {},
+            "area": null,
+            "volume": 1024.5874866628392,
+            "validation_id": null,
+            "scs_geometry_hash": -1894302935,
+            "scs_z_min": -0.7799999999999998,
+            "scs_z_max": 3.4899999999999998
+          },
+          {
+            "id": 46927,
+            "type": "FLOOR",
+            "name": "1",
+            "scs_polygon": null,
+            "children": [],
+            "scs_center": [
+              19.70705231151662,
+              4.516907527081423,
+              18.490000000000002
+            ],
+            "attributes": {},
+            "area": null,
+            "volume": 7198.50693205742,
+            "validation_id": null,
+            "scs_geometry_hash": -1088329476,
+            "scs_z_min": 3.4899999999999998,
+            "scs_z_max": 33.49
+          }
+        ],
+        "scs_center": [
+          19.70705231151662,
+          4.516907527081423,
+          0
+        ],
+        "attributes": {},
+        "area": 239.95023106858065,
+        "volume": null,
+        "validation_id": null,
+        "scs_geometry_hash": 1276192313,
+        "scs_z_min": null,
+        "scs_z_max": null
+      },
+      {
+        "id": 46918,
+        "type": "BUILDING",
+        "name": "Maison principale",
+        "scs_polygon": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [
+                -24.274937966983522,
+                15.922555048168377
+              ],
+              [
+                -23.32038116455078,
+                12.128069877624512
+              ],
+              [
+                -20.837715914333224,
+                3.676629112078249
+              ],
+              [
+                -7.455906925728616,
+                7.1494788213631715
+              ],
+              [
+                -10.623030463114143,
+                18.801958295978014
+              ],
+              [
+                -9.271731570501727,
+                18.865103104044014
+              ],
+              [
+                -9.170699877596125,
+                20.393207459241232
+              ],
+              [
+                -9.915808612774935,
+                21.049913463127645
+              ],
+              [
+                -10.875609695378149,
+                20.82259215409004
+              ],
+              [
+                -11.254478543774152,
+                20.07748341891123
+              ],
+              [
+                -11.22922062054775,
+                19.534438069543622
+              ],
+              [
+                -24.274937966983522,
+                15.922555048168377
+              ]
+            ]
+          ]
+        },
+        "children": [
+          {
+            "id": 46928,
+            "type": "FLOOR",
+            "name": "-1",
+            "scs_polygon": null,
+            "children": [],
+            "scs_center": [
+              -15.752019343452439,
+              11.768048955724918,
+              -0.8800000000000003
+            ],
+            "attributes": {},
+            "area": null,
+            "volume": 667.1541011381194,
+            "validation_id": null,
+            "scs_geometry_hash": -668954835,
+            "scs_z_min": -2.7100000000000004,
+            "scs_z_max": 0.9499999999999997
+          },
+          {
+            "id": 46929,
+            "type": "FLOOR",
+            "name": "0",
+            "scs_polygon": null,
+            "children": [],
+            "scs_center": [
+              -15.752019343452439,
+              11.768048955724918,
+              2.915
+            ],
+            "attributes": {},
+            "area": null,
+            "volume": 716.3703872876528,
+            "validation_id": null,
+            "scs_geometry_hash": -1804960564,
+            "scs_z_min": 0.9499999999999997,
+            "scs_z_max": 4.88
+          },
+          {
+            "id": 46930,
+            "type": "FLOOR",
+            "name": "1",
+            "scs_polygon": null,
+            "children": [],
+            "scs_center": [
+              -15.752019343452439,
+              11.768048955724918,
+              6.715
+            ],
+            "attributes": {},
+            "area": null,
+            "volume": 668.9769265510652,
+            "validation_id": null,
+            "scs_geometry_hash": -1637457864,
+            "scs_z_min": 4.88,
+            "scs_z_max": 8.55
+          },
+          {
+            "id": 46931,
+            "type": "FLOOR",
+            "name": "2",
+            "scs_polygon": null,
+            "children": [],
+            "scs_center": [
+              -15.752019343452439,
+              11.768048955724918,
+              23.549999999999997
+            ],
+            "attributes": {},
+            "area": null,
+            "volume": 5468.476238837043,
+            "validation_id": null,
+            "scs_geometry_hash": 268230355,
+            "scs_z_min": 8.55,
+            "scs_z_max": 38.55
+          }
+        ],
+        "scs_center": [
+          -15.752019343452439,
+          11.768048955724918,
+          0
+        ],
+        "attributes": {},
+        "area": 182.28254129456812,
+        "volume": null,
+        "validation_id": null,
+        "scs_geometry_hash": -1871683844,
+        "scs_z_min": null,
+        "scs_z_max": null
+      }
+    ]
+  },
+  "spatial_models": {
+    "status": 200,
+    "content_type": "application/json",
+    "body": []
+  },
+  "vector_maps": {
+    "status": 200,
+    "content_type": "application/json",
+    "body": []
+  },
+  "vector_layers": {
+    "status": 200,
+    "content_type": "application/json",
+    "body": []
+  },
+  "tiled_maps": {
+    "status": 200,
+    "content_type": "application/json",
+    "body": [
+      {
+        "id": 41953,
+        "scs_location": [
+          -13.475411032298465,
+          16.220129893106375,
+          -1.7100000000000004
+        ],
+        "scs_orientation": [
+          1,
+          0,
+          0,
+          0
+        ],
+        "file_path": "data/3186889630268293/datasets_web/bundle_3192b098-5543-4006-ae02-4c3d6a181c7e/maps/building_46918/maps-46928.nvr",
+        "storage_file_path": "3186889630268293/datasets_web/bundle_3192b098-5543-4006-ae02-4c3d6a181c7e/maps/building_46918/maps-46928.nvr",
+        "file_name": "",
+        "type": "TILED_PYRAMID",
+        "map_size_m": 40.96,
+        "tile_size_px": 256,
+        "max_depth": 4,
+        "quadtree": "f84b5c42f3d1ccd2ffff23ff41",
+        "outdoor": false,
+        "floor_id": 46928,
+        "bundle_id": 4469
+      },
+      {
+        "id": 41954,
+        "scs_location": [
+          -13.475411032298465,
+          16.220129893106375,
+          1.9499999999999997
+        ],
+        "scs_orientation": [
+          1,
+          0,
+          0,
+          0
+        ],
+        "file_path": "data/3186889630268293/datasets_web/bundle_3192b098-5543-4006-ae02-4c3d6a181c7e/maps/building_46918/maps-46929.nvr",
+        "storage_file_path": "3186889630268293/datasets_web/bundle_3192b098-5543-4006-ae02-4c3d6a181c7e/maps/building_46918/maps-46929.nvr",
+        "file_name": "",
+        "type": "TILED_PYRAMID",
+        "map_size_m": 40.96,
+        "tile_size_px": 256,
+        "max_depth": 4,
+        "quadtree": "f84b5c42f3d1cef2ffff33ff51",
+        "outdoor": false,
+        "floor_id": 46929,
+        "bundle_id": 4469
+      },
+      {
+        "id": 41955,
+        "scs_location": [
+          -13.475411032298465,
+          16.220129893106375,
+          5.88
+        ],
+        "scs_orientation": [
+          1,
+          0,
+          0,
+          0
+        ],
+        "file_path": "data/3186889630268293/datasets_web/bundle_3192b098-5543-4006-ae02-4c3d6a181c7e/maps/building_46918/maps-46930.nvr",
+        "storage_file_path": "3186889630268293/datasets_web/bundle_3192b098-5543-4006-ae02-4c3d6a181c7e/maps/building_46918/maps-46930.nvr",
+        "file_name": "",
+        "type": "TILED_PYRAMID",
+        "map_size_m": 40.96,
+        "tile_size_px": 256,
+        "max_depth": 4,
+        "quadtree": "f84b5c42f3d1cef2ffff33ff51",
+        "outdoor": false,
+        "floor_id": 46930,
+        "bundle_id": 4469
+      },
+      {
+        "id": 41956,
+        "scs_location": [
+          -13.475411032298465,
+          16.220129893106375,
+          9.55
+        ],
+        "scs_orientation": [
+          1,
+          0,
+          0,
+          0
+        ],
+        "file_path": "data/3186889630268293/datasets_web/bundle_3192b098-5543-4006-ae02-4c3d6a181c7e/maps/building_46918/maps-46931.nvr",
+        "storage_file_path": "3186889630268293/datasets_web/bundle_3192b098-5543-4006-ae02-4c3d6a181c7e/maps/building_46918/maps-46931.nvr",
+        "file_name": "",
+        "type": "TILED_PYRAMID",
+        "map_size_m": 40.96,
+        "tile_size_px": 256,
+        "max_depth": 4,
+        "quadtree": "f84b5c42f3d1cef2ffff23ff51",
+        "outdoor": false,
+        "floor_id": 46931,
+        "bundle_id": 4469
+      },
+      {
+        "id": 41957,
+        "scs_location": [
+          -22.12335641196561,
+          -21.14868289208433,
+          -0.5799999999999998
+        ],
+        "scs_orientation": [
+          1,
+          0,
+          0,
+          0
+        ],
+        "file_path": "data/3186889630268293/datasets_web/bundle_3192b098-5543-4006-ae02-4c3d6a181c7e/maps/building_46914/maps-46915.nvr",
+        "storage_file_path": "3186889630268293/datasets_web/bundle_3192b098-5543-4006-ae02-4c3d6a181c7e/maps/building_46914/maps-46915.nvr",
+        "file_name": "",
+        "type": "TILED_PYRAMID",
+        "map_size_m": 81.92,
+        "tile_size_px": 256,
+        "max_depth": 5,
+        "quadtree": "3a5e241c2fa45ccaff2ff24f1",
+        "outdoor": false,
+        "floor_id": 46915,
+        "bundle_id": 4469
+      },
+      {
+        "id": 41958,
+        "scs_location": [
+          -22.12335641196561,
+          -21.14868289208433,
+          1.31
+        ],
+        "scs_orientation": [
+          1,
+          0,
+          0,
+          0
+        ],
+        "file_path": "data/3186889630268293/datasets_web/bundle_3192b098-5543-4006-ae02-4c3d6a181c7e/maps/building_46914/maps-46916.nvr",
+        "storage_file_path": "3186889630268293/datasets_web/bundle_3192b098-5543-4006-ae02-4c3d6a181c7e/maps/building_46914/maps-46916.nvr",
+        "file_name": "",
+        "type": "TILED_PYRAMID",
+        "map_size_m": 81.92,
+        "tile_size_px": 256,
+        "max_depth": 5,
+        "quadtree": "fa5a5ea4582f3cffa25dfcff4e531ccff33ff2ffba5dff4f5fdcfff21bfaf5fffdbf31",
+        "outdoor": false,
+        "floor_id": 46916,
+        "bundle_id": 4469
+      },
+      {
+        "id": 41959,
+        "scs_location": [
+          -22.12335641196561,
+          -21.14868289208433,
+          5.609999999999999
+        ],
+        "scs_orientation": [
+          1,
+          0,
+          0,
+          0
+        ],
+        "file_path": "data/3186889630268293/datasets_web/bundle_3192b098-5543-4006-ae02-4c3d6a181c7e/maps/building_46914/maps-46917.nvr",
+        "storage_file_path": "3186889630268293/datasets_web/bundle_3192b098-5543-4006-ae02-4c3d6a181c7e/maps/building_46914/maps-46917.nvr",
+        "file_name": "",
+        "type": "TILED_PYRAMID",
+        "map_size_m": 81.92,
+        "tile_size_px": 256,
+        "max_depth": 5,
+        "quadtree": "fa5a5ea4582f3cffa25dfcff4f531ccff33ff2ffba5dff4f5fdc7dc31bfaf52f33dfe33",
+        "outdoor": false,
+        "floor_id": 46917,
+        "bundle_id": 4469
+      },
+      {
+        "id": 41960,
+        "scs_location": [
+          12.510368824285765,
+          -25.134015745987814,
+          0.13999999999999968
+        ],
+        "scs_orientation": [
+          1,
+          0,
+          0,
+          0
+        ],
+        "file_path": "data/3186889630268293/datasets_web/bundle_3192b098-5543-4006-ae02-4c3d6a181c7e/maps/building_46921/maps-46922.nvr",
+        "storage_file_path": "3186889630268293/datasets_web/bundle_3192b098-5543-4006-ae02-4c3d6a181c7e/maps/building_46921/maps-46922.nvr",
+        "file_name": "",
+        "type": "TILED_PYRAMID",
+        "map_size_m": 81.92,
+        "tile_size_px": 256,
+        "max_depth": 5,
+        "quadtree": "ed23cf4f3184af8f4cf23ff1cebaf5fd8ffff4afccffb73ffffff335",
+        "outdoor": false,
+        "floor_id": 46922,
+        "bundle_id": 4469
+      },
+      {
+        "id": 41961,
+        "scs_location": [
+          12.510368824285765,
+          -25.134015745987814,
+          4.21
+        ],
+        "scs_orientation": [
+          1,
+          0,
+          0,
+          0
+        ],
+        "file_path": "data/3186889630268293/datasets_web/bundle_3192b098-5543-4006-ae02-4c3d6a181c7e/maps/building_46921/maps-46923.nvr",
+        "storage_file_path": "3186889630268293/datasets_web/bundle_3192b098-5543-4006-ae02-4c3d6a181c7e/maps/building_46921/maps-46923.nvr",
+        "file_name": "",
+        "type": "TILED_PYRAMID",
+        "map_size_m": 81.92,
+        "tile_size_px": 256,
+        "max_depth": 5,
+        "quadtree": "ed23cf4f7184af8f48f23ff11cebaf5fd8ffff4fccffb73ffffff3315",
+        "outdoor": false,
+        "floor_id": 46923,
+        "bundle_id": 4469
+      },
+      {
+        "id": 41962,
+        "scs_location": [
+          19.730221442377335,
+          4.5080094092700485,
+          0.2200000000000002
+        ],
+        "scs_orientation": [
+          1,
+          0,
+          0,
+          0
+        ],
+        "file_path": "data/3186889630268293/datasets_web/bundle_3192b098-5543-4006-ae02-4c3d6a181c7e/maps/building_46920/maps-46926.nvr",
+        "storage_file_path": "3186889630268293/datasets_web/bundle_3192b098-5543-4006-ae02-4c3d6a181c7e/maps/building_46920/maps-46926.nvr",
+        "file_name": "",
+        "type": "TILED_PYRAMID",
+        "map_size_m": 20.48,
+        "tile_size_px": 256,
+        "max_depth": 3,
+        "quadtree": "fffffccffccffff33ff33",
+        "outdoor": false,
+        "floor_id": 46926,
+        "bundle_id": 4469
+      },
+      {
+        "id": 41963,
+        "scs_location": [
+          19.730221442377335,
+          4.5080094092700485,
+          4.49
+        ],
+        "scs_orientation": [
+          1,
+          0,
+          0,
+          0
+        ],
+        "file_path": "data/3186889630268293/datasets_web/bundle_3192b098-5543-4006-ae02-4c3d6a181c7e/maps/building_46920/maps-46927.nvr",
+        "storage_file_path": "3186889630268293/datasets_web/bundle_3192b098-5543-4006-ae02-4c3d6a181c7e/maps/building_46920/maps-46927.nvr",
+        "file_name": "",
+        "type": "TILED_PYRAMID",
+        "map_size_m": 20.48,
+        "tile_size_px": 256,
+        "max_depth": 3,
+        "quadtree": "ffbffccf8ccfff33ff33",
+        "outdoor": false,
+        "floor_id": 46927,
+        "bundle_id": 4469
+      },
+      {
+        "id": 41964,
+        "scs_location": [
+          16.095317840576172,
+          -9.791889190673828,
+          1
+        ],
+        "scs_orientation": [
+          1,
+          0,
+          0,
+          0
+        ],
+        "file_path": "data/3186889630268293/datasets_web/bundle_3192b098-5543-4006-ae02-4c3d6a181c7e/maps/building_0/maps-0.nvr",
+        "storage_file_path": "3186889630268293/datasets_web/bundle_3192b098-5543-4006-ae02-4c3d6a181c7e/maps/building_0/maps-0.nvr",
+        "file_name": "",
+        "type": "TILED_PYRAMID",
+        "map_size_m": 327.68,
+        "tile_size_px": 256,
+        "max_depth": 7,
+        "quadtree": "fc4218ffff2cefff4f5ffbff571a8e8ffffbff3ffc4ff4ffef5dafafffffaf2ff33fffffff71182ccceedcff6fffefffffffafbffffff73ffdffff5fffd4fffff5ff5ffaffffff5fffff7dffdaffffffffffdfffffffffbfffefff2ffafffffffffff773fffefffffffffffffffff7f5fff37711182cc8fa7fdfccfcf4fef7fffbffadffffffffffff84affffdfbffffffffffffffffffffff2ffff2fbf7ff35fdffffffffffffffffff531ffffffff2afcfff2f5ffffffffffffffffdffccff4df4ffffffffffffffffffff4dffffd4fe45ff7bffffa2fffffffffbfffffffdffffbfcfffffffffffffffffffff54cffffffff7fd1b4abccb7ffffffffffffffff3fafaf8fffeffffffffffff5afafffff4f5ffbffffffffffffffff7fff3aff8cffffff73fe8ffffffffffb73eafffbffffffffafdfa6ffffffffffffffffffffffffffffffffff33f71fb333f5fdafafff31f8fffffffffffffffffcffffffffffffffffffffffffffffffffffffcfdfffffdf7ffff315ffff51fffffffffff7fbf3d311113",
+        "outdoor": true,
+        "floor_id": null,
+        "bundle_id": 4469
+      },
+      {
+        "id": 41965,
+        "scs_location": [
+          7.021063820370518,
+          16.944844424113118,
+          0.45999999999999996
+        ],
+        "scs_orientation": [
+          1,
+          0,
+          0,
+          0
+        ],
+        "file_path": "data/3186889630268293/datasets_web/bundle_3192b098-5543-4006-ae02-4c3d6a181c7e/maps/building_46919/maps-46924.nvr",
+        "storage_file_path": "3186889630268293/datasets_web/bundle_3192b098-5543-4006-ae02-4c3d6a181c7e/maps/building_46919/maps-46924.nvr",
+        "file_name": "",
+        "type": "TILED_PYRAMID",
+        "map_size_m": 81.92,
+        "tile_size_px": 256,
+        "max_depth": 5,
+        "quadtree": "f8423cc331ffffffff18cafccffccffc4f5af2ffff3ff33fd315",
+        "outdoor": false,
+        "floor_id": 46924,
+        "bundle_id": 4469
+      },
+      {
+        "id": 41966,
+        "scs_location": [
+          7.021063820370518,
+          16.944844424113118,
+          4
+        ],
+        "scs_orientation": [
+          1,
+          0,
+          0,
+          0
+        ],
+        "file_path": "data/3186889630268293/datasets_web/bundle_3192b098-5543-4006-ae02-4c3d6a181c7e/maps/building_46919/maps-46925.nvr",
+        "storage_file_path": "3186889630268293/datasets_web/bundle_3192b098-5543-4006-ae02-4c3d6a181c7e/maps/building_46919/maps-46925.nvr",
+        "file_name": "",
+        "type": "TILED_PYRAMID",
+        "map_size_m": 81.92,
+        "tile_size_px": 256,
+        "max_depth": 5,
+        "quadtree": "f8423cc331ffffffff18cafccffccffc4f5af2ffff3ff33fd315",
+        "outdoor": false,
+        "floor_id": 46925,
+        "bundle_id": 4469
+      }
+    ]
+  },
+  "affine_ref_sys": {
+    "status": 200,
+    "content_type": "application/json",
+    "body": [
+      {
+        "id": 12060,
+        "name": "Site",
+        "spatial_reference": "EPSG:8370",
+        "spatial_reference_string": null,
+        "parent_id": null,
+        "rx": 1,
+        "ry": 0,
+        "tx": 617027.344,
+        "ty": 621045.953,
+        "tz": 96.394,
+        "type": "SITE"
+      },
+      {
+        "id": 12061,
+        "name": "676b2bec-451d-4705-8819-07756bdca997=2026-06-04_13.53.03",
+        "spatial_reference": "EPSG:8370",
+        "spatial_reference_string": null,
+        "parent_id": null,
+        "rx": 0.9966677882793868,
+        "ry": 0.08156788465000081,
+        "tx": 617011.2841457488,
+        "ty": 621047.7572570771,
+        "tz": 100.43700857142856,
+        "type": "ALIGNMENT"
+      },
+      {
+        "id": 12062,
+        "name": "65895e0e-bfb1-4551-9e77-c7409d02e629=2026-06-04_12.53.01",
+        "spatial_reference": "EPSG:8370",
+        "spatial_reference_string": null,
+        "parent_id": null,
+        "rx": 0.11778027047945483,
+        "ry": -0.9930396809220597,
+        "tx": 617013.7703604439,
+        "ty": 621016.9116478369,
+        "tz": 102.30268714285715,
+        "type": "ALIGNMENT"
+      }
+    ]
+  },
+  "proj4": {
+    "status": 200,
+    "content_type": "application/json",
+    "body": {
+      "proj4text": "+proj=lcc +lat_0=50.797815 +lon_0=4.35921583333333 +lat_1=49.8333333333333 +lat_2=51.1666666666667 +x_0=649328 +y_0=665262 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +vunits=m +no_defs",
+      "nadgridcontent": null,
+      "nadgridname": null
+    }
+  },
+  "datasets": {
+    "status": 200,
+    "content_type": "application/json",
+    "body": [
+      {
+        "security": {
+          "group_read": 0,
+          "group_write": 3754,
+          "can_write": false
+        },
+        "id": 8729,
+        "bundle_id": 4469,
+        "type": "NAVVIS",
+        "name": "676b2bec-451d-4705-8819-07756bdca997=2026-06-04_13.53.03",
+        "title": "12039 _00-00-01_est",
+        "color": "#304ffe",
+        "storage_prefix": "datasets_web/676b2bec-451d-4705-8819-07756bdca997=2026-06-04_13.53.03",
+        "gridmap_filename": null,
+        "gridmap_res": null,
+        "gridmap_size": null,
+        "gridmap_origin": null,
+        "gridmap_orientation": null,
+        "site_model_entity_ids": [
+          46921,
+          46922,
+          46923
+        ],
+        "point_cloud_type": "POTREE2",
+        "cda_cluster_id": "dca030d4-9172-423d-b63b-c9ec838eb41a",
+        "bounding_box_min": [
+          -19.15325164794922,
+          -77.29058837890625,
+          -7.554686069488525
+        ],
+        "bounding_box_max": [
+          90.10647583007812,
+          53.96075439453125,
+          19.09804344177246
+        ],
+        "has_depth_images": true,
+        "has_gaussian_splats": false,
+        "depth_image_version": "2",
+        "reference_system_id": 12061,
+        "has_sensor_frame": true,
+        "has_webmesh": false,
+        "acquisition_time": 1780573988000,
+        "device_type": "UNKNOWN",
+        "has_scan_trajectory": true,
+        "has_control_points": true,
+        "is_drone_scan": false,
+        "hide_overlap_state": "WEIGHTED",
+        "has_deviation_data": false,
+        "draft_visibility": false,
+        "cleanup_percentage": 0,
+        "overlap_percentage": 0,
+        "scanning_session_id": 1796355862,
+        "display_name": "2026-06-04_13.53.03_676",
+        "is_epano_dataset": false
+      },
+      {
+        "security": {
+          "group_read": 0,
+          "group_write": 3754,
+          "can_write": false
+        },
+        "id": 8730,
+        "bundle_id": 4469,
+        "type": "NAVVIS",
+        "name": "65895e0e-bfb1-4551-9e77-c7409d02e629=2026-06-04_12.53.01",
+        "title": "12039 _00-00-01_ouest",
+        "color": "#fe0000",
+        "storage_prefix": "datasets_web/65895e0e-bfb1-4551-9e77-c7409d02e629=2026-06-04_12.53.01",
+        "gridmap_filename": null,
+        "gridmap_res": null,
+        "gridmap_size": null,
+        "gridmap_origin": null,
+        "gridmap_orientation": null,
+        "site_model_entity_ids": [
+          46914,
+          46915,
+          46916,
+          46917,
+          46918,
+          46919,
+          46920,
+          46924,
+          46925,
+          46926,
+          46927,
+          46928,
+          46929,
+          46930,
+          46931
+        ],
+        "point_cloud_type": "POTREE2",
+        "cda_cluster_id": "dca030d4-9172-423d-b63b-c9ec838eb41a",
+        "bounding_box_min": [
+          -77.83032989501953,
+          -47.36766815185547,
+          -8.535619735717773
+        ],
+        "bounding_box_max": [
+          50.04054641723633,
+          46.17240524291992,
+          16.806352615356445
+        ],
+        "has_depth_images": true,
+        "has_gaussian_splats": false,
+        "depth_image_version": "2",
+        "reference_system_id": 12062,
+        "has_sensor_frame": true,
+        "has_webmesh": false,
+        "acquisition_time": 1780570387000,
+        "device_type": "UNKNOWN",
+        "has_scan_trajectory": true,
+        "has_control_points": true,
+        "is_drone_scan": false,
+        "hide_overlap_state": "WEIGHTED",
+        "has_deviation_data": false,
+        "draft_visibility": false,
+        "cleanup_percentage": 0,
+        "overlap_percentage": 0,
+        "scanning_session_id": 159544006,
+        "display_name": "2026-06-04_12.53.01_658",
+        "is_epano_dataset": false
+      }
+    ]
+  },
+  "bundles": {
+    "status": 200,
+    "content_type": "application/json",
+    "body": [
+      {
+        "security": {
+          "group_read": 0,
+          "group_write": 3754,
+          "can_write": false
+        },
+        "id": 4469,
+        "serial": "3192b098-5543-4006-ae02-4c3d6a181c7e",
+        "name": "Ferme du temple",
+        "storage_prefix": "datasets_web/bundle_3192b098-5543-4006-ae02-4c3d6a181c7e"
+      }
+    ]
+  }
+}

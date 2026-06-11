@@ -1,0 +1,199 @@
+{
+ "site": "12039 - Ferme du Temple, Avenue Joseph Wauters 227, Frameries",
+ "buildings": [
+  {
+   "building": "Aile Ouest",
+   "id": 46914,
+   "footprint_area_m2": 564.266,
+   "n_footprint_pts": 14,
+   "floors": [
+    {
+     "name": "-1",
+     "id": 46915,
+     "z_min": -1.5799999999999998,
+     "z_max": 0.31000000000000005,
+     "height_m": 1.89,
+     "volume_m3": 1066.46
+    },
+    {
+     "name": "0",
+     "id": 46916,
+     "z_min": 0.31000000000000005,
+     "z_max": 4.609999999999999,
+     "height_m": 4.3,
+     "volume_m3": 2426.34
+    },
+    {
+     "name": "1",
+     "id": 46917,
+     "z_min": 4.609999999999999,
+     "z_max": 34.61,
+     "height_m": 30.0,
+     "volume_m3": 16927.97
+    }
+   ]
+  },
+  {
+   "building": "Aile Sud-Est",
+   "id": 46921,
+   "footprint_area_m2": 449.514,
+   "n_footprint_pts": 9,
+   "floors": [
+    {
+     "name": "0",
+     "id": 46922,
+     "z_min": -0.8600000000000003,
+     "z_max": 3.21,
+     "height_m": 4.07,
+     "volume_m3": 1829.52
+    },
+    {
+     "name": "1",
+     "id": 46923,
+     "z_min": 3.21,
+     "z_max": 33.21,
+     "height_m": 30.0,
+     "volume_m3": 13485.42
+    }
+   ]
+  },
+  {
+   "building": "Atelier",
+   "id": 46919,
+   "footprint_area_m2": 454.994,
+   "n_footprint_pts": 12,
+   "floors": [
+    {
+     "name": "0",
+     "id": 46924,
+     "z_min": -0.54,
+     "z_max": 3,
+     "height_m": 3.54,
+     "volume_m3": 1610.68
+    },
+    {
+     "name": "1",
+     "id": 46925,
+     "z_min": 3,
+     "z_max": 33,
+     "height_m": 30,
+     "volume_m3": 13649.83
+    }
+   ]
+  },
+  {
+   "building": "Chapelle",
+   "id": 46920,
+   "footprint_area_m2": 239.95,
+   "n_footprint_pts": 5,
+   "floors": [
+    {
+     "name": "0",
+     "id": 46926,
+     "z_min": -0.7799999999999998,
+     "z_max": 3.4899999999999998,
+     "height_m": 4.27,
+     "volume_m3": 1024.59
+    },
+    {
+     "name": "1",
+     "id": 46927,
+     "z_min": 3.4899999999999998,
+     "z_max": 33.49,
+     "height_m": 30.0,
+     "volume_m3": 7198.51
+    }
+   ]
+  },
+  {
+   "building": "Maison principale",
+   "id": 46918,
+   "footprint_area_m2": 182.283,
+   "n_footprint_pts": 12,
+   "floors": [
+    {
+     "name": "-1",
+     "id": 46928,
+     "z_min": -2.7100000000000004,
+     "z_max": 0.9499999999999997,
+     "height_m": 3.66,
+     "volume_m3": 667.15
+    },
+    {
+     "name": "0",
+     "id": 46929,
+     "z_min": 0.9499999999999997,
+     "z_max": 4.88,
+     "height_m": 3.93,
+     "volume_m3": 716.37
+    },
+    {
+     "name": "1",
+     "id": 46930,
+     "z_min": 4.88,
+     "z_max": 8.55,
+     "height_m": 3.67,
+     "volume_m3": 668.98
+    },
+    {
+     "name": "2",
+     "id": 46931,
+     "z_min": 8.55,
+     "z_max": 38.55,
+     "height_m": 30.0,
+     "volume_m3": 5468.48
+    }
+   ]
+  }
+ ],
+ "georef": {
+  "epsg": "EPSG:8370 (Belgian Lambert 2008)",
+  "proj4": "+proj=lcc +lat_0=50.797815 +lon_0=4.35921583333333 +lat_1=49.8333333333333 +lat_2=51.1666666666667 +x_0=649328 +y_0=665262 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +vunits=m +no_defs",
+  "site_origin": {
+   "tx": 617027.344,
+   "ty": 621045.953,
+   "tz": 96.394
+  },
+  "affine_ref_sys": [
+   {
+    "id": 12060,
+    "name": "Site",
+    "spatial_reference": "EPSG:8370",
+    "spatial_reference_string": null,
+    "parent_id": null,
+    "rx": 1,
+    "ry": 0,
+    "tx": 617027.344,
+    "ty": 621045.953,
+    "tz": 96.394,
+    "type": "SITE"
+   },
+   {
+    "id": 12061,
+    "name": "676b2bec-451d-4705-8819-07756bdca997=2026-06-04_13.53.03",
+    "spatial_reference": "EPSG:8370",
+    "spatial_reference_string": null,
+    "parent_id": null,
+    "rx": 0.9966677882793868,
+    "ry": 0.08156788465000081,
+    "tx": 617011.2841457488,
+    "ty": 621047.7572570771,
+    "tz": 100.43700857142856,
+    "type": "ALIGNMENT"
+   },
+   {
+    "id": 12062,
+    "name": "65895e0e-bfb1-4551-9e77-c7409d02e629=2026-06-04_12.53.01",
+    "spatial_reference": "EPSG:8370",
+    "spatial_reference_string": null,
+    "parent_id": null,
+    "rx": 0.11778027047945483,
+    "ry": -0.9930396809220597,
+    "tx": 617013.7703604439,
+    "ty": 621016.9116478369,
+    "tz": 102.30268714285715,
+    "type": "ALIGNMENT"
+   }
+  ]
+ }
+}

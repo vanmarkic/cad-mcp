@@ -1,0 +1,11 @@
+elevation,ground_z,eaves_z,ridge_z,max_z,H_eaves,H_ridge,H_max
+elev_AileOuest_EW,-1.58,12.82,13.0,13.0,14.4,14.58,14.58
+elev_AileOuest_NS,-1.58,13.0,13.0,13.0,14.58,14.58,14.58
+elev_AileSudEst_EW,-0.86,11.03,13.0,13.0,11.89,13.86,13.86
+elev_AileSudEst_NS,-0.86,10.34,12.89,13.0,11.2,13.75,13.86
+elev_Atelier_EW,-0.54,12.41,13.0,13.0,12.95,13.54,13.54
+elev_Atelier_NS,-0.54,10.52,13.0,13.0,11.06,13.54,13.54
+elev_Chapelle_EW,-0.78,11.24,12.27,12.94,12.02,13.05,13.72
+elev_Chapelle_NS,-0.78,11.73,12.02,12.94,12.51,12.8,13.72
+elev_Maisonprincipale_EW,-2.71,13.0,13.0,13.0,15.71,15.71,15.71
+elev_Maisonprincipale_NS,-2.71,13.0,13.0,13.0,15.71,15.71,15.71

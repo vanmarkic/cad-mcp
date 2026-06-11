@@ -1,0 +1,10 @@
+# Environments / tooling
+.venv/
+.playwright-mcp/
+.DS_Store
+__pycache__/
+
+# Secrets — never commit (live NavVis credentials & captured tokens)
+navvis_export/ACCESS.md
+navvis_export/raw/network_requests_full.txt
+navvis_storage_probe.json

@@ -1,0 +1,100 @@
+[
+  {
+    "id": 20292,
+    "busy": true,
+    "success": false,
+    "file": "elev_AileOuest_NS.tiff",
+    "url": "https://eu.iv-cdn.navvis.com/3186889630268293/interim/163b7c6c-09a8-4abc-a608-20f50b61b6aa/elev_AileOuest_NS.tiff?signed=eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJldS5pdi1jZG4ubmF2dmlzLmNvbSIsInN1YiI6IjI2NmNjNTY1NzAzMTczNTQ5YWUwNmM4YmM0OTlkNTc4MTkyZmVjZTMzNTEyMThjZThhMzc1ODZkNDk2NDZlMDgiLCJleHAiOjE3ODExMzc2OTEsImlhdCI6MTc4MDk2NDg5MSwic2NvcGUiOlsiMzE4Njg4OTYzMDI2ODI5My9pbnRlcmltLzE2M2I3YzZjLTA5YTgtNGFiYy1hNjA4LTIwZjUwYjYxYjZhYS9lbGV2X0FpbGVPdWVzdF9OUy50aWZmIl19.OhkCsIVTBOjc1x1uAb-vGwMmPk0oV8hzLuRkT-R3ZLs"
+  },
+  {
+    "id": 20293,
+    "busy": true,
+    "success": false,
+    "file": "elev_AileOuest_EW.tiff",
+    "url": "https://eu.iv-cdn.navvis.com/3186889630268293/interim/9f92989f-0281-49a2-81e1-790bbe853ffd/elev_AileOuest_EW.tiff?signed=eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJldS5pdi1jZG4ubmF2dmlzLmNvbSIsInN1YiI6IjI2NmNjNTY1NzAzMTczNTQ5YWUwNmM4YmM0OTlkNTc4MTkyZmVjZTMzNTEyMThjZThhMzc1ODZkNDk2NDZlMDgiLCJleHAiOjE3ODExMzc2OTEsImlhdCI6MTc4MDk2NDg5MSwic2NvcGUiOlsiMzE4Njg4OTYzMDI2ODI5My9pbnRlcmltLzlmOTI5ODlmLTAyODEtNDlhMi04MWUxLTc5MGJiZTg1M2ZmZC9lbGV2X0FpbGVPdWVzdF9FVy50aWZmIl19.bGob0eU0eCPIUnlIRS5UJ5WPoHNOWsnfBgtNMZ7ju-g"
+  },
+  {
+    "id": 20294,
+    "busy": true,
+    "success": false,
+    "file": "elev_AileSudEst_NS.tiff",
+    "url": "https://eu.iv-cdn.navvis.com/3186889630268293/interim/18f162df-f164-4b9b-84f6-01495a689a72/elev_AileSudEst_NS.tiff?signed=eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJldS5pdi1jZG4ubmF2dmlzLmNvbSIsInN1YiI6IjI2NmNjNTY1NzAzMTczNTQ5YWUwNmM4YmM0OTlkNTc4MTkyZmVjZTMzNTEyMThjZThhMzc1ODZkNDk2NDZlMDgiLCJleHAiOjE3ODExMzc2OTIsImlhdCI6MTc4MDk2NDg5Miwic2NvcGUiOlsiMzE4Njg4OTYzMDI2ODI5My9pbnRlcmltLzE4ZjE2MmRmLWYxNjQtNGI5Yi04NGY2LTAxNDk1YTY4OWE3Mi9lbGV2X0FpbGVTdWRFc3RfTlMudGlmZiJdfQ.PX3AyTLawZ3RNsiX4pDIi9aMGErAhKTVElvewCVYasU"
+  },
+  {
+    "id": 20295,
+    "busy": true,
+    "success": false,
+    "file": "elev_AileSudEst_EW.tiff",
+    "url": "https://eu.iv-cdn.navvis.com/3186889630268293/interim/1f0bf7f6-2e02-4c7e-b988-effd3fefea83/elev_AileSudEst_EW.tiff?signed=eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJldS5pdi1jZG4ubmF2dmlzLmNvbSIsInN1YiI6IjI2NmNjNTY1NzAzMTczNTQ5YWUwNmM4YmM0OTlkNTc4MTkyZmVjZTMzNTEyMThjZThhMzc1ODZkNDk2NDZlMDgiLCJleHAiOjE3ODExMzc2OTIsImlhdCI6MTc4MDk2NDg5Miwic2NvcGUiOlsiMzE4Njg4OTYzMDI2ODI5My9pbnRlcmltLzFmMGJmN2Y2LTJlMDItNGM3ZS1iOTg4LWVmZmQzZmVmZWE4My9lbGV2X0FpbGVTdWRFc3RfRVcudGlmZiJdfQ.SdokFJ5qsmcLR556twECejo0JMLRYN6SjsCe0cOLk3g"
+  },
+  {
+    "id": 20296,
+    "busy": true,
+    "success": false,
+    "file": "elev_Atelier_NS.tiff",
+    "url": "https://eu.iv-cdn.navvis.com/3186889630268293/interim/9f3aff18-13c5-4a4b-9707-589e6c59677e/elev_Atelier_NS.tiff?signed=eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJldS5pdi1jZG4ubmF2dmlzLmNvbSIsInN1YiI6IjI2NmNjNTY1NzAzMTczNTQ5YWUwNmM4YmM0OTlkNTc4MTkyZmVjZTMzNTEyMThjZThhMzc1ODZkNDk2NDZlMDgiLCJleHAiOjE3ODExMzc2OTIsImlhdCI6MTc4MDk2NDg5Miwic2NvcGUiOlsiMzE4Njg4OTYzMDI2ODI5My9pbnRlcmltLzlmM2FmZjE4LTEzYzUtNGE0Yi05NzA3LTU4OWU2YzU5Njc3ZS9lbGV2X0F0ZWxpZXJfTlMudGlmZiJdfQ.ImxEjdTKxHQFZFiDeU_RmCiCvYgc1lv3UqVSxo04t4Y"
+  },
+  {
+    "id": 20297,
+    "busy": true,
+    "success": false,
+    "file": "elev_Atelier_EW.tiff",
+    "url": "https://eu.iv-cdn.navvis.com/3186889630268293/interim/d156c011-0ccd-44c0-a717-8de608c0bc21/elev_Atelier_EW.tiff?signed=eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJldS5pdi1jZG4ubmF2dmlzLmNvbSIsInN1YiI6IjI2NmNjNTY1NzAzMTczNTQ5YWUwNmM4YmM0OTlkNTc4MTkyZmVjZTMzNTEyMThjZThhMzc1ODZkNDk2NDZlMDgiLCJleHAiOjE3ODExMzc2OTIsImlhdCI6MTc4MDk2NDg5Miwic2NvcGUiOlsiMzE4Njg4OTYzMDI2ODI5My9pbnRlcmltL2QxNTZjMDExLTBjY2QtNDRjMC1hNzE3LThkZTYwOGMwYmMyMS9lbGV2X0F0ZWxpZXJfRVcudGlmZiJdfQ.VtfoEI9-khlhePpNrVvE-nBTPQ09u5mxUwEYJSfAQ-8"
+  },
+  {
+    "id": 20298,
+    "busy": true,
+    "success": false,
+    "file": "elev_Chapelle_NS.tiff",
+    "url": "https://eu.iv-cdn.navvis.com/3186889630268293/interim/5c5d6529-eafa-4029-a386-e4f22e3d71da/elev_Chapelle_NS.tiff?signed=eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJldS5pdi1jZG4ubmF2dmlzLmNvbSIsInN1YiI6IjI2NmNjNTY1NzAzMTczNTQ5YWUwNmM4YmM0OTlkNTc4MTkyZmVjZTMzNTEyMThjZThhMzc1ODZkNDk2NDZlMDgiLCJleHAiOjE3ODExMzc2OTMsImlhdCI6MTc4MDk2NDg5Mywic2NvcGUiOlsiMzE4Njg4OTYzMDI2ODI5My9pbnRlcmltLzVjNWQ2NTI5LWVhZmEtNDAyOS1hMzg2LWU0ZjIyZTNkNzFkYS9lbGV2X0NoYXBlbGxlX05TLnRpZmYiXX0.zz0fx4zGb5gRnGSDvFXTIgIYoWN1kFGEfO2tL6r9UaQ"
+  },
+  {
+    "id": 20299,
+    "busy": true,
+    "success": false,
+    "file": "elev_Chapelle_EW.tiff",
+    "url": "https://eu.iv-cdn.navvis.com/3186889630268293/interim/b160239d-a88f-4557-a7df-e709d160f69d/elev_Chapelle_EW.tiff?signed=eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJldS5pdi1jZG4ubmF2dmlzLmNvbSIsInN1YiI6IjI2NmNjNTY1NzAzMTczNTQ5YWUwNmM4YmM0OTlkNTc4MTkyZmVjZTMzNTEyMThjZThhMzc1ODZkNDk2NDZlMDgiLCJleHAiOjE3ODExMzc2OTMsImlhdCI6MTc4MDk2NDg5Mywic2NvcGUiOlsiMzE4Njg4OTYzMDI2ODI5My9pbnRlcmltL2IxNjAyMzlkLWE4OGYtNDU1Ny1hN2RmLWU3MDlkMTYwZjY5ZC9lbGV2X0NoYXBlbGxlX0VXLnRpZmYiXX0.2iBR2VzHaApNJYRgRK-2iE1NRDXMoPer0XpO2Ep_Qss"
+  },
+  {
+    "id": 20300,
+    "busy": true,
+    "success": false,
+    "file": "elev_Maisonprincipale_NS.tiff",
+    "url": "https://eu.iv-cdn.navvis.com/3186889630268293/interim/d1ecc6db-bb10-4e5f-9295-a7bde567094d/elev_Maisonprincipale_NS.tiff?signed=eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJldS5pdi1jZG4ubmF2dmlzLmNvbSIsInN1YiI6IjI2NmNjNTY1NzAzMTczNTQ5YWUwNmM4YmM0OTlkNTc4MTkyZmVjZTMzNTEyMThjZThhMzc1ODZkNDk2NDZlMDgiLCJleHAiOjE3ODExMzc2OTMsImlhdCI6MTc4MDk2NDg5Mywic2NvcGUiOlsiMzE4Njg4OTYzMDI2ODI5My9pbnRlcmltL2QxZWNjNmRiLWJiMTAtNGU1Zi05Mjk1LWE3YmRlNTY3MDk0ZC9lbGV2X01haXNvbnByaW5jaXBhbGVfTlMudGlmZiJdfQ.jDy_HRCd0gAjziB_jLhlVmRJX1YZcFXx_B6Hfwq4TBc"
+  },
+  {
+    "id": 20301,
+    "busy": true,
+    "success": false,
+    "file": "elev_Maisonprincipale_EW.tiff",
+    "url": "https://eu.iv-cdn.navvis.com/3186889630268293/interim/5012e49a-6a5e-42f7-85ab-f408288d84b5/elev_Maisonprincipale_EW.tiff?signed=eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJldS5pdi1jZG4ubmF2dmlzLmNvbSIsInN1YiI6IjI2NmNjNTY1NzAzMTczNTQ5YWUwNmM4YmM0OTlkNTc4MTkyZmVjZTMzNTEyMThjZThhMzc1ODZkNDk2NDZlMDgiLCJleHAiOjE3ODExMzc2OTMsImlhdCI6MTc4MDk2NDg5Mywic2NvcGUiOlsiMzE4Njg4OTYzMDI2ODI5My9pbnRlcmltLzUwMTJlNDlhLTZhNWUtNDJmNy04NWFiLWY0MDgyODhkODRiNS9lbGV2X01haXNvbnByaW5jaXBhbGVfRVcudGlmZiJdfQ.UMdtDEdZ_h1jBAPIR3yZinB6Cayxl_5hB3zXPaaPBWs"
+  },
+  {
+    "id": 20302,
+    "busy": true,
+    "success": false,
+    "file": "coupe_AileOuest_transv.tiff",
+    "url": "https://eu.iv-cdn.navvis.com/3186889630268293/interim/10392964-9be3-4a3c-94b6-13eb0dccc461/coupe_AileOuest_transv.tiff?signed=eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJldS5pdi1jZG4ubmF2dmlzLmNvbSIsInN1YiI6IjI2NmNjNTY1NzAzMTczNTQ5YWUwNmM4YmM0OTlkNTc4MTkyZmVjZTMzNTEyMThjZThhMzc1ODZkNDk2NDZlMDgiLCJleHAiOjE3ODExMzc2OTQsImlhdCI6MTc4MDk2NDg5NCwic2NvcGUiOlsiMzE4Njg4OTYzMDI2ODI5My9pbnRlcmltLzEwMzkyOTY0LTliZTMtNGEzYy05NGI2LTEzZWIwZGNjYzQ2MS9jb3VwZV9BaWxlT3Vlc3RfdHJhbnN2LnRpZmYiXX0.t8GQ7aRQ8vyUsPotpMzCutsoN6jCT8GxLTMbr6PB7bk"
+  },
+  {
+    "id": 20303,
+    "busy": true,
+    "success": false,
+    "file": "coupe_AileSudEst_transv.tiff",
+    "url": "https://eu.iv-cdn.navvis.com/3186889630268293/interim/70fe45a8-458f-4e07-8ef6-707e125e2dd5/coupe_AileSudEst_transv.tiff?signed=eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJldS5pdi1jZG4ubmF2dmlzLmNvbSIsInN1YiI6IjI2NmNjNTY1NzAzMTczNTQ5YWUwNmM4YmM0OTlkNTc4MTkyZmVjZTMzNTEyMThjZThhMzc1ODZkNDk2NDZlMDgiLCJleHAiOjE3ODExMzc2OTQsImlhdCI6MTc4MDk2NDg5NCwic2NvcGUiOlsiMzE4Njg4OTYzMDI2ODI5My9pbnRlcmltLzcwZmU0NWE4LTQ1OGYtNGUwNy04ZWY2LTcwN2UxMjVlMmRkNS9jb3VwZV9BaWxlU3VkRXN0X3RyYW5zdi50aWZmIl19.nziWH0EpOzdDhycw3J8XTNAq6WhSKZ38_iu9IrUY-50"
+  },
+  {
+    "id": 20304,
+    "busy": false,
+    "success": true,
+    "file": "coupe_Atelier_transv.tiff",
+    "url": "https://eu.iv-cdn.navvis.com/3186889630268293/interim/cf8819a9-09af-4996-b1f7-9d32dd12ce1c/coupe_Atelier_transv.tiff?signed=eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJldS5pdi1jZG4ubmF2dmlzLmNvbSIsInN1YiI6IjI2NmNjNTY1NzAzMTczNTQ5YWUwNmM4YmM0OTlkNTc4MTkyZmVjZTMzNTEyMThjZThhMzc1ODZkNDk2NDZlMDgiLCJleHAiOjE3ODExMzc2OTQsImlhdCI6MTc4MDk2NDg5NCwic2NvcGUiOlsiMzE4Njg4OTYzMDI2ODI5My9pbnRlcmltL2NmODgxOWE5LTA5YWYtNDk5Ni1iMWY3LTlkMzJkZDEyY2UxYy9jb3VwZV9BdGVsaWVyX3RyYW5zdi50aWZmIl19.hinyfQd8opxbrG9JUIAfaJo1Mjv-5Mt4KVSsC50kCt8"
+  },
+  {
+    "id": 20305,
+    "busy": true,
+    "success": false,
+    "file": "coupe_MaisonPrinc_transv.tiff",
+    "url": "https://eu.iv-cdn.navvis.com/3186889630268293/interim/7c72d9ea-c4e6-42ea-bc82-abf5ec036403/coupe_MaisonPrinc_transv.tiff?signed=eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJldS5pdi1jZG4ubmF2dmlzLmNvbSIsInN1YiI6IjI2NmNjNTY1NzAzMTczNTQ5YWUwNmM4YmM0OTlkNTc4MTkyZmVjZTMzNTEyMThjZThhMzc1ODZkNDk2NDZlMDgiLCJleHAiOjE3ODExMzc2OTUsImlhdCI6MTc4MDk2NDg5NSwic2NvcGUiOlsiMzE4Njg4OTYzMDI2ODI5My9pbnRlcmltLzdjNzJkOWVhLWM0ZTYtNDJlYS1iYzgyLWFiZjVlYzAzNjQwMy9jb3VwZV9NYWlzb25QcmluY190cmFuc3YudGlmZiJdfQ.atESBHDXxOlHBsoMJmlHQn8yEEoTPGA_xHLQOdpNcrM"
+  }
+]

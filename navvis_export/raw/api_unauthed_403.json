@@ -1,0 +1,82 @@
+{
+  "site_meta": {
+    "status": 403,
+    "content_type": "application/json",
+    "body": {
+      "msg": "Full authentication is required to access this resource",
+      "exception": "org.springframework.security.access.AccessDeniedException"
+    }
+  },
+  "site_model": {
+    "status": 403,
+    "content_type": "application/json",
+    "body": {
+      "msg": "Full authentication is required to access this resource",
+      "exception": "org.springframework.security.access.AccessDeniedException"
+    }
+  },
+  "spatial_models": {
+    "status": 403,
+    "content_type": "application/json",
+    "body": {
+      "msg": "Full authentication is required to access this resource",
+      "exception": "org.springframework.security.access.AccessDeniedException"
+    }
+  },
+  "vector_maps": {
+    "status": 403,
+    "content_type": "application/json",
+    "body": {
+      "msg": "Full authentication is required to access this resource",
+      "exception": "org.springframework.security.access.AccessDeniedException"
+    }
+  },
+  "vector_layers": {
+    "status": 403,
+    "content_type": "application/json",
+    "body": {
+      "msg": "Full authentication is required to access this resource",
+      "exception": "org.springframework.security.access.AccessDeniedException"
+    }
+  },
+  "tiled_maps": {
+    "status": 403,
+    "content_type": "application/json",
+    "body": {
+      "msg": "Full authentication is required to access this resource",
+      "exception": "org.springframework.security.access.AccessDeniedException"
+    }
+  },
+  "affine_ref_sys": {
+    "status": 403,
+    "content_type": "application/json",
+    "body": {
+      "msg": "Full authentication is required to access this resource",
+      "exception": "org.springframework.security.access.AccessDeniedException"
+    }
+  },
+  "proj4": {
+    "status": 403,
+    "content_type": "application/json",
+    "body": {
+      "msg": "Full authentication is required to access this resource",
+      "exception": "org.springframework.security.access.AccessDeniedException"
+    }
+  },
+  "datasets": {
+    "status": 403,
+    "content_type": "application/json",
+    "body": {
+      "msg": "Full authentication is required to access this resource",
+      "exception": "org.springframework.security.access.AccessDeniedException"
+    }
+  },
+  "bundles": {
+    "status": 403,
+    "content_type": "application/json",
+    "body": {
+      "msg": "Full authentication is required to access this resource",
+      "exception": "org.springframework.security.access.AccessDeniedException"
+    }
+  }
+}

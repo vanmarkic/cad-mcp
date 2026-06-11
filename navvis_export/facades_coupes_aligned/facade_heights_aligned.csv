@@ -1,0 +1,11 @@
+elevation,ground_z,eaves_z,ridge_z,H_eaves,H_ridge
+belev_AileOuest_long,-1.58,12.79,15.0,14.37,16.58
+belev_AileOuest_short,-1.58,14.86,14.99,16.44,16.57
+belev_AileSudEst_long,-0.86,9.89,12.32,10.75,13.18
+belev_AileSudEst_short,-0.86,10.77,12.7,11.63,13.56
+belev_Atelier_long,-0.54,9.89,13.62,10.43,14.16
+belev_Atelier_short,-0.54,12.94,13.63,13.48,14.17
+belev_Chapelle_long,-0.78,11.73,13.31,12.51,14.09
+belev_Chapelle_short,-0.78,11.1,13.97,11.88,14.75
+belev_Maisonprincipale_long,-2.71,14.57,15.0,17.28,17.71
+belev_Maisonprincipale_short,-2.71,14.63,14.99,17.34,17.7
