@@ -1,0 +1,35 @@
+{
+  "date": "2026-06-11",
+  "method": "trimmed ICP (70%), 6190 'Contour bâtiment' densified pts -> NavVis site_model footprint rings; scale fixed 1.0; visually validated against orthophotos",
+  "frame": "NavVis-local m; nav = R(rot) @ (xy_6190 - O_sheet) + d",
+  "OX": 117027.344,
+  "OY": 121045.953,
+  "xoffB": 3205.5,
+  "ground": {
+    "rot": 0.003,
+    "dx": 5.96,
+    "dy": -3.136,
+    "rms70_m": 0.642,
+    "median_m": 0.378
+  },
+  "first": {
+    "rot": 0.334,
+    "dx": -3.023,
+    "dy": -3.073,
+    "rms70_m": 0.456,
+    "median_m": 0.371
+  },
+  "old_superseded": {
+    "ground": {
+      "rot": 0.0,
+      "dx": 5.0,
+      "dy": -0.5
+    },
+    "first": {
+      "rot": 1.5,
+      "dx": 0.0,
+      "dy": -0.5
+    },
+    "note": "2026-06-09 fit; off ~2.5-3 m, +1 rot 1.5 deg spurious. areas_6190_rooms.json nx/ny still carry the OLD transform."
+  }
+}

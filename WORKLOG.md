@@ -226,3 +226,27 @@ point-cloud as-built**. Delivered #1 + heights:
   rooms (the upper-floor blocker). NavVis raster gridmaps = top-down only & `.nvr` quadtree not yet
   decoded; point-cloud octree path not yet located (loads lazily in a 3D mode). Next: drive the viewer
   into point-cloud mode to capture octree URLs + gauge size, then slice → plans/coupe/façade.
+
+## Update 2026-06-11 — overlay NavVis × 6190 (Albert) + RECALAGE corrigé
+
+User asked for a NavVis-vs-surveyor overlay (DXF + bitmaps) viewable locally (→ QCAD).
+- **Delivered**: `navvis_export/ferme_du_temple_OVERLAY_6190_navvis.dxf` (NavVis-local **m**;
+  base = PLANS_navvis_local_m with its ortho IMAGE underlays — keep the file in `navvis_export/`).
+  Layers: `NAVVIS-MURS-0/1` (murs scan), `6190-PLAN-0/1` (linéaire Albert), `6190-AIRES-0/1`
+  (45 labels `Aire:` préfixés G*/F*, 45/45 matchés), `6190-COTES-0/1`, `6190-LIMITE`,
+  `OVERLAY-NOTES`. Bitmaps: `reference/overlay_6190_navvis_N{0,1}.png`. Audit ezdxf: 0 erreurs.
+- ⚠️ **User spotted general misalignment → root cause: the 2026-06-09 refined transform was wrong.**
+  Refit by trimmed ICP (70%, `Contour bâtiment` densifié → emprises NavVis, échelle fixe 1.0),
+  validated **visually against orthophotos** (decisive test; the old "labels inside footprint"
+  acceptance was too coarse and had passed a bad fit):
+  - sol (+0): rot 0.003°, d=(+5.960, −3.136) — rms70 1.80 → **0.64 m** (old dy was ~2.6 m off)
+  - étage (+1): rot **0.334°** (the old 1.5° was spurious), d=(−3.023, −3.073) — rms70 2.01 → **0.46 m**
+  - persisted: `navvis_export/areas/transform_sheet_refit_icp.json` (supersedes
+    `/tmp/cadwork/transform_refined.json` for placement).
+- **Downstream caveat**: `areas_6190_rooms.json` nx/ny (and the room→building assignment behind
+  `AREAS_consolidated.md`, incl. the F1 flag) were computed with the OLD transform (~2.5–3 m off).
+  Areas/ids are untouched; only *positions/assignments near building edges* deserve a re-check
+  with the ICP transform before round-2 conclusions. Aire-label id-matching in the overlay was done
+  in the old frame on purpose (consistent with the json), placement in the new.
+- Scripts (rerunnable): `/tmp/poc/build_overlay_6190_navvis.py`, `render_overlay_png.py`,
+  `refit_6190_transforms.py`, `validate_new_transforms.py`, `diag_old_vs_new.py`.
