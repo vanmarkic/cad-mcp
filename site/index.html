@@ -192,6 +192,26 @@ table{width:100%;border-collapse:collapse}
 .sw.r{background:var(--red)}
 .layers .ldesc{color:var(--ink-soft)}
 
+/* methodology notes */
+.method{margin-top:28px;border:1px solid var(--hair-2);background:var(--card)}
+.method summary{
+  cursor:pointer;font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--ink-soft);padding:12px 18px;list-style:none;
+  display:flex;gap:10px;align-items:baseline;
+}
+.method summary::-webkit-details-marker{display:none}
+.method summary::before{content:"§";color:var(--red);font-size:13px}
+.method summary::after{content:"+ déplier";margin-left:auto;letter-spacing:.06em;font-weight:400}
+.method[open] summary::after{content:"− replier"}
+.method[open] summary{border-bottom:1px solid var(--hair)}
+.method .mbody{padding:6px 20px 16px;font-size:13px;color:var(--ink-soft);line-height:1.65}
+.method .mbody b{color:var(--ink)}
+.method .mbody ul{list-style:none;margin:0}
+.method .mbody li{padding:7px 0;border-top:1px solid var(--hair)}
+.method .mbody li:first-child{border-top:none}
+.method .mbody .m-k{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--blue);margin-right:10px}
+.method .mbody .warn{color:var(--red)}
+
 /* footer */
 footer{
   margin-top:84px;border-top:1.5px solid var(--ink);padding-top:22px;
@@ -256,6 +276,15 @@ footer b{color:var(--ink)}
       </figure>
     </a>
   </div>
+  <details class="method">
+    <summary>Méthode &amp; précision — plans corrigés</summary>
+    <div class="mbody"><ul>
+      <li><span class="m-k">Base</span>Plans +0/+1 du PDF architecte 260512 (vectoriel), rasterisés via poppler ; étiquettes de surface re-posées par lot.</li>
+      <li><span class="m-k">Valeurs</span>Hiérarchie des sources : scan NavVis (existant) &gt; géomètre 6190 &gt; PDF architecte (projet). Chaque valeur est citée à sa source — aucune valeur inventée.</li>
+      <li><span class="m-k">L13</span>Lot absent du DWG : reconstruit depuis le plan vectoriel du PDF (calibration ≈ 0,020 m²/pt²) ; valeur 78 m² concordante par 3 lectures indépendantes (tableau, géométrie vectorielle, étiquette du plan).</li>
+      <li><span class="m-k">Vérif.</span>Revue contradictoire multi-passes + audit structurel du fichier : 0 erreur / 0 réparation.</li>
+    </ul></div>
+  </details>
 </section>
 
 <!-- ============ 02 · TÉLÉCHARGEMENTS ============ -->
@@ -289,6 +318,13 @@ footer b{color:var(--ink)}
         <td class="fsize">0,3 Mo</td>
         <td><a class="get" href="files/260608_FermeduTemple.dwg" download>télécharger ↓</a></td>
       </tr>
+      <tr>
+        <td><span class="fmt dwg">ZIP</span></td>
+        <td><span class="fname">260612_dwg.zip</span><span class="reco">12/06</span><br>
+            <span class="fdesc">DWG architecte du 12/06/2026 — niveaux N−1 / +0 / +1 / +2 + plan de site (5 fichiers).</span></td>
+        <td class="fsize">0,3 Mo</td>
+        <td><a class="get" href="files/260612_dwg.zip" download>télécharger ↓</a></td>
+      </tr>
     </table>
     <p class="foot-note">Le DXF s'ouvre tel quel dans AutoCAD / BricsCAD ; pour produire un <b style="color:var(--ink)">.dwg</b>, « Enregistrer sous » depuis votre logiciel (contenu strictement équivalent).</p>
   </div>
@@ -316,13 +352,25 @@ footer b{color:var(--ink)}
       </tr>
       <tr>
         <td><span class="fmt pdf">PDF</span></td>
-        <td><span class="fname">260610_plansdedivision_archi.pdf</span><br><span class="fdesc">Plans de division — version architecte du 10/06/2026 (4 niveaux).</span></td>
+        <td><span class="fname">260612_plansdedivision_archi.pdf</span><span class="reco">Dernière version</span><br><span class="fdesc">Plans de division — version architecte du 12/06/2026 (modifications L1, L5, L6 ; 4 niveaux).</span></td>
+        <td class="fsize">0,1 Mo</td>
+        <td><a class="get" href="files/260612_plansdedivision_archi.pdf" download>télécharger ↓</a></td>
+      </tr>
+      <tr>
+        <td><span class="fmt pdf">PDF</span></td>
+        <td><span class="fname">260612_surfaces.pdf</span><span class="reco">Dernière version</span><br><span class="fdesc">Tableau des surfaces <b>brutes</b> — version architecte du 12/06/2026 (L1 : 65,56 → 89,85 m² par niveau).</span></td>
+        <td class="fsize">45 Ko</td>
+        <td><a class="get" href="files/260612_surfaces.pdf" download>télécharger ↓</a></td>
+      </tr>
+      <tr>
+        <td><span class="fmt pdf">PDF</span></td>
+        <td><span class="fname">260610_plansdedivision_archi.pdf</span><br><span class="fdesc">Plans de division — version précédente du 10/06/2026.</span></td>
         <td class="fsize">0,1 Mo</td>
         <td><a class="get" href="files/260610_plansdedivision_archi.pdf" download>télécharger ↓</a></td>
       </tr>
       <tr>
         <td><span class="fmt pdf">PDF</span></td>
-        <td><span class="fname">260610_surfaces.pdf</span><br><span class="fdesc">Tableau des surfaces — version architecte du 10/06/2026.</span></td>
+        <td><span class="fname">260610_surfaces.pdf</span><br><span class="fdesc">Tableau des surfaces — version précédente du 10/06/2026.</span></td>
         <td class="fsize">48 Ko</td>
         <td><a class="get" href="files/260610_surfaces.pdf" download>télécharger ↓</a></td>
       </tr>
@@ -358,6 +406,16 @@ footer b{color:var(--ink)}
       </tr>
     </table>
   </div>
+  <details class="method">
+    <summary>Méthode &amp; intégrité — fichiers CAO</summary>
+    <div class="mbody"><ul>
+      <li><span class="m-k">Édition</span>Traitement « headless » (LibreDWG + ezdxf) — aucune ouverture/réécriture par un logiciel CAO tiers. Les calques d'origine ne sont <b>jamais modifiés</b> : corrections sur calques dupliqués, provisoires sur calque rouge dédié.</li>
+      <li><span class="m-k">Intégrité</span>Comparaison binaire FINAL vs version de travail : seuls l'horodatage et l'empreinte de session diffèrent. Audit structurel ezdxf : <b>0 erreur / 0 réparation</b> ; géométrie et calques non-étiquettes identiques octet par octet.</li>
+      <li><span class="m-k">_xcheck</span>Variante de lecture : calque d'origine gelé/masqué (conservé dans le fichier) et 2 étiquettes +1 obsolètes retirées du calque corrigé — leurs valeurs d'origine restent sur le calque masqué.</li>
+      <li><span class="m-k">DWG</span>La réécriture .dwg n'est pas fiable en chaîne libre pour ce format (AC1032) : le DXF est le livrable ; « Enregistrer sous → DWG » depuis AutoCAD/BricsCAD est sans perte.</li>
+      <li><span class="m-k">260610/12</span>Documents architecte (Carton123) repris <b>tels quels</b>, sans aucun traitement.</li>
+    </ul></div>
+  </details>
 </section>
 
 <!-- ============ 03 · CORRECTIONS ============ -->
@@ -405,6 +463,16 @@ footer b{color:var(--ink)}
       <li><span class="lname"><span class="sw r"></span>Correction-L13-AVERIFIER</span><span class="ldesc">Rouge — 5 étiquettes provisoires, toutes marquées « à confirmer ».</span></li>
     </ul>
   </div>
+  <details class="method">
+    <summary>Méthode — critères de décision certaine / provisoire</summary>
+    <div class="mbody"><ul>
+      <li><span class="m-k">Certaine</span>Valeur du tableau PDF architecte <b>concordante avec une seconde source indépendante</b> : géométrie dessinée dans le DWG (&lt; 1 m² d'écart) ou test d'enveloppe réussi sur un niveau bien scanné.</li>
+      <li><span class="m-k">Provisoire</span>Lots d'étage situés dans des enveloppes <b>non partitionnées</b> chez le géomètre (F19 = 348 m² → L7/L8/L12/L13 ; F18 = 158 m² → L10/L11), avec une couverture scan +1 de seulement ~11–20 % (ruine sans toiture) : la valeur PDF ne peut pas y être contre-vérifiée lot par lot.</li>
+      <li><span class="m-k">Somme</span>Σ corrigée = 1 390,5 m² vs 1 391 m² au PDF — l'écart de 0,5 m² est le seul cas L11 (106,5 mesuré dans le fichier vs 107 arrondi PDF) ; la valeur mesurée est conservée.</li>
+      <li><span class="m-k warn">⚠ Conventions</span><span class="warn">Ces étiquettes sont des surfaces <b>nettes</b> par niveau. Le tableau architecte 260610/260612 est en surfaces <b>brutes</b> (murs extérieurs + ½ mitoyennetés) — les deux séries ne sont pas directement comparables.</span></li>
+      <li><span class="m-k">Traçabilité</span>Détail complet par étiquette (avant/après, source, confiance) : CORRECTION_PROPOSAL / CORRECTION_applied / XCHECK_REPORT dans le dossier de travail.</li>
+    </ul></div>
+  </details>
 </section>
 
 <!-- ============ 04 · ANNEXES ============ -->
@@ -420,16 +488,16 @@ footer b{color:var(--ink)}
         <figcaption><span class="code">AN-01</span><span class="name">Façades &amp; coupes</span><span class="dl">PDF ↓ 2,7 Mo</span></figcaption>
       </figure>
     </a>
-    <a class="plate" href="files/260610_plansdedivision_archi.pdf" download>
+    <a class="plate" href="files/260612_plansdedivision_archi.pdf" download>
       <figure>
-        <div class="img"><img src="previews/archi260610.png" alt="Plan de division architecte 10/06 — niveau +0" loading="lazy"></div>
-        <figcaption><span class="code">AN-02</span><span class="name">Division (archi 10/06)</span><span class="dl">PDF ↓</span></figcaption>
+        <div class="img"><img src="previews/archi260612.png" alt="Plan de division architecte 12/06 — niveau +0" loading="lazy"></div>
+        <figcaption><span class="code">AN-02</span><span class="name">Division (archi 12/06)</span><span class="dl">PDF ↓</span></figcaption>
       </figure>
     </a>
-    <a class="plate" href="files/260610_surfaces.pdf" download>
+    <a class="plate" href="files/260612_surfaces.pdf" download>
       <figure>
-        <div class="img"><img src="previews/surfaces.png" alt="Tableau des surfaces architecte 10/06" loading="lazy"></div>
-        <figcaption><span class="code">AN-03</span><span class="name">Surfaces (archi 10/06)</span><span class="dl">PDF ↓</span></figcaption>
+        <div class="img"><img src="previews/surfaces260612.png" alt="Tableau des surfaces architecte 12/06" loading="lazy"></div>
+        <figcaption><span class="code">AN-03</span><span class="name">Surfaces (archi 12/06)</span><span class="dl">PDF ↓</span></figcaption>
       </figure>
     </a>
     <a class="plate" href="files/overlay_6190_navvis_N0.png" target="_blank" rel="noopener">
@@ -445,6 +513,15 @@ footer b{color:var(--ink)}
       </figure>
     </a>
   </div>
+  <details class="method">
+    <summary>Méthode &amp; précision — annexes</summary>
+    <div class="mbody"><ul>
+      <li><span class="m-k">Façades/coupes</span>Rendu orthographique du <b>nuage de points</b> (63,7 M points, scan ImmoPass du 04/06/2026) via l'API NavVis « pointcloud/crop ». Chaque boîte de coupe est alignée sur l'axe propre des murs du bâtiment (Aile O 15,9° · Aile SE 15,6° · Maison pr. 14,5° · Atelier 5,1° · Chapelle 4,5°) → élévations vraies, murs verticaux. Fenêtre z −2…+15 m : <b>Aile Ouest et Maison principale écrêtées</b> (hauteur réelle &gt; 15 m).</li>
+      <li><span class="m-k">Hauteurs</span>Extraction vérifiée (protocole v2 du 12/06) : détection de sommet, médiane glissante 0,5 m, cohérence inter-élévations 0,02–0,27 m. Faîtages vérifiés : Aile SE 12,9 m · Atelier 13,6–13,7 m · Chapelle 11,83–11,87 m. Les hauteurs d'égout v1 sont <b>retirées</b> (l'enveloppe pleine profondeur ne les isole pas). <span class="warn">Valeurs indicatives, non contractuelles.</span></li>
+      <li><span class="m-k">Superpositions</span>Recalage du plan géomètre 6190 sur l'empreinte du scan par <b>ICP</b> (rotation + translation, échelle fixée à 1,0 — deux levés métriques) : rms70 = 0,64 m (N0) / 0,46 m (N1), médiane ≈ 0,38 m. Surfaces et identifiants du géomètre repris verbatim — seules les positions sont recalées. La pièce F1 figurant hors emprise est une anomalie de la source, laissée visible volontairement.</li>
+      <li><span class="m-k">Docs archi</span>Plans et tableau 260612 : documents Carton123 du 12/06/2026, repris tels quels.</li>
+    </ul></div>
+  </details>
 </section>
 
 <!-- ============ 05 · ORTHOPHOTOS ============ -->
@@ -510,6 +587,15 @@ footer b{color:var(--ink)}
     Limites monde &amp; résolution de chaque planche : <a class="get" href="files/orthophotos/georef.json" download>georef.json ↓</a> —
     conversion pixel→monde&nbsp;: <span style="font-family:var(--mono);font-size:11.5px">wx = xmin + col·(m/px) ; wy = ymax − row·(m/px)</span>.
   </p>
+  <details class="method">
+    <summary>Méthode &amp; limites — orthophotos</summary>
+    <div class="mbody"><ul>
+      <li><span class="m-k">Rendu</span>Vue orthographique <b>du dessus</b> du nuage de points (même API « pointcloud/crop » que les façades), tranche horizontale ≈ 0,85–1,35 m au-dessus du sol de chaque niveau — absorbe les sols irréguliers et gravats de la ruine.</li>
+      <li><span class="m-k">Géoréf.</span>Repère local NavVis natif en mètres (aucun recalage secondaire) ; balises GeoTIFF (ModelPixelScale / ModelTiepoint) intégrées — chargement direct dans QGIS/ArcGIS ; résolution 10–23 mm/px selon le bâtiment.</li>
+      <li><span class="m-k">Couverture</span>Niveau +0 ≈ 90–100 % ; niveau <b>+1 ≈ 11–20 % seulement</b> (ruine sans toiture, murs d'étage partiels). Intérieur de la Maison principale non capté par le scan → emprise extérieure seule.</li>
+      <li><span class="m-k warn">⚠ Usage</span><span class="warn">Référence d'implantation et de vérification visuelle — trop bruité pour tracer des cloisons au niveau d'exigence cadastral ; ne pas utiliser pour le mesurage final des lots.</span></li>
+    </ul></div>
+  </details>
 </section>
 
 <footer>
