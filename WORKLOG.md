@@ -323,3 +323,28 @@ conceptually invalid (any plateau is ridge-class); (b) raw column-tops catch flo
   façade-plane re-renders (NavVis crop API), parked.
 - Outputs: `facade_heights_verified.csv`, `VERIF_hauteurs.md`, `measured/verif/*_verif.png`;
   measured DXF + PNGs rebuilt (rev. C) from verified values only. Sidecars updated.
+
+## Update 2026-06-12 — exterior façades "from outside inward" (outward faces) — explored, partial
+
+User asked for orthographic **exterior** façade photos of each **outward** (countryside-facing)
+wall — i.e. the thin façade-plane re-render parked on 2026-06-11, but the *outer* skin viewed from
+outside, the counterpart to the full-depth `belev_*`. Built a fully local, reproducible pipeline
+(no live NavVis needed — the POTREE2 octrees `octree_8729/8730.bin` are already in `/tmp/poc`):
+- `scripts/decode_rgb.py` — POTREE2 BROTLI decoder **with RGB** (extends the position-only
+  `decode_potree2.py`; colour block ported from potree `DecoderWorker_brotli.js`). Validated:
+  18.4 M-pt Aile Sud-Est top-down render, true colour.
+- `scripts/facade_enum.py` — outward-face enumeration via `convex_hull − union` courtyard test
+  (court is an *open* horseshoe, not a hole) → 17 outward segments + `outward_facades_plan.png`.
+- `scripts/render_facades.py` — per face: both datasets, auto-detect dominant wall plane `d*`
+  (footprint line is offset ≤3 m from the real surface), thin slab `[d*−1.6, d*+0.5]`, ortho view
+  from outside (painter order outer-on-top), RGB splat, robust "persistent column-tops" z. 1.5 cm/px.
+- Output: `navvis_export/facades_exterieures/` (TIFFs + previews + specs + plan + contact + README).
+
+**Key finding (honest, blocks a full deliverable):** NavVis is an **indoor/courtyard walk**, so the
+well-scanned faces are the *courtyard/interior* ones; the **true outer faces are only partially
+captured**, and the site is roofless/overgrown. Result by tier: **A** (usable) = Aile Sud-Est S & E,
+Chapelle E; **B** (partial, interior shows through) = Aile Ouest W/S/N, Atelier E; **C** (no/insufficient
+coverage, not shipped) = Aile Ouest foot, Atelier N, Maison principale N. Nothing retouched/invented.
+Vegetation is brown/grey → colour filtering doesn't help. **Courtyard-facing faces render better**
+(`WHICH=inward facade_enum.py`) if those would also be useful. Awaiting user direction on scope;
+DXF placement + measurement deferred until faces are chosen.

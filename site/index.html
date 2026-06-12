@@ -352,6 +352,18 @@ footer b{color:var(--ink)}
       </tr>
       <tr>
         <td><span class="fmt pdf">PDF</span></td>
+        <td><span class="fname">facades_exterieures.pdf</span><br><span class="fdesc">Façades <b>extérieures</b> — relevé as-built NavVis, orthographique, vues de l'extérieur vers l'intérieur. <span class="warn">Couverture partielle (scan intérieur) — indicatif.</span></span></td>
+        <td class="fsize">1,6 Mo</td>
+        <td><a class="get" href="files/facades_exterieures.pdf" download>télécharger ↓</a></td>
+      </tr>
+      <tr>
+        <td><span class="fmt dxf">DXF</span></td>
+        <td><span class="fname">facades_exterieures_dxf.zip</span><br><span class="fdesc">Mêmes façades extérieures placées à l'échelle z réelle (DXF + images PNG, 1 unité = 1 m).</span></td>
+        <td class="fsize">4,0 Mo</td>
+        <td><a class="get" href="files/facades_exterieures_dxf.zip" download>télécharger ↓</a></td>
+      </tr>
+      <tr>
+        <td><span class="fmt pdf">PDF</span></td>
         <td><span class="fname">260612_plansdedivision_archi.pdf</span><span class="reco">Dernière version</span><br><span class="fdesc">Plans de division — version architecte du 12/06/2026 (modifications L1, L5, L6 ; 4 niveaux).</span></td>
         <td class="fsize">0,1 Mo</td>
         <td><a class="get" href="files/260612_plansdedivision_archi.pdf" download>télécharger ↓</a></td>
@@ -512,11 +524,18 @@ footer b{color:var(--ink)}
         <figcaption><span class="code">AN-05</span><span class="name">Superposition 6190 / scan — N1</span><span class="dl">PNG ⤢</span></figcaption>
       </figure>
     </a>
+    <a class="plate" href="files/facades_exterieures.pdf" download>
+      <figure>
+        <div class="img"><img src="previews/facades_ext.png" alt="Façades extérieures as-built — vues de l'extérieur vers l'intérieur" loading="lazy"></div>
+        <figcaption><span class="code">AN-06</span><span class="name">Façades extérieures</span><span class="dl">PDF ↓ 1,6 Mo</span></figcaption>
+      </figure>
+    </a>
   </div>
   <details class="method">
     <summary>Méthode &amp; précision — annexes</summary>
     <div class="mbody"><ul>
       <li><span class="m-k">Façades/coupes</span>Rendu orthographique du <b>nuage de points</b> (63,7 M points, scan ImmoPass du 04/06/2026) via l'API NavVis « pointcloud/crop ». Chaque boîte de coupe est alignée sur l'axe propre des murs du bâtiment (Aile O 15,9° · Aile SE 15,6° · Maison pr. 14,5° · Atelier 5,1° · Chapelle 4,5°) → élévations vraies, murs verticaux. Fenêtre z −2…+15 m : <b>Aile Ouest et Maison principale écrêtées</b> (hauteur réelle &gt; 15 m).</li>
+      <li><span class="m-k">Façades extérieures</span>Même nuage de points, mais tranche fine prise à la <b>surface extérieure</b> du mur et vue de l'extérieur (≠ enveloppe pleine profondeur des façades/coupes). Le scan étant un relevé <b>intérieur / cour</b>, la couverture des vraies faces extérieures est <b>partielle</b> : Aile Sud-Est (sud, est) et Chapelle (est) exploitables ; Aile Ouest et Atelier partielles. <span class="warn">Indicatif, non retouché — les vides correspondent aux surfaces non atteintes par le scan.</span></li>
       <li><span class="m-k">Hauteurs</span>Extraction vérifiée (protocole v2 du 12/06) : détection de sommet, médiane glissante 0,5 m, cohérence inter-élévations 0,02–0,27 m. Faîtages vérifiés : Aile SE 12,9 m · Atelier 13,6–13,7 m · Chapelle 11,83–11,87 m. Les hauteurs d'égout v1 sont <b>retirées</b> (l'enveloppe pleine profondeur ne les isole pas). <span class="warn">Valeurs indicatives, non contractuelles.</span></li>
       <li><span class="m-k">Superpositions</span>Recalage du plan géomètre 6190 sur l'empreinte du scan par <b>ICP</b> (rotation + translation, échelle fixée à 1,0 — deux levés métriques) : rms70 = 0,64 m (N0) / 0,46 m (N1), médiane ≈ 0,38 m. Surfaces et identifiants du géomètre repris verbatim — seules les positions sont recalées. La pièce F1 figurant hors emprise est une anomalie de la source, laissée visible volontairement.</li>
       <li><span class="m-k">Docs archi</span>Plans et tableau 260612 : documents Carton123 du 12/06/2026, repris tels quels.</li>
