@@ -598,6 +598,45 @@ footer b{color:var(--ink)}
   </details>
 </section>
 
+<!-- ============ 06 · OUTIL INTERACTIF ============ -->
+<section id="outil">
+  <div class="sec-head">
+    <span class="sec-num">06</span><h2>Outil de coupes &amp; plans partiels</h2>
+    <span class="note">interactif · dans le navigateur</span>
+  </div>
+  <a href="outil.html" style="text-decoration:none;color:inherit;display:block">
+  <div class="layers" style="display:flex;gap:26px;align-items:center;flex-wrap:wrap;transition:transform .2s" onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='none'">
+    <div style="flex:1;min-width:280px">
+      <h3 style="color:var(--red)">Générer une coupe ou un plan partiel à la demande →</h3>
+      <p style="font-size:14px;line-height:1.6;margin-top:8px">
+        Outil interactif sur le relevé as-built NavVis : choisissez un bâtiment, tracez une ligne sur le plan,
+        la <b>coupe verticale</b> s'affiche avec ses cotes. Tranche de plan à une hauteur donnée, mesure à deux clics,
+        export <b>PNG</b> et <b>DXF</b>. Tout est calculé <b>dans le navigateur</b> — aucune donnée ni identifiant
+        ne quitte votre poste.
+      </p>
+      <p style="font-family:var(--mono);font-size:11px;color:var(--ink-soft);margin-top:10px">
+        4 bâtiments · Aile Sud-Est · Aile Ouest · Atelier · Chapelle —
+        <span style="color:var(--red)">ouvrir l'outil ↗</span>
+      </p>
+    </div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--ink-soft);border-left:1px solid var(--hair);padding-left:22px;line-height:1.7">
+      ✎ ligne de coupe → élévation<br>
+      ↔ mesure réelle en mètres<br>
+      ⤓ export PNG / DXF<br>
+      nuage ~3 cm · scan 04/06/2026
+    </div>
+  </div>
+  </a>
+  <details class="method">
+    <summary>Méthode &amp; limites — outil interactif</summary>
+    <div class="mbody"><ul>
+      <li><span class="m-k">Données</span>Nuage de points NavVis décodé localement (POTREE2), échantillonné à ~3 cm et embarqué dans la page (uint16). Le navigateur extrait les tranches plan/coupe à la volée — pas de serveur, pas d'API, pas d'identifiant en ligne.</li>
+      <li><span class="m-k">Couverture</span>4 bâtiments scannés. <b>Maison principale exclue</b> (intérieur non capté par le scan). Étages partiellement scannés (ruine sans toiture) : certaines coupes d'étage sont creuses.</li>
+      <li><span class="m-k warn">⚠ Précision</span><span class="warn">Mesures ~2–3 cm, <b>indicatives et non contractuelles</b> — le mesurage cadastral reste du ressort du géomètre.</span></li>
+    </ul></div>
+  </details>
+</section>
+
 <footer>
   <div class="principles">
     <b>Principes.</b> Originaux jamais modifiés — corrections sur calques dupliqués · aucune valeur inventée —

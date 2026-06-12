@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Ferme du Temple — Outil de coupes & plans partiels (as-built)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#f4f0e6;--paper-2:#efe9db;--card:#faf8f2;--ink:#211d16;--ink-soft:#5c554a;
+  --hair:#cdc5b2;--hair-2:#b9af97;--red:#b3271e;--blue:#2e567c;
+  --serif:"Fraunces",Georgia,serif;--sans:"IBM Plex Sans",sans-serif;--mono:"IBM Plex Mono",monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:14px;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1320px;margin:0 auto;padding:24px 20px 60px}
+a{color:var(--red)}
+header.top{border:1.5px solid var(--ink);background:var(--card);padding:0;margin-bottom:20px;position:relative}
+header.top .row{display:flex;justify-content:space-between;align-items:center;padding:16px 22px;gap:18px;flex-wrap:wrap}
+.kicker{font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-soft)}
+.kicker .dot{color:var(--red)}
+h1{font-family:var(--serif);font-weight:600;font-size:clamp(22px,3.2vw,30px);letter-spacing:-.01em;line-height:1.05;margin-top:4px}
+.backlink{font-family:var(--mono);font-size:11px}
+.warn-strip{font-family:var(--mono);font-size:11px;background:#f6e9e2;color:var(--red);border-top:1px solid var(--red);padding:8px 22px;letter-spacing:.02em}
+
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;font-family:var(--mono);font-size:11.5px}
+.toolbar .grp{display:flex;gap:6px;align-items:center;border:1px solid var(--hair-2);background:var(--card);padding:6px 10px}
+.toolbar .lbl{color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;font-size:10px}
+button.tool{font-family:var(--mono);font-size:11.5px;border:1px solid var(--ink);background:var(--paper);color:var(--ink);padding:5px 11px;cursor:pointer;letter-spacing:.04em}
+button.tool:hover{background:var(--paper-2)}
+button.tool.on{background:var(--ink);color:var(--card)}
+button.tool.red{border-color:var(--red);color:var(--red)}
+button.tool.red.on{background:var(--red);color:var(--card)}
+input[type=range]{accent-color:var(--blue);vertical-align:middle}
+select{font-family:var(--mono);font-size:11.5px;border:1px solid var(--hair-2);background:var(--paper);padding:4px 6px}
+
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:980px){.grid{grid-template-columns:1fr}}
+.pane{border:1px solid var(--hair-2);background:var(--card);position:relative;display:flex;flex-direction:column}
+.pane h2{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-soft);padding:10px 12px;border-bottom:1px solid var(--hair);display:flex;justify-content:space-between;align-items:center}
+.pane h2 .hint{font-weight:400;letter-spacing:.04em;text-transform:none;color:var(--ink-soft)}
+.canvas-stack{position:relative;width:100%;aspect-ratio:1/1;background:#fbfaf6}
+.canvas-stack canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.canvas-stack .gl{z-index:1}
+.canvas-stack .ov{z-index:2;cursor:crosshair}
+.pane .foot{font-family:var(--mono);font-size:11px;color:var(--ink-soft);padding:8px 12px;border-top:1px solid var(--hair);min-height:34px;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+.pane .foot .read{color:var(--ink)}
+.pane .foot b{color:var(--red)}
+.loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;color:var(--ink-soft);z-index:3;background:var(--card)}
+.loading.hidden{display:none}
+.note{font-family:var(--mono);font-size:10.5px;color:var(--ink-soft);margin-top:14px;line-height:1.6}
+.note b{color:var(--ink)}
+.bar{height:5px;width:200px;background:var(--paper-2);border:1px solid var(--hair-2);margin-top:8px;overflow:hidden}
+.bar>i{display:block;height:100%;width:0;background:var(--blue)}
+.kbd{font-family:var(--mono);font-size:10px;border:1px solid var(--hair-2);border-radius:3px;padding:1px 5px;background:var(--paper-2);color:var(--ink-soft)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <div class="row">
+    <div>
+      <p class="kicker">Ferme du Temple · Frameries <span class="dot">●</span> relevé as-built NavVis</p>
+      <h1>Outil de coupes &amp; plans partiels</h1>
+    </div>
+    <a class="backlink" href="index.html">← retour au dossier</a>
+  </div>
+  <div class="warn-strip">Mesures issues du nuage de points (scan ImmoPass 04/06/2026) — <b>indicatives, non contractuelles</b>. Précision ~2–3 cm, étage scanné partiellement.</div>
+</header>
+
+<div class="toolbar">
+  <div class="grp"><span class="lbl">Bâtiment</span>
+    <select id="building"><option value="AsE">Aile Sud-Est (L7·L8·L9·L12·L13)</option><option value="AO">Aile Ouest (L2·L3·L4)</option><option value="AT">Atelier</option><option value="CH">Chapelle</option></select>
+  </div>
+  <div class="grp"><span class="lbl">Plan : tranche</span>
+    <button class="tool on" id="m-full">tout</button>
+    <button class="tool" id="m-slab">à la hauteur</button>
+    <span id="slabwrap" style="display:none">z=<span id="hval">1.20</span>m
+      <input type="range" id="height" min="-1" max="13" step="0.05" value="1.2" style="width:120px">
+      ±<input type="range" id="thick" min="0.05" max="1.5" step="0.05" value="0.25" style="width:70px"><span id="tval">0.25</span></span>
+  </div>
+  <div class="grp"><span class="lbl">Coupe : épaisseur</span>
+    ±<input type="range" id="cthick" min="0.1" max="3" step="0.1" value="0.6" style="width:90px"><span id="ctval">0.6</span>m
+  </div>
+</div>
+
+<div class="grid">
+  <!-- PLAN -->
+  <div class="pane">
+    <h2>Plan (vue de dessus) <span class="hint" id="planmode">tracez une ligne de coupe ✎</span></h2>
+    <div class="canvas-stack" id="planstack">
+      <canvas class="gl" id="planGL"></canvas>
+      <canvas class="ov" id="planOV"></canvas>
+      <div class="loading" id="planLoad">chargement du nuage de points…<div class="bar"><i id="planBar"></i></div></div>
+    </div>
+    <div class="foot">
+      <span><button class="tool red" id="t-section">✎ ligne de coupe</button>
+            <button class="tool" id="t-measure-p">↔ mesurer</button>
+            <button class="tool" id="t-clear-p">effacer</button></span>
+      <span class="read" id="planRead">—</span>
+    </div>
+  </div>
+  <!-- COUPE -->
+  <div class="pane">
+    <h2>Coupe / élévation <span class="hint" id="coupehint">— tracez d'abord une ligne sur le plan</span></h2>
+    <div class="canvas-stack" id="coupestack">
+      <canvas class="gl" id="coupeGL"></canvas>
+      <canvas class="ov" id="coupeOV"></canvas>
+    </div>
+    <div class="foot">
+      <span><button class="tool" id="t-measure-c">↔ mesurer</button>
+            <button class="tool" id="t-clear-c">effacer</button>
+            <button class="tool" id="t-png">⤓ PNG</button>
+            <button class="tool" id="t-dxf">⤓ DXF</button></span>
+      <span class="read" id="coupeRead">—</span>
+    </div>
+  </div>
+</div>
+
+<p class="note">
+  <b>Plan</b> : vue orthographique de dessus, couleur = altitude. Cliquez deux points pour tracer la <b>ligne de coupe</b> → la coupe verticale s'affiche à droite (toute la profondeur ±épaisseur). <span class="kbd">↔ mesurer</span> : deux clics donnent la distance réelle en mètres. <b>⤓ PNG</b>/<b>⤓ DXF</b> exportent la coupe courante (échelle &amp; cotes incluses).<br>
+  Repère local NavVis en mètres. Le nuage est échantillonné à ~3 cm pour l'usage web ; le mesurage légal reste du ressort du géomètre.
+</p>
+</div>
+
+<script>
+const DATA = 'cuts-data/';
+let M=null, P=null, N=0;           // manifest, Float32 positions (x,y,z) flat, count
+const views = {};                  // plan/coupe view state
+
+// ---------- WebGL point renderer ----------
+function makeGL(canvas){
+  const gl = canvas.getContext('webgl', {antialias:true, preserveDrawingBuffer:true});
+  const vs = `attribute vec2 a_xy; attribute float a_c;
+    uniform vec2 u_scale; uniform vec2 u_off; uniform float u_size;
+    varying float v_c;
+    void main(){ vec2 p = a_xy*u_scale + u_off; gl_Position=vec4(p,0.,1.); gl_PointSize=u_size; v_c=a_c; }`;
+  const fs = `precision mediump float; varying float v_c;
+    vec3 ramp(float t){ // paper-friendly terrain ramp
+      vec3 a=vec3(0.18,0.34,0.49), b=vec3(0.30,0.55,0.45), c=vec3(0.78,0.70,0.36), d=vec3(0.70,0.30,0.20);
+      if(t<0.5){ return mix(a,b,t*2.0);} return mix(c,d,(t-0.5)*2.0);}
+    void main(){ vec2 q=gl_PointCoord-0.5; if(dot(q,q)>0.25) discard; gl_FragColor=vec4(ramp(v_c),1.0);}`;
+  function sh(t,s){const o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);
+    if(!gl.getShaderParameter(o,gl.COMPILE_STATUS))throw gl.getShaderInfoLog(o);return o;}
+  const pr=gl.createProgram();gl.attachShader(pr,sh(gl.VERTEX_SHADER,vs));gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,fs));
+  gl.linkProgram(pr);gl.useProgram(pr);
+  const buf=gl.createBuffer(), cbuf=gl.createBuffer();
+  const loc={xy:gl.getAttribLocation(pr,'a_xy'),c:gl.getAttribLocation(pr,'a_c'),
+    scale:gl.getUniformLocation(pr,'u_scale'),off:gl.getUniformLocation(pr,'u_off'),size:gl.getUniformLocation(pr,'u_size')};
+  gl.clearColor(0.984,0.980,0.965,1);
+  return {gl,pr,buf,cbuf,loc,
+    draw(xy,col,vp,ptsize){
+      const c=canvas; const dpr=Math.min(window.devicePixelRatio||1,2);
+      c.width=c.clientWidth*dpr; c.height=c.clientHeight*dpr;
+      gl.viewport(0,0,c.width,c.height); gl.clear(gl.COLOR_BUFFER_BIT);
+      if(!xy||!xy.length){return;}
+      gl.bindBuffer(gl.ARRAY_BUFFER,buf); gl.bufferData(gl.ARRAY_BUFFER,xy,gl.DYNAMIC_DRAW);
+      gl.enableVertexAttribArray(loc.xy); gl.vertexAttribPointer(loc.xy,2,gl.FLOAT,false,0,0);
+      gl.bindBuffer(gl.ARRAY_BUFFER,cbuf); gl.bufferData(gl.ARRAY_BUFFER,col,gl.DYNAMIC_DRAW);
+      gl.enableVertexAttribArray(loc.c); gl.vertexAttribPointer(loc.c,1,gl.FLOAT,false,0,0);
+      // vp: {mppx, cx, cy, w, h} -> clip = (world - center)/(mppx) * (2/pixels)
+      const sx=2/c.width*dpr/vp.mppx, sy=2/c.height*dpr/vp.mppx;
+      gl.uniform2f(loc.scale, sx, sy);
+      gl.uniform2f(loc.off, -vp.cx*sx, -vp.cy*sy);
+      gl.uniform1f(loc.size, (ptsize||1.4)*dpr);
+      gl.drawArrays(gl.POINTS, 0, xy.length/2);
+    }};
+}
+
+// world<->screen for overlay/measurement (matches GL vp; y flips for screen)
+function worldToScreen(vp, c, wx, wy){
+  const x = (wx - vp.cx)/vp.mppx + c.clientWidth/2;
+  const y = c.clientHeight/2 - (wy - vp.cy)/vp.mppx;
+  return [x,y];
+}
+function screenToWorld(vp, c, sx, sy){
+  const wx = (sx - c.clientWidth/2)*vp.mppx + vp.cx;
+  const wy = (c.clientHeight/2 - sy)*vp.mppx + vp.cy;
+  return [wx,wy];
+}
+function fitView(c, x0,x1,y0,y1, pad=1.06){
+  const w=c.clientWidth,h=c.clientHeight, dx=(x1-x0)*pad, dy=(y1-y0)*pad;
+  const mppx=Math.max(dx/w, dy/h);
+  return {mppx, cx:(x0+x1)/2, cy:(y0+y1)/2};
+}
+
+// ---------- overlay drawing (measurements, section line, scale bar) ----------
+function niceScale(mppx, px){ // choose round metre length ~px wide
+  const target=px*mppx; const pow=Math.pow(10,Math.floor(Math.log10(target)));
+  for(const m of [1,2,5,10]){ if(pow*m>=target) return pow*m; } return pow*10;
+}
+function drawScaleBar(ctx,vp,c,label){
+  const px=120, m=niceScale(vp.mppx,px), wpx=m/vp.mppx;
+  const x=14, y=c.clientHeight-18;
+  ctx.strokeStyle='#211d16'; ctx.fillStyle='#211d16'; ctx.lineWidth=2; ctx.font='11px "IBM Plex Mono",monospace';
+  ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+wpx,y); ctx.moveTo(x,y-4);ctx.lineTo(x,y+4); ctx.moveTo(x+wpx,y-4);ctx.lineTo(x+wpx,y+4); ctx.stroke();
+  ctx.fillText((m>=1?m+' m':(m*100)+' cm'), x, y-7);
+  if(label){ctx.textAlign='right';ctx.fillText(label,c.clientWidth-12,18);ctx.textAlign='left';}
+}
+function drawMeasure(ctx,pts,toS,dist,unit='m'){
+  if(pts.length<1)return;
+  ctx.strokeStyle='#b3271e';ctx.fillStyle='#b3271e';ctx.lineWidth=1.5;ctx.font='12px "IBM Plex Mono",monospace';
+  const a=toS(pts[0]); ctx.beginPath();ctx.arc(a[0],a[1],3,0,7);ctx.fill();
+  if(pts.length===2){const b=toS(pts[1]);
+    ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.stroke();
+    ctx.beginPath();ctx.arc(b[0],b[1],3,0,7);ctx.fill();
+    const mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2;
+    const t=dist.toFixed(2)+' '+unit; ctx.save();
+    ctx.fillStyle='#faf8f2';const tw=ctx.measureText(t).width+8;ctx.fillRect(mx-tw/2,my-16,tw,16);
+    ctx.fillStyle='#b3271e';ctx.textAlign='center';ctx.fillText(t,mx,my-4);ctx.restore();ctx.textAlign='left';
+  }
+}
+
+// ---------- application state ----------
+const state={ planMode:'section', coupeMode:null, slab:false,
+  section:[], measP:[], measC:[], coupe:null };
+
+function dequant(){ // uint16 -> Float32 world
+  // filled in load()
+}
+
+async function load(key){
+  document.getElementById('planLoad').classList.remove('hidden');
+  M = await (await fetch(DATA+key+'.json')).json();
+  const resp = await fetch(DATA+key+'.bin');
+  const reader = resp.body.getReader();
+  const len = +resp.headers.get('content-length')||M.count*6;
+  let recv=0, chunks=[];
+  while(true){const {done,value}=await reader.read(); if(done)break; chunks.push(value); recv+=value.length;
+    document.getElementById('planBar').style.width=(recv/len*100)+'%';}
+  const buf=new Uint8Array(recv); let o=0; for(const ch of chunks){buf.set(ch,o);o+=ch.length;}
+  const q=new Uint16Array(buf.buffer);
+  N=M.count; P=new Float32Array(N*3);
+  const mn=M.min, mx=M.max, rx=(mx[0]-mn[0])/65535, ry=(mx[1]-mn[1])/65535, rz=(mx[2]-mn[2])/65535;
+  for(let i=0;i<N;i++){ P[i*3]=mn[0]+q[i*3]*rx; P[i*3+1]=mn[1]+q[i*3+1]*ry; P[i*3+2]=mn[2]+q[i*3+2]*rz; }
+  document.getElementById('planLoad').classList.add('hidden');
+  views.plan.vp = fitView(views.plan.c, M.min[0],M.max[0],M.min[1],M.max[1]);
+  renderPlan();
+}
+
+// build plan arrays (xy + colour by z), optionally slab-filtered
+function renderPlan(){
+  const zmin=M.min[2], zspan=(M.max[2]-zmin)||1;
+  let xy, col;
+  if(state.slab){
+    const h=+document.getElementById('height').value, t=+document.getElementById('thick').value;
+    const idx=[]; for(let i=0;i<N;i++){const z=P[i*3+2]; if(z>=h-t&&z<=h+t) idx.push(i);}
+    xy=new Float32Array(idx.length*2); col=new Float32Array(idx.length);
+    idx.forEach((i,k)=>{xy[k*2]=P[i*3];xy[k*2+1]=P[i*3+1];col[k]=(P[i*3+2]-zmin)/zspan;});
+  } else {
+    xy=new Float32Array(N*2); col=new Float32Array(N);
+    for(let i=0;i<N;i++){xy[i*2]=P[i*3];xy[i*2+1]=P[i*3+1];col[i]=(P[i*3+2]-zmin)/zspan;}
+  }
+  views.plan.gl.draw(xy,col,views.plan.vp, state.slab?2.2:1.5);
+  overlayPlan();
+}
+
+function overlayPlan(){
+  const c=views.plan.ov, ctx=c.getContext('2d');
+  const dpr=Math.min(window.devicePixelRatio||1,2); c.width=c.clientWidth*dpr;c.height=c.clientHeight*dpr;
+  ctx.scale(dpr,dpr); ctx.clearRect(0,0,c.clientWidth,c.clientHeight);
+  const vp=views.plan.vp, toS=(p)=>worldToScreen(vp,c,p[0],p[1]);
+  drawScaleBar(ctx,vp,c,M.building+' · plan');
+  // section line
+  if(state.section.length){ctx.strokeStyle='#b3271e';ctx.fillStyle='#b3271e';ctx.lineWidth=2;
+    const a=toS(state.section[0]);ctx.beginPath();ctx.arc(a[0],a[1],4,0,7);ctx.fill();
+    ctx.font='11px "IBM Plex Mono"';ctx.fillText('A',a[0]+6,a[1]-6);
+    if(state.section.length===2){const b=toS(state.section[1]);
+      ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.stroke();
+      ctx.beginPath();ctx.arc(b[0],b[1],4,0,7);ctx.fill();ctx.fillText('B',b[0]+6,b[1]-6);
+      // thickness ribbon
+      const ct=+document.getElementById('cthick').value;
+      const dx=state.section[1][0]-state.section[0][0], dy=state.section[1][1]-state.section[0][1];
+      const L=Math.hypot(dx,dy)||1, nx=-dy/L*ct, ny=dx/L*ct;
+      ctx.strokeStyle='rgba(179,39,30,.35)';ctx.setLineDash([4,3]);
+      [ct,-ct].forEach(()=>{});
+      const off=(ox,oy)=>{const p0=toS([state.section[0][0]+ox,state.section[0][1]+oy]),p1=toS([state.section[1][0]+ox,state.section[1][1]+oy]);ctx.beginPath();ctx.moveTo(p0[0],p0[1]);ctx.lineTo(p1[0],p1[1]);ctx.stroke();};
+      off(nx,ny);off(-nx,-ny);ctx.setLineDash([]);
+    }}
+  if(state.measP.length){const d=state.measP.length===2?Math.hypot(state.measP[0][0]-state.measP[1][0],state.measP[0][1]-state.measP[1][1]):0;
+    drawMeasure(ctx,state.measP,toS,d);}
+}
+
+// ---------- coupe extraction ----------
+function buildCoupe(){
+  if(state.section.length<2){return;}
+  const A=state.section[0], B=state.section[1];
+  const dx=B[0]-A[0], dy=B[1]-A[1], L=Math.hypot(dx,dy)||1, ux=dx/L, uy=dy/L;
+  const t=+document.getElementById('cthick').value;
+  const us=[], zs=[]; let zmin=1e9,zmax=-1e9;
+  for(let i=0;i<N;i++){const px=P[i*3]-A[0], py=P[i*3+1]-A[1];
+    const u=px*ux+py*uy; if(u<-0.2||u>L+0.2)continue;
+    const perp=Math.abs(-uy*px+ux*py); if(perp>t)continue;
+    const z=P[i*3+2]; us.push(u);zs.push(z); if(z<zmin)zmin=z; if(z>zmax)zmax=z;}
+  state.coupe={us,zs,L,zmin,zmax,A,B,t};
+  document.getElementById('coupehint').textContent='— '+us.length.toLocaleString('fr')+' pts · longueur '+L.toFixed(2)+' m';
+  const c=views.coupe.c;
+  views.coupe.vp=fitView(c, 0,L, zmin,zmax);
+  const xy=new Float32Array(us.length*2), col=new Float32Array(us.length), span=(zmax-zmin)||1;
+  for(let k=0;k<us.length;k++){xy[k*2]=us[k];xy[k*2+1]=zs[k];col[k]=(zs[k]-zmin)/span;}
+  views.coupe.data={xy,col};
+  views.coupe.gl.draw(xy,col,views.coupe.vp,1.8);
+  overlayCoupe();
+}
+function overlayCoupe(){
+  const c=views.coupe.ov, ctx=c.getContext('2d'); if(!state.coupe){c.getContext('2d').clearRect(0,0,c.width,c.height);return;}
+  const dpr=Math.min(window.devicePixelRatio||1,2); c.width=c.clientWidth*dpr;c.height=c.clientHeight*dpr;ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,c.clientWidth,c.clientHeight);
+  const vp=views.coupe.vp, toS=(p)=>worldToScreen(vp,c,p[0],p[1]);
+  // storey guide lines from manifest (dedupe levels sharing the ground datum)
+  ctx.font='10px "IBM Plex Mono"';ctx.textAlign='left';
+  const guides=[]; const seen=new Set();
+  if(M.levels){for(const k in M.levels){const z=M.levels[k][0]; const key=z.toFixed(2);
+    const lab=(Math.abs(z-M.ground_z)<0.1?'sol · niv '+k:'niv '+k);
+    if(!seen.has(key)){seen.add(key);guides.push([lab,z]);}}}
+  guides.forEach(([lab,z])=>{const s=toS([0,z]);ctx.strokeStyle='rgba(46,86,124,.4)';ctx.setLineDash([3,3]);
+    ctx.beginPath();ctx.moveTo(0,s[1]);ctx.lineTo(c.clientWidth,s[1]);ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle='#2e567c';ctx.fillText(lab+' ('+z.toFixed(2)+')',4,s[1]-3);});
+  drawScaleBar(ctx,vp,c,M.building+' · coupe A–B');
+  if(state.measC.length){const d=state.measC.length===2?Math.hypot(state.measC[0][0]-state.measC[1][0],state.measC[0][1]-state.measC[1][1]):0;
+    drawMeasure(ctx,state.measC,toS,d);}
+}
+
+// ---------- interactions ----------
+function evpos(c,e){const r=c.getBoundingClientRect();return[e.clientX-r.left,e.clientY-r.top];}
+function setBtn(id,on){document.getElementById(id).classList.toggle('on',on);}
+
+function initUI(){
+  // plan canvases
+  views.plan={c:document.getElementById('planstack'),gl:makeGL(document.getElementById('planGL')),
+    ov:document.getElementById('planOV'),get vp(){return this._vp},set vp(v){this._vp=v}};
+  views.plan.c=document.getElementById('planGL'); // client size source
+  views.coupe={c:document.getElementById('coupeGL'),gl:makeGL(document.getElementById('coupeGL')),
+    ov:document.getElementById('coupeOV'),_vp:null,get vp(){return this._vp},set vp(v){this._vp=v}};
+
+  const planOV=document.getElementById('planOV'), coupeOV=document.getElementById('coupeOV');
+  planOV.addEventListener('click',e=>{
+    const sp=evpos(planOV,e); const w=screenToWorld(views.plan.vp,views.plan.c,sp[0],sp[1]);
+    if(state.planMode==='section'){ if(state.section.length>=2)state.section=[]; state.section.push(w);
+      document.getElementById('planRead').textContent='A–B : '+(state.section.length<2?'point A posé':('longueur '+Math.hypot(state.section[0][0]-state.section[1][0],state.section[0][1]-state.section[1][1]).toFixed(2)+' m'));
+      overlayPlan(); if(state.section.length===2)buildCoupe();
+    } else if(state.planMode==='measure'){ if(state.measP.length>=2)state.measP=[]; state.measP.push(w);
+      if(state.measP.length===2){const d=Math.hypot(state.measP[0][0]-state.measP[1][0],state.measP[0][1]-state.measP[1][1]);
+        document.getElementById('planRead').innerHTML='distance : <b>'+d.toFixed(2)+' m</b>';}
+      overlayPlan();}
+  });
+  coupeOV.addEventListener('click',e=>{ if(!state.coupe)return;
+    const sp=evpos(coupeOV,e); const w=screenToWorld(views.coupe.vp,views.coupe.c,sp[0],sp[1]);
+    if(state.coupeMode==='measure'){ if(state.measC.length>=2)state.measC=[]; state.measC.push(w);
+      if(state.measC.length===2){const d=Math.hypot(state.measC[0][0]-state.measC[1][0],state.measC[0][1]-state.measC[1][1]);
+        document.getElementById('coupeRead').innerHTML='distance : <b>'+d.toFixed(2)+' m</b> (Δu '+Math.abs(state.measC[0][0]-state.measC[1][0]).toFixed(2)+' · Δz '+Math.abs(state.measC[0][1]-state.measC[1][1]).toFixed(2)+')';}
+      overlayCoupe();}
+  });
+
+  // tool buttons
+  document.getElementById('t-section').classList.add('on');
+  document.getElementById('t-section').onclick=()=>{state.planMode='section';setBtn('t-section',true);setBtn('t-measure-p',false);document.getElementById('planmode').textContent='tracez une ligne de coupe ✎';};
+  document.getElementById('t-measure-p').onclick=()=>{state.planMode='measure';setBtn('t-section',false);setBtn('t-measure-p',true);document.getElementById('planmode').textContent='mesure : deux clics ↔';};
+  document.getElementById('t-clear-p').onclick=()=>{state.section=[];state.measP=[];document.getElementById('planRead').textContent='—';overlayPlan();};
+  document.getElementById('t-measure-c').onclick=()=>{state.coupeMode=state.coupeMode==='measure'?null:'measure';setBtn('t-measure-c',state.coupeMode==='measure');};
+  document.getElementById('t-clear-c').onclick=()=>{state.measC=[];document.getElementById('coupeRead').textContent='—';overlayCoupe();};
+  document.getElementById('t-png').onclick=exportPNG;
+  document.getElementById('t-dxf').onclick=exportDXF;
+
+  // plan slab mode
+  document.getElementById('m-full').onclick=()=>{state.slab=false;setBtn('m-full',true);setBtn('m-slab',false);document.getElementById('slabwrap').style.display='none';renderPlan();};
+  document.getElementById('m-slab').onclick=()=>{state.slab=true;setBtn('m-slab',true);setBtn('m-full',false);document.getElementById('slabwrap').style.display='inline';renderPlan();};
+  document.getElementById('height').oninput=e=>{document.getElementById('hval').textContent=(+e.target.value).toFixed(2);if(state.slab)renderPlan();};
+  document.getElementById('thick').oninput=e=>{document.getElementById('tval').textContent=(+e.target.value).toFixed(2);if(state.slab)renderPlan();};
+  document.getElementById('cthick').oninput=e=>{document.getElementById('ctval').textContent=(+e.target.value).toFixed(1);overlayPlan();if(state.section.length===2)buildCoupe();};
+
+  // building switch
+  document.getElementById('building').onchange=e=>{
+    state.section=[];state.measP=[];state.measC=[];state.coupe=null;
+    document.getElementById('planRead').textContent='—';document.getElementById('coupeRead').textContent='—';
+    document.getElementById('coupehint').textContent='— tracez d’abord une ligne sur le plan';
+    overlayCoupe(); load(e.target.value);
+  };
+
+  window.addEventListener('resize',()=>{ if(!P)return;
+    views.plan.vp=fitView(views.plan.c,M.min[0],M.max[0],M.min[1],M.max[1]);renderPlan();
+    if(state.coupe)buildCoupe();});
+}
+
+function exportPNG(){
+  if(!state.coupe){alert('Tracez d’abord une ligne de coupe sur le plan.');return;}
+  const gl=document.getElementById('coupeGL'), ov=document.getElementById('coupeOV');
+  const out=document.createElement('canvas'); out.width=gl.width;out.height=gl.height;
+  const x=out.getContext('2d'); x.fillStyle='#fbfaf6';x.fillRect(0,0,out.width,out.height);
+  x.drawImage(gl,0,0); x.drawImage(ov,0,0);
+  out.toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);
+    a.download='coupe_'+M.building.replace(/\s/g,'')+'.png';a.click();});
+}
+function exportDXF(){
+  if(!state.coupe){alert('Tracez d’abord une ligne de coupe.');return;}
+  // export the coupe points + measurements as a simple DXF (POINT entities + measure LINE/TEXT)
+  let s='0\nSECTION\n2\nENTITIES\n';
+  const {us,zs}=state.coupe; const step=Math.ceil(us.length/120000); // cap entities
+  for(let i=0;i<us.length;i+=step){s+=`0\nPOINT\n8\nCOUPE\n10\n${us[i].toFixed(3)}\n20\n${zs[i].toFixed(3)}\n30\n0\n`;}
+  if(state.measC.length===2){const[a,b]=state.measC;
+    s+=`0\nLINE\n8\nMESURE\n10\n${a[0].toFixed(3)}\n20\n${a[1].toFixed(3)}\n30\n0\n11\n${b[0].toFixed(3)}\n21\n${b[1].toFixed(3)}\n31\n0\n`;
+    const d=Math.hypot(a[0]-b[0],a[1]-b[1]);
+    s+=`0\nTEXT\n8\nMESURE\n10\n${((a[0]+b[0])/2).toFixed(3)}\n20\n${((a[1]+b[1])/2).toFixed(3)}\n30\n0\n40\n0.2\n1\n${d.toFixed(2)} m\n`;}
+  s+='0\nENDSEC\n0\nEOF\n';
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([s],{type:'application/dxf'}));
+  a.download='coupe_'+M.building.replace(/\s/g,'')+'.dxf';a.click();
+}
+
+initUI();
+load('AsE');
+</script>
+</body>
+</html>
