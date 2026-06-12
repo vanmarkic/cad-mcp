@@ -115,6 +115,14 @@ section:nth-of-type(4){animation-delay:.2s}
 .plate .name{font-family:var(--serif);font-size:16.5px;font-weight:600}
 .plate .dl{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--red);white-space:nowrap}
 .plate:hover .dl{text-decoration:underline}
+/* gallery plates with two actions (view / download) */
+figure.plate figcaption{flex-wrap:wrap}
+.plate .res{font-family:var(--mono);font-size:10px;color:var(--ink-soft);white-space:nowrap}
+.plate .acts{margin-left:auto;display:flex;gap:14px;white-space:nowrap}
+.plate .acts a{font-family:var(--mono);font-size:11px;text-decoration:none}
+.plate .acts .view{color:var(--blue)}
+.plate .acts .tif{color:var(--red)}
+.plate .acts a:hover{text-decoration:underline}
 
 /* downloads */
 .dl-group{margin-bottom:34px}
@@ -437,6 +445,71 @@ footer b{color:var(--ink)}
       </figure>
     </a>
   </div>
+</section>
+
+<!-- ============ 05 · ORTHOPHOTOS ============ -->
+<section id="orthophotos">
+  <div class="sec-head">
+    <span class="sec-num">05</span><h2>Orthophotos — as-built</h2>
+    <span class="note">scan NavVis (ImmoPass) · vues orthographiques par bâtiment</span>
+  </div>
+  <div class="plates">
+    <figure class="plate">
+      <a class="img" href="files/orthophotos/png/plan_AileOuest_0.png" target="_blank" rel="noopener"><img src="previews/ortho/plan_AileOuest_0.png" alt="Orthophoto Aile Ouest — niveau 0" loading="lazy"></a>
+      <figcaption><span class="code">OR-01</span><span class="name">Aile Ouest · N0</span><span class="res">23 mm/px</span>
+        <span class="acts"><a class="view" href="files/orthophotos/png/plan_AileOuest_0.png" target="_blank" rel="noopener">PNG ⤢</a><a class="tif" href="files/orthophotos/plan_AileOuest_0.tiff" download>TIFF ↓ 6,7 Mo</a></span></figcaption>
+    </figure>
+    <figure class="plate">
+      <a class="img" href="files/orthophotos/png/plan_AileOuest_1.png" target="_blank" rel="noopener"><img src="previews/ortho/plan_AileOuest_1.png" alt="Orthophoto Aile Ouest — niveau 1" loading="lazy"></a>
+      <figcaption><span class="code">OR-02</span><span class="name">Aile Ouest · N1</span><span class="res">23 mm/px</span>
+        <span class="acts"><a class="view" href="files/orthophotos/png/plan_AileOuest_1.png" target="_blank" rel="noopener">PNG ⤢</a><a class="tif" href="files/orthophotos/plan_AileOuest_1.tiff" download>TIFF ↓ 1,7 Mo</a></span></figcaption>
+    </figure>
+    <figure class="plate">
+      <a class="img" href="files/orthophotos/png/plan_AileSudEst_0.png" target="_blank" rel="noopener"><img src="previews/ortho/plan_AileSudEst_0.png" alt="Orthophoto Aile Sud-Est — niveau 0" loading="lazy"></a>
+      <figcaption><span class="code">OR-03</span><span class="name">Aile Sud-Est · N0</span><span class="res">14 mm/px</span>
+        <span class="acts"><a class="view" href="files/orthophotos/png/plan_AileSudEst_0.png" target="_blank" rel="noopener">PNG ⤢</a><a class="tif" href="files/orthophotos/plan_AileSudEst_0.tiff" download>TIFF ↓ 16 Mo</a></span></figcaption>
+    </figure>
+    <figure class="plate">
+      <a class="img" href="files/orthophotos/png/plan_AileSudEst_1.png" target="_blank" rel="noopener"><img src="previews/ortho/plan_AileSudEst_1.png" alt="Orthophoto Aile Sud-Est — niveau 1" loading="lazy"></a>
+      <figcaption><span class="code">OR-04</span><span class="name">Aile Sud-Est · N1</span><span class="res">14 mm/px</span>
+        <span class="acts"><a class="view" href="files/orthophotos/png/plan_AileSudEst_1.png" target="_blank" rel="noopener">PNG ⤢</a><a class="tif" href="files/orthophotos/plan_AileSudEst_1.tiff" download>TIFF ↓ 4,2 Mo</a></span></figcaption>
+    </figure>
+    <figure class="plate">
+      <a class="img" href="files/orthophotos/png/plan_Maisonprincipale_0.png" target="_blank" rel="noopener"><img src="previews/ortho/plan_Maisonprincipale_0.png" alt="Orthophoto Maison principale — niveau 0" loading="lazy"></a>
+      <figcaption><span class="code">OR-05</span><span class="name">Maison principale · N0</span><span class="res">10 mm/px</span>
+        <span class="acts"><a class="view" href="files/orthophotos/png/plan_Maisonprincipale_0.png" target="_blank" rel="noopener">PNG ⤢</a><a class="tif" href="files/orthophotos/plan_Maisonprincipale_0.tiff" download>TIFF ↓ 1,7 Mo</a></span></figcaption>
+    </figure>
+    <figure class="plate">
+      <a class="img" href="files/orthophotos/png/plan_Maisonprincipale_1.png" target="_blank" rel="noopener"><img src="previews/ortho/plan_Maisonprincipale_1.png" alt="Orthophoto Maison principale — niveau 1" loading="lazy"></a>
+      <figcaption><span class="code">OR-06</span><span class="name">Maison principale · N1</span><span class="res">10 mm/px</span>
+        <span class="acts"><a class="view" href="files/orthophotos/png/plan_Maisonprincipale_1.png" target="_blank" rel="noopener">PNG ⤢</a><a class="tif" href="files/orthophotos/plan_Maisonprincipale_1.tiff" download>TIFF ↓ 1,5 Mo</a></span></figcaption>
+    </figure>
+    <figure class="plate">
+      <a class="img" href="files/orthophotos/png/plan_Atelier_0.png" target="_blank" rel="noopener"><img src="previews/ortho/plan_Atelier_0.png" alt="Orthophoto Atelier — niveau 0" loading="lazy"></a>
+      <figcaption><span class="code">OR-07</span><span class="name">Atelier · N0</span><span class="res">15 mm/px</span>
+        <span class="acts"><a class="view" href="files/orthophotos/png/plan_Atelier_0.png" target="_blank" rel="noopener">PNG ⤢</a><a class="tif" href="files/orthophotos/plan_Atelier_0.tiff" download>TIFF ↓ 3,2 Mo</a></span></figcaption>
+    </figure>
+    <figure class="plate">
+      <a class="img" href="files/orthophotos/png/plan_Atelier_1.png" target="_blank" rel="noopener"><img src="previews/ortho/plan_Atelier_1.png" alt="Orthophoto Atelier — niveau 1" loading="lazy"></a>
+      <figcaption><span class="code">OR-08</span><span class="name">Atelier · N1</span><span class="res">15 mm/px</span>
+        <span class="acts"><a class="view" href="files/orthophotos/png/plan_Atelier_1.png" target="_blank" rel="noopener">PNG ⤢</a><a class="tif" href="files/orthophotos/plan_Atelier_1.tiff" download>TIFF ↓ 5,4 Mo</a></span></figcaption>
+    </figure>
+    <figure class="plate">
+      <a class="img" href="files/orthophotos/png/plan_Chapelle_0.png" target="_blank" rel="noopener"><img src="previews/ortho/plan_Chapelle_0.png" alt="Orthophoto Chapelle — niveau 0" loading="lazy"></a>
+      <figcaption><span class="code">OR-09</span><span class="name">Chapelle · N0</span><span class="res">10 mm/px</span>
+        <span class="acts"><a class="view" href="files/orthophotos/png/plan_Chapelle_0.png" target="_blank" rel="noopener">PNG ⤢</a><a class="tif" href="files/orthophotos/plan_Chapelle_0.tiff" download>TIFF ↓ 6,4 Mo</a></span></figcaption>
+    </figure>
+    <figure class="plate">
+      <a class="img" href="files/orthophotos/png/plan_Chapelle_1.png" target="_blank" rel="noopener"><img src="previews/ortho/plan_Chapelle_1.png" alt="Orthophoto Chapelle — niveau 1" loading="lazy"></a>
+      <figcaption><span class="code">OR-10</span><span class="name">Chapelle · N1</span><span class="res">10 mm/px</span>
+        <span class="acts"><a class="view" href="files/orthophotos/png/plan_Chapelle_1.png" target="_blank" rel="noopener">PNG ⤢</a><a class="tif" href="files/orthophotos/plan_Chapelle_1.tiff" download>TIFF ↓ 3,2 Mo</a></span></figcaption>
+    </figure>
+  </div>
+  <p class="foot-note" style="margin-top:22px">
+    Repère local NavVis en <b style="color:var(--ink)">mètres</b> (vues orthographiques géoréférencées).
+    Limites monde &amp; résolution de chaque planche : <a class="get" href="files/orthophotos/georef.json" download>georef.json ↓</a> —
+    conversion pixel→monde&nbsp;: <span style="font-family:var(--mono);font-size:11.5px">wx = xmin + col·(m/px) ; wy = ymax − row·(m/px)</span>.
+  </p>
 </section>
 
 <footer>
