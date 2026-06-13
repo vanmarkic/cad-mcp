@@ -27,8 +27,12 @@ window.storage = {
 };
 </script>
 
+<!-- shared, framework-free calculation core (also unit-tested under test/) -->
+<script src="lib/etabli-core.js"></script>
+
 <script type="text/babel" data-presets="react">
 const { useState, useEffect, useMemo, useRef } = React;
+const { num, computeLine, calculateCutlist, panelMetrics, cutListText } = window.EtabliCore;
 
 /* =========================================================================
    ÉTABLI — Générateur de devis pour menuisier
@@ -39,12 +43,7 @@ const { useState, useEffect, useMemo, useRef } = React;
    ========================================================================= */
 
 /* ---------- helpers ---------- */
-const num = (v) => {
-  if (typeof v === "number") return isFinite(v) ? v : 0;
-  if (v == null) return 0;
-  const f = parseFloat(String(v).replace(/\s/g, "").replace(",", "."));
-  return isFinite(f) ? f : 0;
-};
+/* num() lives in lib/etabli-core.js (shared with the test suite) */
 const eur = (n) =>
   new Intl.NumberFormat("fr-BE", { style: "currency", currency: "EUR" }).format(
     isFinite(n) ? n : 0
@@ -114,24 +113,7 @@ function AreaIn({ value, onChange, placeholder }) {
   );
 }
 
-/* ---------- line computation ---------- */
-function computeLine(l) {
-  if (l.type === "main") {
-    const cout = num(l.heures) * num(l.coutHoraire);
-    const vente = num(l.heures) * num(l.tauxVente);
-    return { cout, vente, puv: num(l.tauxVente), qte: num(l.heures), unite: "h" };
-  }
-  if (l.type === "forfait") {
-    const cout = num(l.pa);
-    const vente = num(l.pa) * (1 + num(l.marge) / 100);
-    return { cout, vente, puv: vente, qte: 1, unite: "forfait" };
-  }
-  // fourniture
-  const puv = num(l.pa) * (1 + num(l.marge) / 100);
-  const vente = puv * num(l.qte);
-  const cout = num(l.pa) * num(l.qte);
-  return { cout, vente, puv, qte: num(l.qte), unite: l.unite || "u" };
-}
+/* ---------- line computation lives in lib/etabli-core.js ---------- */
 
 /* ---------- defaults ---------- */
 const DEFAULT_COMPANY = {
@@ -186,6 +168,30 @@ const newDevis = (company, p) => ({
   lines: [],
 });
 
+/* ---------- calepinage (cutlist) ---------- */
+const PIECE_PALETTE = [
+  "#A8631F", "#3D6B4A", "#2E567C", "#8A5018",
+  "#5B4769", "#C08A2E", "#7A5A1C", "#39593F",
+];
+const newPiece = (i = 0) => ({
+  id: uid(),
+  label: "",
+  w: "",
+  h: "",
+  qty: "1",
+  color: PIECE_PALETTE[i % PIECE_PALETTE.length],
+});
+// Tout en millimètres ; le prix matière est au m².
+const DEFAULT_CALEP = {
+  material: "Panneau",
+  pricePerM2: "",
+  panelW: "2500",
+  panelH: "1250",
+  kerf: "3",
+  grainDirection: false,
+  pieces: [],
+};
+
 /* =========================================================================
    APP
    ========================================================================= */
@@ -195,8 +201,9 @@ function App() {
   const [params, setParams] = useState(DEFAULT_PARAMS);
   const [devis, setDevis] = useState(() => newDevis(DEFAULT_COMPANY, DEFAULT_PARAMS));
   const [saved, setSaved] = useState([]);
-  const [modal, setModal] = useState(null); // 'reglages' | 'mesdevis' | null
+  const [modal, setModal] = useState(null); // 'reglages' | 'mesdevis' | 'calepinage' | null
   const [toast, setToast] = useState("");
+  const [calep, setCalep] = useState(DEFAULT_CALEP);
   const loaded = useRef(false);
 
   /* load persisted state */
@@ -212,6 +219,8 @@ function App() {
           }
           const q = await window.storage.get("etabli:quotes").catch(() => null);
           if (q && q.value) setSaved(JSON.parse(q.value) || []);
+          const cp = await window.storage.get("etabli:calepinage").catch(() => null);
+          if (cp && cp.value) setCalep((c) => ({ ...c, ...JSON.parse(cp.value) }));
         }
       } catch (e) {
         /* ignore — first run */
@@ -220,6 +229,15 @@ function App() {
       }
     })();
   }, []);
+
+  /* persist the calepinage workbench whenever it changes (after first load) */
+  useEffect(() => {
+    if (!loaded.current) return;
+    try {
+      if (window.storage)
+        window.storage.set("etabli:calepinage", JSON.stringify(calep));
+    } catch (e) {}
+  }, [calep]);
 
   const flash = (m) => {
     setToast(m);
@@ -250,7 +268,19 @@ function App() {
       const c = computeLine(l);
       cout += c.cout;
       venteHT += c.vente;
-      return { ...l, ...c, marge: c.vente - c.cout };
+      // Keep computed values on DISTINCT keys (qteNum / uniteOut / margeEur).
+      // Spreading c directly used to overwrite the raw text inputs the LineCard
+      // is bound to (qte / unite / marge) — so typing a digit made another value
+      // appear. The raw strings from `l` must survive untouched.
+      return {
+        ...l,
+        cout: c.cout,
+        vente: c.vente,
+        puv: c.puv,
+        qteNum: c.qte,
+        uniteOut: c.unite,
+        margeEur: c.vente - c.cout,
+      };
     });
     const remise =
       devis.remiseType === "pct"
@@ -344,6 +374,16 @@ function App() {
     setTimeout(() => window.print(), 350);
   };
 
+  /* ---------- calepinage → devis ---------- */
+  // Adds the result as a single "fourniture" line: N whole panels at the
+  // per-panel cost, with the cut list folded into the metré detail.
+  const addCalepToDevis = (line) => {
+    setDevis((d) => ({ ...d, lines: [...d.lines, line] }));
+    setModal(null);
+    setView("atelier");
+    flash("Calepinage ajouté au devis");
+  };
+
   /* ============================ RENDER ============================ */
   return (
     <div className="app">
@@ -375,6 +415,9 @@ function App() {
         </div>
 
         <div className="bar-actions">
+          <button className="btn ghost" onClick={() => setModal("calepinage")}>
+            Calepinage
+          </button>
           <button className="btn ghost" onClick={() => setModal("reglages")}>
             Réglages
           </button>
@@ -412,6 +455,17 @@ function App() {
       )}
 
       {/* ---------- modals ---------- */}
+      {modal === "calepinage" && (
+        <Modal title="Calepinage — débit de panneaux" onClose={() => setModal(null)} wide>
+          <Calepinage
+            calep={calep}
+            setCalep={setCalep}
+            params={params}
+            onAddToDevis={addCalepToDevis}
+            flash={flash}
+          />
+        </Modal>
+      )}
       {modal === "reglages" && (
         <Modal title="Réglages" onClose={() => setModal(null)} wide>
           <Reglages
@@ -804,8 +858,8 @@ function LineCard({ line, index, last, setLine, delLine, moveLine, margeColor })
           <span className="fig">
             Coût <b className="mono">{eur(l.cout)}</b>
           </span>
-          <span className="fig" style={{ color: margeColor(l.vente > 0 ? (l.marge / l.vente) * 100 : 0) }}>
-            Marge <b className="mono">{eur(l.marge)}</b>
+          <span className="fig" style={{ color: margeColor(l.vente > 0 ? (l.margeEur / l.vente) * 100 : 0) }}>
+            Marge <b className="mono">{eur(l.margeEur)}</b>
           </span>
           <span className="fig fig-sell">
             Vente HTVA <b className="mono">{eur(l.vente)}</b>
@@ -912,7 +966,7 @@ function ClientSheet({ devis, company, calc, onPrint }) {
                 </td>
                 <td className="c-qte mono">
                   {l.showQty
-                    ? `${l.qte.toLocaleString("fr-BE", { maximumFractionDigits: 2 })} ${l.unite}`
+                    ? `${l.qteNum.toLocaleString("fr-BE", { maximumFractionDigits: 2 })} ${l.uniteOut}`
                     : ""}
                 </td>
                 <td className="c-pu mono">{l.showQty ? eur(l.puv) : ""}</td>
@@ -1084,6 +1138,236 @@ function Modal({ title, children, onClose, wide }) {
         </div>
         <div className="modal-body">{children}</div>
       </div>
+    </div>
+  );
+}
+
+/* =========================================================================
+   CALEPINAGE — débit de panneaux (cutlist)
+   ========================================================================= */
+function SheetSVG({ layout, panelW, panelH, index }) {
+  // viewBox en mm ; le CSS gère la taille affichée.
+  const fs = Math.max(panelW, panelH) / 40; // taille de texte (unités mm)
+  const sw = Math.max(panelW, panelH) / 350; // épaisseur de trait (unités mm)
+  const nf1 = (n) => (isFinite(n) ? n : 0).toLocaleString("fr-BE", { maximumFractionDigits: 1 });
+  return (
+    <figure className="cl-sheet">
+      <figcaption className="cl-sheet-cap">
+        Panneau {index + 1} · chute {nf1(layout.wastePercent)} %
+      </figcaption>
+      <svg className="cl-svg" viewBox={`0 0 ${panelW} ${panelH}`} preserveAspectRatio="xMidYMid meet">
+        <rect x={0} y={0} width={panelW} height={panelH} className="cl-panel" />
+        {layout.pieces.map((p, i) => (
+          <g key={i}>
+            <rect
+              x={p.x} y={p.y} width={p.width} height={p.height}
+              fill={p.color} fillOpacity={0.5} stroke={p.color} strokeWidth={sw}
+            />
+            <text
+              x={p.x + p.width / 2} y={p.y + p.height / 2}
+              fontSize={fs} textAnchor="middle" dominantBaseline="central"
+              className="cl-piece-lab"
+            >
+              <tspan x={p.x + p.width / 2} dy={-fs * 0.15}>{p.label || "—"}</tspan>
+              <tspan x={p.x + p.width / 2} dy={fs * 1.1}>
+                {Math.round(p.width)}×{Math.round(p.height)}{p.rotated ? " ↻" : ""}
+              </tspan>
+            </text>
+          </g>
+        ))}
+      </svg>
+    </figure>
+  );
+}
+
+function Calepinage({ calep, setCalep, params, onAddToDevis, flash }) {
+  const set = (patch) => setCalep((c) => ({ ...c, ...patch }));
+  const setPiece = (id, patch) =>
+    setCalep((c) => ({ ...c, pieces: c.pieces.map((p) => (p.id === id ? { ...p, ...patch } : p)) }));
+  const addPiece = () =>
+    setCalep((c) => ({ ...c, pieces: [...c.pieces, newPiece(c.pieces.length)] }));
+  const delPiece = (id) =>
+    setCalep((c) => ({ ...c, pieces: c.pieces.filter((p) => p.id !== id) }));
+
+  const config = {
+    width: num(calep.panelW),
+    height: num(calep.panelH),
+    kerf: num(calep.kerf),
+    grainDirection: !!calep.grainDirection,
+  };
+
+  const piecesForCore = useMemo(
+    () =>
+      calep.pieces.map((p) => ({
+        id: p.id, label: p.label,
+        width: num(p.w), height: num(p.h), quantity: num(p.qty), color: p.color,
+      })),
+    [calep.pieces]
+  );
+
+  const result = useMemo(
+    () => calculateCutlist(piecesForCore, config),
+    [piecesForCore, calep.panelW, calep.panelH, calep.kerf, calep.grainDirection]
+  );
+  const metrics = useMemo(
+    () => panelMetrics(result, config, num(calep.pricePerM2), 0.001),
+    [result, calep.panelW, calep.panelH, calep.pricePerM2]
+  );
+  const cutList = useMemo(() => cutListText(piecesForCore, { unit: "mm" }), [piecesForCore]);
+
+  const hasPieces = piecesForCore.some((p) => p.width > 0 && p.height > 0 && p.quantity > 0);
+  const nf1 = (n) => (isFinite(n) ? n : 0).toLocaleString("fr-BE", { maximumFractionDigits: 1 });
+
+  const copyList = async () => {
+    try {
+      await navigator.clipboard.writeText(cutList.text);
+      flash("Liste de débit copiée");
+    } catch (e) {
+      flash("Sélectionne le texte puis Ctrl+C");
+    }
+  };
+
+  const addToDevis = () => {
+    const detail = [
+      `${metrics.totalSheets} panneau(x) ${num(calep.panelW)}×${num(calep.panelH)} mm — chute ${nf1(metrics.totalWastePercent)} %`,
+      cutList.text,
+    ].join("\n");
+    onAddToDevis({
+      id: uid(),
+      type: "fourniture",
+      designation: (calep.material || "Panneau") + " — débit calepiné",
+      detail,
+      showDetail: true,
+      showQty: true,
+      qte: String(metrics.totalSheets),
+      unite: "panneau",
+      pa: (Math.round(metrics.costPerPanel * 100) / 100).toString(),
+      marge: params.marge,
+      heures: "",
+      tauxVente: "",
+      coutHoraire: "",
+    });
+  };
+
+  return (
+    <div className="cl">
+      <p className="muted tip">
+        Les panneaux s'achètent entiers. Indique la cote des panneaux et le prix au m²,
+        liste les pièces à débiter (longueur × largeur, en mm) : ÉTABLI calcule le nombre
+        de panneaux à commander, le calepinage et le coût matière.
+      </p>
+
+      {/* stock + matière */}
+      <div className="card-eyebrow">Panneau &amp; matière</div>
+      <div className="grid">
+        <Field label="Matière / désignation" wide>
+          <TextIn value={calep.material} onChange={(v) => set({ material: v })} placeholder="Ex. MDF 18 mm, multiplex bouleau 18 mm…" />
+        </Field>
+        <Field label="Longueur panneau">
+          <NumIn value={calep.panelW} onChange={(v) => set({ panelW: v })} suffix="mm" />
+        </Field>
+        <Field label="Largeur panneau">
+          <NumIn value={calep.panelH} onChange={(v) => set({ panelH: v })} suffix="mm" />
+        </Field>
+        <Field label="Prix matière" hint="HTVA, au m²">
+          <NumIn value={calep.pricePerM2} onChange={(v) => set({ pricePerM2: v })} suffix="€/m²" />
+        </Field>
+        <Field label="Trait de scie">
+          <NumIn value={calep.kerf} onChange={(v) => set({ kerf: v })} suffix="mm" />
+        </Field>
+        <Field label="Sens du fil">
+          <label className="tog cl-tog">
+            <input
+              type="checkbox"
+              checked={!!calep.grainDirection}
+              onChange={(e) => set({ grainDirection: e.target.checked })}
+            />
+            Bloquer la rotation
+          </label>
+        </Field>
+      </div>
+
+      {/* pièces */}
+      <div className="card-eyebrow mt">Pièces à débiter</div>
+      {calep.pieces.length === 0 && (
+        <div className="empty">Aucune pièce. Ajoute les pièces à découper ci-dessous.</div>
+      )}
+      {calep.pieces.length > 0 && (
+        <div className="cl-pieces">
+          <div className="cl-prow cl-prow-head">
+            <span>Désignation</span><span>Long.</span><span>Larg.</span><span>Qté</span><span></span>
+          </div>
+          {calep.pieces.map((p) => (
+            <div className="cl-prow" key={p.id}>
+              <span className="cl-swatch-wrap">
+                <span className="cl-swatch" style={{ background: p.color }} />
+                <input className="in" type="text" value={p.label} placeholder="Ex. côté, étagère…"
+                  onChange={(e) => setPiece(p.id, { label: e.target.value })} />
+              </span>
+              <input className="in in-mono in-num" inputMode="decimal" value={p.w} placeholder="0"
+                onChange={(e) => setPiece(p.id, { w: e.target.value })} />
+              <input className="in in-mono in-num" inputMode="decimal" value={p.h} placeholder="0"
+                onChange={(e) => setPiece(p.id, { h: e.target.value })} />
+              <input className="in in-mono in-num" inputMode="decimal" value={p.qty} placeholder="1"
+                onChange={(e) => setPiece(p.id, { qty: e.target.value })} />
+              <button className="ico ico-del" title="Supprimer" onClick={() => delPiece(p.id)}>✕</button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="add-row">
+        <button className="btn add" onClick={addPiece}>+ Ajouter une pièce</button>
+      </div>
+
+      {/* résultats */}
+      {hasPieces && result && (
+        <>
+          <div className="card-eyebrow mt">Résultat</div>
+          <div className="sum-grid cl-stats">
+            <Stat label="Panneaux à acheter" value={String(metrics.totalSheets)} big />
+            <Stat label="Chute" value={nf1(metrics.totalWastePercent) + " %"} />
+            <Stat label="Coût / panneau" value={eur(metrics.costPerPanel)} muted />
+            <Stat label="Coût matière total" value={eur(metrics.totalCost)} color="var(--oak-2)" />
+          </div>
+
+          {result.unfitPieces.length > 0 && (
+            <div className="cl-warn">
+              ⚠ {result.unfitPieces.length} pièce(s) ne tiennent pas sur un panneau{" "}
+              {num(calep.panelW)}×{num(calep.panelH)} mm
+              {calep.grainDirection ? " (rotation bloquée — essaie de décocher « Bloquer la rotation »)" : ""}.
+              Vérifie les cotes : {result.unfitPieces.map((u) => u.label || "—").join(", ")}.
+            </div>
+          )}
+
+          {result.sheets.length > 0 && (
+            <div className="cl-sheets">
+              {result.sheets.map((s) => (
+                <SheetSVG key={s.sheetIndex} layout={s} panelW={num(calep.panelW)} panelH={num(calep.panelH)} index={s.sheetIndex} />
+              ))}
+            </div>
+          )}
+
+          {/* liste de débit copiable */}
+          <div className="card-eyebrow mt">Liste de débit — à copier pour le fournisseur</div>
+          <p className="muted tip">
+            {cutList.totalPieces} pièce(s) · {cutList.distinct} cote(s) différente(s). Colonnes séparées
+            par des tabulations — colle directement dans un mail ou un tableur.
+          </p>
+          <textarea
+            className="in in-area cl-list"
+            readOnly
+            rows={Math.min(12, cutList.distinct + 2)}
+            value={cutList.text}
+            onFocus={(e) => e.target.select()}
+          />
+          <div className="add-row cl-actions">
+            <button className="btn ghost" onClick={copyList}>Copier la liste</button>
+            <button className="btn" onClick={addToDevis} disabled={metrics.totalSheets === 0}>
+              Ajouter au devis ({metrics.totalSheets} panneau{metrics.totalSheets > 1 ? "x" : ""})
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -1308,6 +1592,27 @@ const CSS = `
 .qrow-meta{font-size:11.5px; color:var(--ink-3); margin-top:2px}
 .qrow-act{display:flex; gap:7px}
 
+/* calepinage */
+.cl .grid{margin-bottom:4px}
+.cl-tog{height:38px; border:1px solid var(--line); border-radius:7px; padding:0 10px; background:#fff}
+.cl-pieces{display:flex; flex-direction:column; gap:7px; margin-bottom:4px}
+.cl-prow{display:grid; grid-template-columns:1fr 96px 96px 70px 30px; gap:8px; align-items:center}
+.cl-prow .in{padding:7px 9px; font-size:13px}
+.cl-prow-head{font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-3); font-weight:600; padding:0 2px}
+.cl-prow-head span:nth-child(2),.cl-prow-head span:nth-child(3),.cl-prow-head span:nth-child(4){text-align:right; padding-right:9px}
+.cl-swatch-wrap{display:flex; align-items:center; gap:8px; min-width:0}
+.cl-swatch{flex:none; width:14px; height:14px; border-radius:3px; border:1px solid rgba(0,0,0,.18)}
+.cl-stats{margin-top:2px}
+.cl-warn{background:#f6e9e2; border:1px solid var(--brick); color:#7c2a1d; border-radius:8px; padding:10px 12px; font-size:12.5px; margin:6px 0 14px; line-height:1.5}
+.cl-sheets{display:flex; flex-wrap:wrap; gap:14px; margin:4px 0 6px}
+.cl-sheet{margin:0; flex:1 1 320px; min-width:280px; max-width:520px}
+.cl-sheet-cap{font-family:var(--mono); font-size:11px; color:var(--ink-3); margin-bottom:5px}
+.cl-svg{display:block; width:100%; height:auto; background:#fff; border:1px solid var(--line); border-radius:6px}
+.cl-panel{fill:#faf7f0; stroke:var(--ink-3); stroke-width:0; }
+.cl-piece-lab{fill:var(--ink); font-family:var(--mono); font-weight:600; paint-order:stroke; stroke:#fff; stroke-width:.6; stroke-linejoin:round}
+.cl-list{font-family:var(--mono); font-size:12px; white-space:pre; overflow:auto; background:#fff}
+.cl-actions{justify-content:flex-end; align-items:center}
+
 .toast{position:fixed; bottom:22px; left:50%; transform:translateX(-50%); background:var(--ink); color:#fff; padding:11px 20px; border-radius:8px; font-size:13px; font-weight:500; z-index:60; box-shadow:0 8px 24px rgba(0,0,0,.3)}
 
 /* responsive */
@@ -1323,6 +1628,8 @@ const CSS = `
   .s-metatab{margin-left:0}
   .s-parties{grid-template-columns:1fr}
   .s-totals{width:100%}
+  .cl-prow{grid-template-columns:1fr 64px 64px 50px 28px; gap:6px}
+  .cl-sheet{max-width:none}
 }
 
 /* print */
