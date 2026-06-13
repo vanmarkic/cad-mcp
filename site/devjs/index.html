@@ -181,16 +181,101 @@ const newPiece = (i = 0) => ({
   qty: "1",
   color: PIECE_PALETTE[i % PIECE_PALETTE.length],
 });
-// Tout en millimètres ; le prix matière est au m².
-const DEFAULT_CALEP = {
-  material: "Panneau",
+// Un « matériau » = un type de panneau (cote + prix au m² + sens du fil) avec sa
+// propre liste de pièces. Un calepinage peut en empiler plusieurs (p. ex. MDF
+// 18 mm à 30 €/m² ET aglo 8 mm à 15 €/m²) : chacun se débite sur SES plaques —
+// on ne mélange jamais deux matières sur une même plaque — et chacun produit sa
+// propre ligne de devis. Tout est en millimètres ; le prix matière est au m².
+const newMaterial = (i = 0) => ({
+  id: uid(),
+  material: "",
   pricePerM2: "",
   panelW: "2500",
   panelH: "1250",
   kerf: "3",
   grainDirection: false,
   pieces: [],
-};
+});
+const FIRST_MATERIAL = newMaterial(0);
+const DEFAULT_CALEP = { materials: [FIRST_MATERIAL], activeId: FIRST_MATERIAL.id };
+
+// Mise à niveau du format stocké. L'ancien atelier ne gardait qu'un seul
+// panneau (`{ material, panelW, …, pieces }`) ; on l'enveloppe dans la liste
+// `materials` pour ne rien perdre des devis déjà commencés.
+function migrateCalep(raw) {
+  if (!raw || typeof raw !== "object") return { materials: [newMaterial(0)], activeId: null };
+  let materials;
+  if (Array.isArray(raw.materials)) {
+    materials = raw.materials.map((m, i) => ({
+      ...newMaterial(i),
+      ...m,
+      id: m && m.id ? m.id : uid(),
+      pieces: Array.isArray(m && m.pieces) ? m.pieces : [],
+    }));
+  } else {
+    materials = [{
+      ...newMaterial(0),
+      material: raw.material != null ? raw.material : "",
+      pricePerM2: raw.pricePerM2 != null ? raw.pricePerM2 : "",
+      panelW: raw.panelW != null ? raw.panelW : "2500",
+      panelH: raw.panelH != null ? raw.panelH : "1250",
+      kerf: raw.kerf != null ? raw.kerf : "3",
+      grainDirection: !!raw.grainDirection,
+      pieces: Array.isArray(raw.pieces) ? raw.pieces : [],
+    }];
+  }
+  if (!materials.length) materials = [newMaterial(0)];
+  const activeId = materials.some((m) => m.id === raw.activeId) ? raw.activeId : materials[0].id;
+  return { materials, activeId };
+}
+
+const nf1 = (n) => (isFinite(n) ? n : 0).toLocaleString("fr-BE", { maximumFractionDigits: 1 });
+
+// Calepinage + métrique d'UN matériau (pur, sans DOM) : on convertit les
+// champs de saisie (w/h/qty en chaînes) vers le noyau, puis on délègue tout le
+// calcul à etabli-core (source unique de vérité).
+function computeMaterial(mat) {
+  const config = {
+    width: num(mat.panelW),
+    height: num(mat.panelH),
+    kerf: num(mat.kerf),
+    grainDirection: !!mat.grainDirection,
+  };
+  const piecesForCore = mat.pieces.map((p) => ({
+    id: p.id, label: p.label,
+    width: num(p.w), height: num(p.h), quantity: num(p.qty), color: p.color,
+  }));
+  const result = calculateCutlist(piecesForCore, config);
+  const metrics = panelMetrics(result, config, num(mat.pricePerM2), 0.001);
+  const cutList = cutListText(piecesForCore, { unit: "mm" });
+  const hasPieces = piecesForCore.some((p) => p.width > 0 && p.height > 0 && p.quantity > 0);
+  return { id: mat.id, config, piecesForCore, result, metrics, cutList, hasPieces };
+}
+
+// Ligne « fourniture » correspondant à un matériau calepiné : N panneaux entiers
+// au coût/panneau, avec la liste de débit pliée dans le métré.
+function buildCalepLine(mat, comp, marge) {
+  const { metrics, cutList } = comp;
+  const detail = [
+    `${metrics.totalSheets} panneau(x) ${num(mat.panelW)}×${num(mat.panelH)} mm — chute ${nf1(metrics.totalWastePercent)} %`,
+    cutList.text,
+  ].join("\n");
+  return {
+    id: uid(),
+    type: "fourniture",
+    designation: (mat.material || "Panneau") + " — débit calepiné",
+    detail,
+    showDetail: true,
+    showQty: true,
+    qte: String(metrics.totalSheets),
+    unite: "panneau",
+    pa: (Math.round(metrics.costPerPanel * 100) / 100).toString(),
+    marge,
+    heures: "",
+    tauxVente: "",
+    coutHoraire: "",
+  };
+}
 
 /* =========================================================================
    APP
@@ -220,7 +305,7 @@ function App() {
           const q = await window.storage.get("etabli:quotes").catch(() => null);
           if (q && q.value) setSaved(JSON.parse(q.value) || []);
           const cp = await window.storage.get("etabli:calepinage").catch(() => null);
-          if (cp && cp.value) setCalep((c) => ({ ...c, ...JSON.parse(cp.value) }));
+          if (cp && cp.value) setCalep(migrateCalep(JSON.parse(cp.value)));
         }
       } catch (e) {
         /* ignore — first run */
@@ -375,13 +460,15 @@ function App() {
   };
 
   /* ---------- calepinage → devis ---------- */
-  // Adds the result as a single "fourniture" line: N whole panels at the
-  // per-panel cost, with the cut list folded into the metré detail.
-  const addCalepToDevis = (line) => {
-    setDevis((d) => ({ ...d, lines: [...d.lines, line] }));
+  // Adds one or several "fourniture" lines (one per calepiné material): N whole
+  // panels at the per-panel cost, with the cut list folded into the metré detail.
+  const addCalepToDevis = (lineOrLines) => {
+    const lines = Array.isArray(lineOrLines) ? lineOrLines : [lineOrLines];
+    if (!lines.length) return;
+    setDevis((d) => ({ ...d, lines: [...d.lines, ...lines] }));
     setModal(null);
     setView("atelier");
-    flash("Calepinage ajouté au devis");
+    flash(lines.length > 1 ? `${lines.length} lignes ajoutées au devis` : "Calepinage ajouté au devis");
   };
 
   /* ============================ RENDER ============================ */
@@ -1181,42 +1268,65 @@ function SheetSVG({ layout, panelW, panelH, index }) {
 }
 
 function Calepinage({ calep, setCalep, params, onAddToDevis, flash }) {
-  const set = (patch) => setCalep((c) => ({ ...c, ...patch }));
+  // Liste des matériaux + matériau actif (avec garde si l'état est incomplet).
+  const materials = calep.materials && calep.materials.length ? calep.materials : [newMaterial(0)];
+  const activeId = materials.some((m) => m.id === calep.activeId) ? calep.activeId : materials[0].id;
+  const activeMat = materials.find((m) => m.id === activeId) || materials[0];
+
+  // Mutations ciblant le matériau actif.
+  const setMat = (patch) =>
+    setCalep((c) => ({ ...c, materials: c.materials.map((m) => (m.id === activeId ? { ...m, ...patch } : m)) }));
   const setPiece = (id, patch) =>
-    setCalep((c) => ({ ...c, pieces: c.pieces.map((p) => (p.id === id ? { ...p, ...patch } : p)) }));
+    setCalep((c) => ({
+      ...c,
+      materials: c.materials.map((m) =>
+        m.id === activeId ? { ...m, pieces: m.pieces.map((p) => (p.id === id ? { ...p, ...patch } : p)) } : m
+      ),
+    }));
   const addPiece = () =>
-    setCalep((c) => ({ ...c, pieces: [...c.pieces, newPiece(c.pieces.length)] }));
+    setCalep((c) => ({
+      ...c,
+      materials: c.materials.map((m) =>
+        m.id === activeId ? { ...m, pieces: [...m.pieces, newPiece(m.pieces.length)] } : m
+      ),
+    }));
   const delPiece = (id) =>
-    setCalep((c) => ({ ...c, pieces: c.pieces.filter((p) => p.id !== id) }));
+    setCalep((c) => ({
+      ...c,
+      materials: c.materials.map((m) =>
+        m.id === activeId ? { ...m, pieces: m.pieces.filter((p) => p.id !== id) } : m
+      ),
+    }));
 
-  const config = {
-    width: num(calep.panelW),
-    height: num(calep.panelH),
-    kerf: num(calep.kerf),
-    grainDirection: !!calep.grainDirection,
-  };
+  // Gestion des matériaux (onglets).
+  const selectMat = (id) => setCalep((c) => ({ ...c, activeId: id }));
+  const addMaterial = () =>
+    setCalep((c) => {
+      const m = newMaterial(c.materials.length);
+      return { ...c, materials: [...c.materials, m], activeId: m.id };
+    });
+  const delMaterial = (id) =>
+    setCalep((c) => {
+      if (c.materials.length <= 1) return c; // on garde toujours au moins un matériau
+      const left = c.materials.filter((m) => m.id !== id);
+      return { ...c, materials: left, activeId: c.activeId === id ? left[0].id : c.activeId };
+    });
 
-  const piecesForCore = useMemo(
-    () =>
-      calep.pieces.map((p) => ({
-        id: p.id, label: p.label,
-        width: num(p.w), height: num(p.h), quantity: num(p.qty), color: p.color,
-      })),
-    [calep.pieces]
-  );
+  // Calcul de TOUS les matériaux (pour les badges d'onglet + le total général),
+  // puis on isole le matériau actif pour l'éditeur ci-dessous.
+  const computed = useMemo(() => materials.map(computeMaterial), [materials]);
+  const compById = (id) => computed.find((c) => c.id === id) || computeMaterial(activeMat);
+  const active = compById(activeId);
+  const { result, metrics, cutList, hasPieces } = active;
 
-  const result = useMemo(
-    () => calculateCutlist(piecesForCore, config),
-    [piecesForCore, calep.panelW, calep.panelH, calep.kerf, calep.grainDirection]
-  );
-  const metrics = useMemo(
-    () => panelMetrics(result, config, num(calep.pricePerM2), 0.001),
-    [result, calep.panelW, calep.panelH, calep.pricePerM2]
-  );
-  const cutList = useMemo(() => cutListText(piecesForCore, { unit: "mm" }), [piecesForCore]);
-
-  const hasPieces = piecesForCore.some((p) => p.width > 0 && p.height > 0 && p.quantity > 0);
-  const nf1 = (n) => (isFinite(n) ? n : 0).toLocaleString("fr-BE", { maximumFractionDigits: 1 });
+  // Total tous matériaux confondus (uniquement ceux qui consomment ≥ 1 panneau).
+  const grand = useMemo(() => {
+    let sheets = 0, cost = 0, lines = 0;
+    computed.forEach((c) => {
+      if (c.metrics.totalSheets > 0) { sheets += c.metrics.totalSheets; cost += c.metrics.totalCost; lines += 1; }
+    });
+    return { sheets, cost, lines };
+  }, [computed]);
 
   const copyList = async () => {
     try {
@@ -1227,77 +1337,96 @@ function Calepinage({ calep, setCalep, params, onAddToDevis, flash }) {
     }
   };
 
-  const addToDevis = () => {
-    const detail = [
-      `${metrics.totalSheets} panneau(x) ${num(calep.panelW)}×${num(calep.panelH)} mm — chute ${nf1(metrics.totalWastePercent)} %`,
-      cutList.text,
-    ].join("\n");
-    onAddToDevis({
-      id: uid(),
-      type: "fourniture",
-      designation: (calep.material || "Panneau") + " — débit calepiné",
-      detail,
-      showDetail: true,
-      showQty: true,
-      qte: String(metrics.totalSheets),
-      unite: "panneau",
-      pa: (Math.round(metrics.costPerPanel * 100) / 100).toString(),
-      marge: params.marge,
-      heures: "",
-      tauxVente: "",
-      coutHoraire: "",
+  const addActiveToDevis = () => {
+    if (metrics.totalSheets === 0) return;
+    onAddToDevis(buildCalepLine(activeMat, active, params.marge));
+  };
+  const addAllToDevis = () => {
+    const lines = [];
+    materials.forEach((m) => {
+      const c = compById(m.id);
+      if (c.metrics.totalSheets > 0) lines.push(buildCalepLine(m, c, params.marge));
     });
+    if (lines.length) onAddToDevis(lines);
   };
 
   return (
     <div className="cl">
       <p className="muted tip">
-        Les panneaux s'achètent entiers. Indique la cote des panneaux et le prix au m²,
-        liste les pièces à débiter (longueur × largeur, en mm) : ÉTABLI calcule le nombre
-        de panneaux à commander, le calepinage et le coût matière.
+        Les panneaux s'achètent entiers. Ajoute un matériau par type de panneau
+        (ex. MDF 18 mm à 30 €/m², aglo blanc 8 mm à 15 €/m²) : chacun se débite sur
+        ses propres plaques et crée sa propre ligne de devis. Pour chaque matière,
+        indique la cote et le prix au m², puis liste les pièces (longueur × largeur, en mm).
       </p>
 
-      {/* stock + matière */}
+      {/* onglets matériaux */}
+      <div className="cl-mats">
+        {materials.map((m, i) => {
+          const c = compById(m.id);
+          return (
+            <button
+              key={m.id}
+              type="button"
+              className={"cl-mat" + (m.id === activeId ? " active" : "")}
+              onClick={() => selectMat(m.id)}
+            >
+              <span className="cl-mat-name">{m.material || `Matière ${i + 1}`}</span>
+              <span className="cl-mat-badge">{c.metrics.totalSheets > 0 ? `${c.metrics.totalSheets} pann.` : "—"}</span>
+              {materials.length > 1 && (
+                <span
+                  className="cl-mat-x"
+                  title="Supprimer ce matériau"
+                  role="button"
+                  onClick={(e) => { e.stopPropagation(); delMaterial(m.id); }}
+                >✕</span>
+              )}
+            </button>
+          );
+        })}
+        <button type="button" className="btn add cl-mat-add" onClick={addMaterial}>+ Matière</button>
+      </div>
+
+      {/* stock + matière (matériau actif) */}
       <div className="card-eyebrow">Panneau &amp; matière</div>
       <div className="grid">
         <Field label="Matière / désignation" wide>
-          <TextIn value={calep.material} onChange={(v) => set({ material: v })} placeholder="Ex. MDF 18 mm, multiplex bouleau 18 mm…" />
+          <TextIn value={activeMat.material} onChange={(v) => setMat({ material: v })} placeholder="Ex. MDF 18 mm, aglo blanc 8 mm…" />
         </Field>
         <Field label="Longueur panneau">
-          <NumIn value={calep.panelW} onChange={(v) => set({ panelW: v })} suffix="mm" />
+          <NumIn value={activeMat.panelW} onChange={(v) => setMat({ panelW: v })} suffix="mm" />
         </Field>
         <Field label="Largeur panneau">
-          <NumIn value={calep.panelH} onChange={(v) => set({ panelH: v })} suffix="mm" />
+          <NumIn value={activeMat.panelH} onChange={(v) => setMat({ panelH: v })} suffix="mm" />
         </Field>
         <Field label="Prix matière" hint="HTVA, au m²">
-          <NumIn value={calep.pricePerM2} onChange={(v) => set({ pricePerM2: v })} suffix="€/m²" />
+          <NumIn value={activeMat.pricePerM2} onChange={(v) => setMat({ pricePerM2: v })} suffix="€/m²" />
         </Field>
         <Field label="Trait de scie">
-          <NumIn value={calep.kerf} onChange={(v) => set({ kerf: v })} suffix="mm" />
+          <NumIn value={activeMat.kerf} onChange={(v) => setMat({ kerf: v })} suffix="mm" />
         </Field>
         <Field label="Sens du fil">
           <label className="tog cl-tog">
             <input
               type="checkbox"
-              checked={!!calep.grainDirection}
-              onChange={(e) => set({ grainDirection: e.target.checked })}
+              checked={!!activeMat.grainDirection}
+              onChange={(e) => setMat({ grainDirection: e.target.checked })}
             />
             Bloquer la rotation
           </label>
         </Field>
       </div>
 
-      {/* pièces */}
+      {/* pièces (matériau actif) */}
       <div className="card-eyebrow mt">Pièces à débiter</div>
-      {calep.pieces.length === 0 && (
+      {activeMat.pieces.length === 0 && (
         <div className="empty">Aucune pièce. Ajoute les pièces à découper ci-dessous.</div>
       )}
-      {calep.pieces.length > 0 && (
+      {activeMat.pieces.length > 0 && (
         <div className="cl-pieces">
           <div className="cl-prow cl-prow-head">
             <span>Désignation</span><span>Long.</span><span>Larg.</span><span>Qté</span><span></span>
           </div>
-          {calep.pieces.map((p) => (
+          {activeMat.pieces.map((p) => (
             <div className="cl-prow" key={p.id}>
               <span className="cl-swatch-wrap">
                 <span className="cl-swatch" style={{ background: p.color }} />
@@ -1319,10 +1448,10 @@ function Calepinage({ calep, setCalep, params, onAddToDevis, flash }) {
         <button className="btn add" onClick={addPiece}>+ Ajouter une pièce</button>
       </div>
 
-      {/* résultats */}
+      {/* résultats (matériau actif) */}
       {hasPieces && result && (
         <>
-          <div className="card-eyebrow mt">Résultat</div>
+          <div className="card-eyebrow mt">Résultat — {activeMat.material || `Matière ${materials.indexOf(activeMat) + 1}`}</div>
           <div className="sum-grid cl-stats">
             <Stat label="Panneaux à acheter" value={String(metrics.totalSheets)} big />
             <Stat label="Chute" value={nf1(metrics.totalWastePercent) + " %"} />
@@ -1333,8 +1462,8 @@ function Calepinage({ calep, setCalep, params, onAddToDevis, flash }) {
           {result.unfitPieces.length > 0 && (
             <div className="cl-warn">
               ⚠ {result.unfitPieces.length} pièce(s) ne tiennent pas sur un panneau{" "}
-              {num(calep.panelW)}×{num(calep.panelH)} mm
-              {calep.grainDirection ? " (rotation bloquée — essaie de décocher « Bloquer la rotation »)" : ""}.
+              {num(activeMat.panelW)}×{num(activeMat.panelH)} mm
+              {activeMat.grainDirection ? " (rotation bloquée — essaie de décocher « Bloquer la rotation »)" : ""}.
               Vérifie les cotes : {result.unfitPieces.map((u) => u.label || "—").join(", ")}.
             </div>
           )}
@@ -1342,7 +1471,7 @@ function Calepinage({ calep, setCalep, params, onAddToDevis, flash }) {
           {result.sheets.length > 0 && (
             <div className="cl-sheets">
               {result.sheets.map((s) => (
-                <SheetSVG key={s.sheetIndex} layout={s} panelW={num(calep.panelW)} panelH={num(calep.panelH)} index={s.sheetIndex} />
+                <SheetSVG key={s.sheetIndex} layout={s} panelW={num(activeMat.panelW)} panelH={num(activeMat.panelH)} index={s.sheetIndex} />
               ))}
             </div>
           )}
@@ -1362,11 +1491,24 @@ function Calepinage({ calep, setCalep, params, onAddToDevis, flash }) {
           />
           <div className="add-row cl-actions">
             <button className="btn ghost" onClick={copyList}>Copier la liste</button>
-            <button className="btn" onClick={addToDevis} disabled={metrics.totalSheets === 0}>
+            <button className="btn" onClick={addActiveToDevis} disabled={metrics.totalSheets === 0}>
               Ajouter au devis ({metrics.totalSheets} panneau{metrics.totalSheets > 1 ? "x" : ""})
             </button>
           </div>
         </>
+      )}
+
+      {/* total tous matériaux — bouton « tout ajouter » quand plusieurs matières sont chiffrées */}
+      {grand.lines > 1 && (
+        <div className="cl-grand">
+          <div className="cl-grand-sum">
+            <span><strong>{grand.sheets}</strong> panneau(x) · <strong>{grand.lines}</strong> matières chiffrées</span>
+            <span className="cl-grand-cost">{eur(grand.cost)}</span>
+          </div>
+          <button type="button" className="btn" onClick={addAllToDevis}>
+            Ajouter tout au devis ({grand.lines} lignes)
+          </button>
+        </div>
       )}
     </div>
   );
@@ -1612,6 +1754,21 @@ const CSS = `
 .cl-piece-lab{fill:var(--ink); font-family:var(--mono); font-weight:600; paint-order:stroke; stroke:#fff; stroke-width:.6; stroke-linejoin:round}
 .cl-list{font-family:var(--mono); font-size:12px; white-space:pre; overflow:auto; background:#fff}
 .cl-actions{justify-content:flex-end; align-items:center}
+
+/* onglets matériaux + total tous matériaux */
+.cl-mats{display:flex; flex-wrap:wrap; gap:7px; margin-bottom:14px}
+.cl-mat{display:inline-flex; align-items:center; gap:8px; padding:7px 11px; border:1px solid var(--line); border-radius:8px; background:#fff; cursor:pointer; font:inherit; font-size:13px; color:var(--ink-2)}
+.cl-mat:hover{border-color:var(--ink-3)}
+.cl-mat.active{border-color:var(--oak-2); background:var(--oak-soft); color:var(--ink); font-weight:600; box-shadow:inset 0 0 0 1px var(--oak-2)}
+.cl-mat-name{max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.cl-mat-badge{font-family:var(--mono); font-size:11px; color:var(--ink-3)}
+.cl-mat.active .cl-mat-badge{color:var(--oak-2)}
+.cl-mat-x{display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; color:var(--ink-3); font-size:11px; border-radius:5px}
+.cl-mat-x:hover{background:var(--brick); color:#fff}
+.cl-mat-add{padding:7px 11px}
+.cl-grand{display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-top:18px; padding:13px 15px; border:1px solid var(--oak-2); border-radius:9px; background:var(--oak-soft)}
+.cl-grand-sum{display:flex; flex-direction:column; gap:2px; font-size:13px; color:var(--ink-2)}
+.cl-grand-cost{font-family:var(--mono); font-size:16px; font-weight:700; color:var(--oak-2)}
 
 .toast{position:fixed; bottom:22px; left:50%; transform:translateX(-50%); background:var(--ink); color:#fff; padding:11px 20px; border-radius:8px; font-size:13px; font-weight:500; z-index:60; box-shadow:0 8px 24px rgba(0,0,0,.3)}
 

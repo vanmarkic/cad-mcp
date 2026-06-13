@@ -145,6 +145,28 @@ test("panelMetrics: cm unit factor", () => {
   assert.ok(Math.abs(m.areaM2PerPanel - 3.125) < 1e-9);
 });
 
+/* ----- multi-matériaux : plusieurs panneaux/prix dans un même calepinage ----- */
+test("multi-matériaux: chaque panneau est chiffré à son propre €/m²", () => {
+  // MDF 18 mm à 30 €/m² ET aglo blanc 8 mm à 15 €/m², même cote 2500×1250.
+  // On ne mélange pas deux matières sur une plaque : chacune se débite sur ses
+  // propres panneaux, donc les coûts sont strictement indépendants.
+  const mdf = C.panelMetrics(
+    C.calculateCutlist([{ id: "mdf", label: "Côté", width: 600, height: 400, quantity: 4, color: "#a" }], CFG()),
+    { width: 2500, height: 1250 }, 30
+  );
+  const aglo = C.panelMetrics(
+    C.calculateCutlist([{ id: "ag", label: "Fond", width: 800, height: 500, quantity: 2, color: "#b" }], CFG()),
+    { width: 2500, height: 1250 }, 15
+  );
+  assert.ok(Math.abs(mdf.costPerPanel - 93.75) < 1e-9);   // 3,125 m² × 30 €/m²
+  assert.ok(Math.abs(aglo.costPerPanel - 46.875) < 1e-9); // 3,125 m² × 15 €/m²
+  assert.notEqual(mdf.costPerPanel, aglo.costPerPanel);
+  // Le coût matière d'un devis multi-matières = somme des coûts par matière.
+  const grandCost = mdf.totalCost + aglo.totalCost;
+  const expected = mdf.costPerPanel * mdf.totalSheets + aglo.costPerPanel * aglo.totalSheets;
+  assert.ok(Math.abs(grandCost - expected) < 1e-9);
+});
+
 /* -------------------------------------------------- cutListText() */
 test("cutListText: groups identical pieces and counts totals", () => {
   const out = C.cutListText([
