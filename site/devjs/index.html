@@ -1,0 +1,1341 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>ÉTABLI — Générateur de devis pour menuisier</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23E7E2D8'/%3E%3Crect x='4' y='4' width='24' height='24' fill='none' stroke='%23211D18' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Georgia' font-size='14' text-anchor='middle' fill='%23A8631F'%3E%E2%96%9F%E2%96%99%3C/text%3E%3C/svg%3E">
+<style>html,body{margin:0;padding:0;background:#E7E2D8}</style>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<!-- localStorage-backed shim for the async window.storage API the app expects -->
+<script>
+window.storage = {
+  get: async (key) => {
+    try { const v = localStorage.getItem(key); return v == null ? null : { value: v }; }
+    catch (e) { return null; }
+  },
+  set: async (key, value) => {
+    try { localStorage.setItem(key, value); } catch (e) {}
+  },
+};
+</script>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useMemo, useRef } = React;
+
+/* =========================================================================
+   ÉTABLI — Générateur de devis pour menuisier
+   Deux faces d'une même feuille :
+   - ATELIER : tout le back-office (coût, marge, métré, bénéfice)
+   - DEVIS CLIENT : uniquement ce que le client voit (désignation, qté,
+     PU HTVA, total, TVA, acompte). Coût et marge ne sortent jamais.
+   ========================================================================= */
+
+/* ---------- helpers ---------- */
+const num = (v) => {
+  if (typeof v === "number") return isFinite(v) ? v : 0;
+  if (v == null) return 0;
+  const f = parseFloat(String(v).replace(/\s/g, "").replace(",", "."));
+  return isFinite(f) ? f : 0;
+};
+const eur = (n) =>
+  new Intl.NumberFormat("fr-BE", { style: "currency", currency: "EUR" }).format(
+    isFinite(n) ? n : 0
+  );
+const pct = (n) =>
+  (isFinite(n) ? n : 0).toLocaleString("fr-BE", { maximumFractionDigits: 1 }) + " %";
+const todayISO = () => new Date().toISOString().slice(0, 10);
+const frDate = (iso) => {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+};
+const uid = () => Math.random().toString(36).slice(2, 9);
+
+/* ---------- TVA / client types ---------- */
+const TVA_OPTIONS = [
+  { v: 6, label: "6 % — rénovation (logement > 10 ans)" },
+  { v: 21, label: "21 % — standard / neuf" },
+  { v: 12, label: "12 % — cas particuliers" },
+];
+
+/* ---------- small inputs (defined outside to keep focus stable) ---------- */
+function Field({ label, hint, children, wide }) {
+  return (
+    <label className={"fld" + (wide ? " fld-wide" : "")}>
+      <span className="fld-lab">{label}</span>
+      {children}
+      {hint ? <span className="fld-hint">{hint}</span> : null}
+    </label>
+  );
+}
+function TextIn({ value, onChange, placeholder, mono }) {
+  return (
+    <input
+      className={"in" + (mono ? " in-mono" : "")}
+      type="text"
+      value={value ?? ""}
+      placeholder={placeholder || ""}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  );
+}
+function NumIn({ value, onChange, placeholder, suffix }) {
+  return (
+    <span className="numwrap">
+      <input
+        className="in in-mono in-num"
+        type="text"
+        inputMode="decimal"
+        value={value ?? ""}
+        placeholder={placeholder || "0"}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      {suffix ? <span className="numsfx">{suffix}</span> : null}
+    </span>
+  );
+}
+function AreaIn({ value, onChange, placeholder }) {
+  return (
+    <textarea
+      className="in in-area"
+      rows={2}
+      value={value ?? ""}
+      placeholder={placeholder || ""}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  );
+}
+
+/* ---------- line computation ---------- */
+function computeLine(l) {
+  if (l.type === "main") {
+    const cout = num(l.heures) * num(l.coutHoraire);
+    const vente = num(l.heures) * num(l.tauxVente);
+    return { cout, vente, puv: num(l.tauxVente), qte: num(l.heures), unite: "h" };
+  }
+  if (l.type === "forfait") {
+    const cout = num(l.pa);
+    const vente = num(l.pa) * (1 + num(l.marge) / 100);
+    return { cout, vente, puv: vente, qte: 1, unite: "forfait" };
+  }
+  // fourniture
+  const puv = num(l.pa) * (1 + num(l.marge) / 100);
+  const vente = puv * num(l.qte);
+  const cout = num(l.pa) * num(l.qte);
+  return { cout, vente, puv, qte: num(l.qte), unite: l.unite || "u" };
+}
+
+/* ---------- defaults ---------- */
+const DEFAULT_COMPANY = {
+  nom: "Menuiserie Jérémie Peeters",
+  sousTitre: "Agencement · menuiserie sur mesure",
+  adresse: "",
+  tva: "BE 0XXX.XXX.XXX",
+  iban: "",
+  tel: "",
+  email: "",
+};
+const DEFAULT_PARAMS = {
+  tauxVente: "55",
+  coutHoraire: "35",
+  marge: "30",
+  tvaRate: 6,
+  validite: "30",
+  acompte: "30",
+  margeCible: "25",
+};
+const newLine = (type, p) => ({
+  id: uid(),
+  type,
+  designation: "",
+  detail: "",
+  showDetail: false,
+  showQty: true,
+  qte: type === "fourniture" ? "1" : "",
+  unite: "u",
+  pa: "",
+  marge: type === "forfait" || type === "fourniture" ? p.marge : "",
+  heures: "",
+  tauxVente: type === "main" ? p.tauxVente : "",
+  coutHoraire: type === "main" ? p.coutHoraire : "",
+});
+const newDevis = (company, p) => ({
+  numero: "DEV-" + new Date().getFullYear() + "-001",
+  dateISO: todayISO(),
+  client: { nom: "", adresse: "", email: "", tel: "" },
+  chantier: "",
+  clientType: "particulier", // 'particulier' | 'pro'
+  tvaRate: p.tvaRate,
+  remiseType: "eur",
+  remiseVal: "",
+  deplacement: "",
+  deplacementCout: "",
+  acompte: p.acompte,
+  validite: p.validite,
+  conditions:
+    "Devis gratuit, sans engagement. Prix valables pour la durée de validité indiquée. " +
+    "Acompte demandé à la commande, solde à la fin du chantier. Délai à confirmer à la signature.",
+  lines: [],
+});
+
+/* =========================================================================
+   APP
+   ========================================================================= */
+function App() {
+  const [view, setView] = useState("atelier"); // 'atelier' | 'client'
+  const [company, setCompany] = useState(DEFAULT_COMPANY);
+  const [params, setParams] = useState(DEFAULT_PARAMS);
+  const [devis, setDevis] = useState(() => newDevis(DEFAULT_COMPANY, DEFAULT_PARAMS));
+  const [saved, setSaved] = useState([]);
+  const [modal, setModal] = useState(null); // 'reglages' | 'mesdevis' | null
+  const [toast, setToast] = useState("");
+  const loaded = useRef(false);
+
+  /* load persisted state */
+  useEffect(() => {
+    (async () => {
+      try {
+        if (typeof window !== "undefined" && window.storage) {
+          const s = await window.storage.get("etabli:settings").catch(() => null);
+          if (s && s.value) {
+            const parsed = JSON.parse(s.value);
+            if (parsed.company) setCompany((c) => ({ ...c, ...parsed.company }));
+            if (parsed.params) setParams((p) => ({ ...p, ...parsed.params }));
+          }
+          const q = await window.storage.get("etabli:quotes").catch(() => null);
+          if (q && q.value) setSaved(JSON.parse(q.value) || []);
+        }
+      } catch (e) {
+        /* ignore — first run */
+      } finally {
+        loaded.current = true;
+      }
+    })();
+  }, []);
+
+  const flash = (m) => {
+    setToast(m);
+    setTimeout(() => setToast(""), 2200);
+  };
+
+  const persistSettings = async (c, p) => {
+    try {
+      if (window.storage)
+        await window.storage.set(
+          "etabli:settings",
+          JSON.stringify({ company: c, params: p })
+        );
+    } catch (e) {}
+  };
+  const persistQuotes = async (list) => {
+    try {
+      if (window.storage)
+        await window.storage.set("etabli:quotes", JSON.stringify(list));
+    } catch (e) {}
+  };
+
+  /* ---------- totals ---------- */
+  const calc = useMemo(() => {
+    let cout = 0;
+    let venteHT = 0;
+    const rows = devis.lines.map((l) => {
+      const c = computeLine(l);
+      cout += c.cout;
+      venteHT += c.vente;
+      return { ...l, ...c, marge: c.vente - c.cout };
+    });
+    const remise =
+      devis.remiseType === "pct"
+        ? venteHT * (num(devis.remiseVal) / 100)
+        : num(devis.remiseVal);
+    const deplacement = num(devis.deplacement);
+    const baseHT = Math.max(0, venteHT - remise + deplacement);
+    const coutTotal = cout + num(devis.deplacementCout);
+    const rate = devis.clientType === "pro" ? 0 : devis.tvaRate;
+    const tva = baseHT * (rate / 100);
+    const ttc = baseHT + tva;
+    const marge = baseHT - coutTotal;
+    const margePct = baseHT > 0 ? (marge / baseHT) * 100 : 0;
+    const acompte = ttc * (num(devis.acompte) / 100);
+    return {
+      rows,
+      coutTotal,
+      venteHT,
+      remise,
+      deplacement,
+      baseHT,
+      rate,
+      tva,
+      ttc,
+      marge,
+      margePct,
+      acompte,
+    };
+  }, [devis]);
+
+  const margeColor = (p) => {
+    const cible = num(params.margeCible);
+    if (p >= cible) return "var(--green)";
+    if (p >= cible * 0.5) return "var(--amber)";
+    return "var(--brick)";
+  };
+
+  /* ---------- mutations ---------- */
+  const setLine = (id, patch) =>
+    setDevis((d) => ({
+      ...d,
+      lines: d.lines.map((l) => (l.id === id ? { ...l, ...patch } : l)),
+    }));
+  const addLine = (type) =>
+    setDevis((d) => ({ ...d, lines: [...d.lines, newLine(type, params)] }));
+  const delLine = (id) =>
+    setDevis((d) => ({ ...d, lines: d.lines.filter((l) => l.id !== id) }));
+  const moveLine = (id, dir) =>
+    setDevis((d) => {
+      const i = d.lines.findIndex((l) => l.id === id);
+      const j = i + dir;
+      if (i < 0 || j < 0 || j >= d.lines.length) return d;
+      const arr = [...d.lines];
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+      return { ...d, lines: arr };
+    });
+
+  const saveQuote = () => {
+    setSaved((list) => {
+      const idx = list.findIndex((x) => x.numero === devis.numero);
+      const stamped = { ...devis, _savedAt: new Date().toISOString() };
+      const next =
+        idx >= 0
+          ? list.map((x, i) => (i === idx ? stamped : x))
+          : [stamped, ...list];
+      persistQuotes(next);
+      return next;
+    });
+    flash("Devis enregistré : " + devis.numero);
+  };
+  const loadQuote = (q) => {
+    setDevis(JSON.parse(JSON.stringify(q)));
+    setModal(null);
+    setView("atelier");
+    flash("Devis chargé : " + q.numero);
+  };
+  const deleteQuote = (numero) =>
+    setSaved((list) => {
+      const next = list.filter((x) => x.numero !== numero);
+      persistQuotes(next);
+      return next;
+    });
+  const resetQuote = () => {
+    setDevis(newDevis(company, params));
+    setModal(null);
+    flash("Nouveau devis");
+  };
+
+  const doPrint = () => {
+    setView("client");
+    setTimeout(() => window.print(), 350);
+  };
+
+  /* ============================ RENDER ============================ */
+  return (
+    <div className="app">
+      <style>{CSS}</style>
+
+      {/* top bar */}
+      <header className="bar no-print">
+        <div className="brand">
+          <div className="brand-mark">▟▙</div>
+          <div>
+            <div className="brand-name">ÉTABLI</div>
+            <div className="brand-sub">devis de menuiserie · atelier &amp; client</div>
+          </div>
+        </div>
+
+        <div className="flip" role="tablist" aria-label="Vue">
+          <button
+            className={"flip-btn" + (view === "atelier" ? " on" : "")}
+            onClick={() => setView("atelier")}
+          >
+            Atelier
+          </button>
+          <button
+            className={"flip-btn" + (view === "client" ? " on" : "")}
+            onClick={() => setView("client")}
+          >
+            Devis client
+          </button>
+        </div>
+
+        <div className="bar-actions">
+          <button className="btn ghost" onClick={() => setModal("reglages")}>
+            Réglages
+          </button>
+          <button className="btn ghost" onClick={() => setModal("mesdevis")}>
+            Mes devis {saved.length ? `(${saved.length})` : ""}
+          </button>
+          <button className="btn ghost" onClick={resetQuote}>
+            Nouveau
+          </button>
+          <button className="btn" onClick={saveQuote}>
+            Enregistrer
+          </button>
+        </div>
+      </header>
+
+      {view === "atelier" ? (
+        <Atelier
+          devis={devis}
+          setDevis={setDevis}
+          params={params}
+          calc={calc}
+          setLine={setLine}
+          addLine={addLine}
+          delLine={delLine}
+          moveLine={moveLine}
+          margeColor={margeColor}
+        />
+      ) : (
+        <ClientSheet
+          devis={devis}
+          company={company}
+          calc={calc}
+          onPrint={doPrint}
+        />
+      )}
+
+      {/* ---------- modals ---------- */}
+      {modal === "reglages" && (
+        <Modal title="Réglages" onClose={() => setModal(null)} wide>
+          <Reglages
+            company={company}
+            params={params}
+            onSave={(c, p) => {
+              setCompany(c);
+              setParams(p);
+              persistSettings(c, p);
+              setModal(null);
+              flash("Réglages enregistrés");
+            }}
+          />
+        </Modal>
+      )}
+      {modal === "mesdevis" && (
+        <Modal title="Mes devis" onClose={() => setModal(null)}>
+          {saved.length === 0 ? (
+            <p className="muted">
+              Aucun devis enregistré pour l'instant. Clique sur « Enregistrer »
+              pour garder un devis ici.
+            </p>
+          ) : (
+            <ul className="qlist">
+              {saved.map((q) => (
+                <li key={q.numero} className="qrow">
+                  <div>
+                    <div className="qrow-num">{q.numero}</div>
+                    <div className="qrow-meta">
+                      {q.client?.nom || "Client —"} · {frDate(q.dateISO)} ·{" "}
+                      {q.lines?.length || 0} ligne(s)
+                    </div>
+                  </div>
+                  <div className="qrow-act">
+                    <button className="btn sm" onClick={() => loadQuote(q)}>
+                      Charger
+                    </button>
+                    <button
+                      className="btn sm danger"
+                      onClick={() => deleteQuote(q.numero)}
+                    >
+                      Suppr.
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Modal>
+      )}
+
+      {toast ? <div className="toast no-print">{toast}</div> : null}
+    </div>
+  );
+}
+
+/* =========================================================================
+   ATELIER (back-office)
+   ========================================================================= */
+function Atelier({
+  devis,
+  setDevis,
+  params,
+  calc,
+  setLine,
+  addLine,
+  delLine,
+  moveLine,
+  margeColor,
+}) {
+  const set = (patch) => setDevis((d) => ({ ...d, ...patch }));
+  const setClient = (patch) =>
+    setDevis((d) => ({ ...d, client: { ...d.client, ...patch } }));
+
+  return (
+    <main className="wrap no-print">
+      {/* meta + client */}
+      <section className="card">
+        <div className="card-eyebrow">01 — Chantier &amp; client</div>
+        <div className="grid">
+          <Field label="N° de devis">
+            <TextIn value={devis.numero} onChange={(v) => set({ numero: v })} mono />
+          </Field>
+          <Field label="Date">
+            <TextIn value={devis.dateISO} onChange={(v) => set({ dateISO: v })} mono />
+          </Field>
+          <Field label="Validité (jours)">
+            <NumIn value={devis.validite} onChange={(v) => set({ validite: v })} suffix="j" />
+          </Field>
+          <Field label="Client">
+            <TextIn
+              value={devis.client.nom}
+              onChange={(v) => setClient({ nom: v })}
+              placeholder="Nom / société"
+            />
+          </Field>
+          <Field label="Téléphone">
+            <TextIn value={devis.client.tel} onChange={(v) => setClient({ tel: v })} />
+          </Field>
+          <Field label="E-mail">
+            <TextIn value={devis.client.email} onChange={(v) => setClient({ email: v })} />
+          </Field>
+          <Field label="Adresse du chantier" wide>
+            <TextIn
+              value={devis.client.adresse}
+              onChange={(v) => setClient({ adresse: v })}
+            />
+          </Field>
+          <Field label="Description du chantier" wide>
+            <TextIn
+              value={devis.chantier}
+              onChange={(v) => set({ chantier: v })}
+              placeholder="Ex. fabrication et pose d'un dressing sur mesure"
+            />
+          </Field>
+        </div>
+      </section>
+
+      {/* lines */}
+      <section className="card">
+        <div className="card-eyebrow">02 — Bordereau &amp; métré</div>
+        <p className="muted tip">
+          Tout ce que tu encodes ici reste à l'atelier. Le client ne verra ni le
+          coût d'achat, ni le coût horaire, ni la marge — seulement la désignation,
+          la quantité et le prix de vente.
+        </p>
+
+        {devis.lines.length === 0 && (
+          <div className="empty">
+            Aucune ligne. Ajoute une fourniture, de la main-d'œuvre ou un forfait
+            ci-dessous.
+          </div>
+        )}
+
+        <div className="lines">
+          {calc.rows.map((l, i) => (
+            <LineCard
+              key={l.id}
+              line={l}
+              index={i}
+              last={i === devis.lines.length - 1}
+              setLine={setLine}
+              delLine={delLine}
+              moveLine={moveLine}
+              margeColor={margeColor}
+            />
+          ))}
+        </div>
+
+        <div className="add-row">
+          <button className="btn add" onClick={() => addLine("fourniture")}>
+            + Fourniture
+          </button>
+          <button className="btn add" onClick={() => addLine("main")}>
+            + Main-d'œuvre
+          </button>
+          <button className="btn add" onClick={() => addLine("forfait")}>
+            + Forfait / sous-traitance
+          </button>
+        </div>
+      </section>
+
+      {/* adjustments */}
+      <section className="card">
+        <div className="card-eyebrow">03 — Ajustements</div>
+        <div className="grid">
+          <Field label="Remise">
+            <div className="remise">
+              <select
+                className="in in-sel"
+                value={devis.remiseType}
+                onChange={(e) => set({ remiseType: e.target.value })}
+              >
+                <option value="eur">€</option>
+                <option value="pct">%</option>
+              </select>
+              <NumIn value={devis.remiseVal} onChange={(v) => set({ remiseVal: v })} />
+            </div>
+          </Field>
+          <Field label="Déplacement — prix client" hint="HTVA, visible sur le devis">
+            <NumIn value={devis.deplacement} onChange={(v) => set({ deplacement: v })} suffix="€" />
+          </Field>
+          <Field label="Déplacement — coût réel" hint="atelier uniquement">
+            <NumIn
+              value={devis.deplacementCout}
+              onChange={(v) => set({ deplacementCout: v })}
+              suffix="€"
+            />
+          </Field>
+          <Field label="Type de client">
+            <select
+              className="in in-sel"
+              value={devis.clientType}
+              onChange={(e) => set({ clientType: e.target.value })}
+            >
+              <option value="particulier">Particulier (TVA appliquée)</option>
+              <option value="pro">Professionnel (cocontractant)</option>
+            </select>
+          </Field>
+          {devis.clientType === "particulier" && (
+            <Field label="Taux de TVA">
+              <select
+                className="in in-sel"
+                value={devis.tvaRate}
+                onChange={(e) => set({ tvaRate: Number(e.target.value) })}
+              >
+                {TVA_OPTIONS.map((o) => (
+                  <option key={o.v} value={o.v}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+          <Field label="Acompte à la commande">
+            <NumIn value={devis.acompte} onChange={(v) => set({ acompte: v })} suffix="%" />
+          </Field>
+          <Field label="Conditions (bas de devis)" wide>
+            <AreaIn value={devis.conditions} onChange={(v) => set({ conditions: v })} />
+          </Field>
+        </div>
+      </section>
+
+      {/* atelier summary */}
+      <section className="card summary">
+        <div className="card-eyebrow">04 — Vue atelier</div>
+        <div className="sum-grid">
+          <Stat label="Coût de revient" value={eur(calc.coutTotal)} muted />
+          <Stat label="Vente HTVA" value={eur(calc.baseHT)} />
+          <Stat
+            label="Marge"
+            value={eur(calc.marge)}
+            sub={pct(calc.margePct)}
+            color={margeColor(calc.margePct)}
+            big
+          />
+          <Stat label="Bénéfice estimé" value={eur(calc.marge)} color={margeColor(calc.margePct)} />
+        </div>
+        <div className="margebar">
+          <div
+            className="margebar-fill"
+            style={{
+              width: Math.min(100, Math.max(2, calc.margePct)) + "%",
+              background: margeColor(calc.margePct),
+            }}
+          />
+          <span className="margebar-lab">
+            Marge {pct(calc.margePct)} · cible {pct(num(params.margeCible))}
+          </span>
+        </div>
+
+        <div className="sum-tot">
+          <Row k="Total HTVA" v={eur(calc.baseHT)} />
+          <Row
+            k={
+              calc.rate === 0
+                ? "TVA — autoliquidation (0 %)"
+                : `TVA ${calc.rate} %`
+            }
+            v={eur(calc.tva)}
+          />
+          <Row k="Total TVAC" v={eur(calc.ttc)} strong />
+          <Row k={`Acompte (${num(devis.acompte)} %)`} v={eur(calc.acompte)} />
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function Stat({ label, value, sub, color, big, muted }) {
+  return (
+    <div className={"stat" + (big ? " stat-big" : "")}>
+      <div className="stat-lab">{label}</div>
+      <div className="stat-val" style={{ color: color || (muted ? "var(--ink-3)" : "var(--ink)") }}>
+        {value}
+      </div>
+      {sub ? <div className="stat-sub" style={{ color }}>{sub}</div> : null}
+    </div>
+  );
+}
+function Row({ k, v, strong }) {
+  return (
+    <div className={"trow" + (strong ? " trow-strong" : "")}>
+      <span>{k}</span>
+      <span className="mono">{v}</span>
+    </div>
+  );
+}
+
+/* ---------- single line card ---------- */
+function LineCard({ line, index, last, setLine, delLine, moveLine, margeColor }) {
+  const l = line;
+  const typeLabel =
+    l.type === "main" ? "Main-d'œuvre" : l.type === "forfait" ? "Forfait" : "Fourniture";
+  return (
+    <div className="line">
+      <div className="line-head">
+        <span className={"chip chip-" + l.type}>{typeLabel}</span>
+        <input
+          className="in line-title"
+          type="text"
+          placeholder="Désignation (ex. plateau chêne massif 40 mm)"
+          value={l.designation}
+          onChange={(e) => setLine(l.id, { designation: e.target.value })}
+        />
+        <div className="line-ord">
+          <button className="ico" title="Monter" disabled={index === 0} onClick={() => moveLine(l.id, -1)}>
+            ↑
+          </button>
+          <button className="ico" title="Descendre" disabled={last} onClick={() => moveLine(l.id, 1)}>
+            ↓
+          </button>
+          <button className="ico ico-del" title="Supprimer" onClick={() => delLine(l.id)}>
+            ✕
+          </button>
+        </div>
+      </div>
+
+      <div className="line-body">
+        {l.type === "fourniture" && (
+          <>
+            <Field label="Quantité (métré)">
+              <NumIn value={l.qte} onChange={(v) => setLine(l.id, { qte: v })} />
+            </Field>
+            <Field label="Unité">
+              <TextIn value={l.unite} onChange={(v) => setLine(l.id, { unite: v })} placeholder="m², ml, pce…" />
+            </Field>
+            <Field label="Prix d'achat / u" hint="HTVA — atelier">
+              <NumIn value={l.pa} onChange={(v) => setLine(l.id, { pa: v })} suffix="€" />
+            </Field>
+            <Field label="Marge">
+              <NumIn value={l.marge} onChange={(v) => setLine(l.id, { marge: v })} suffix="%" />
+            </Field>
+          </>
+        )}
+        {l.type === "main" && (
+          <>
+            <Field label="Heures">
+              <NumIn value={l.heures} onChange={(v) => setLine(l.id, { heures: v })} suffix="h" />
+            </Field>
+            <Field label="Taux facturé / h" hint="prix client">
+              <NumIn value={l.tauxVente} onChange={(v) => setLine(l.id, { tauxVente: v })} suffix="€" />
+            </Field>
+            <Field label="Coût horaire / h" hint="atelier">
+              <NumIn value={l.coutHoraire} onChange={(v) => setLine(l.id, { coutHoraire: v })} suffix="€" />
+            </Field>
+          </>
+        )}
+        {l.type === "forfait" && (
+          <>
+            <Field label="Coût / achat" hint="HTVA — atelier">
+              <NumIn value={l.pa} onChange={(v) => setLine(l.id, { pa: v })} suffix="€" />
+            </Field>
+            <Field label="Marge">
+              <NumIn value={l.marge} onChange={(v) => setLine(l.id, { marge: v })} suffix="%" />
+            </Field>
+          </>
+        )}
+      </div>
+
+      {/* per-line metré detail */}
+      <div className="line-detail">
+        <AreaIn
+          value={l.detail}
+          onChange={(v) => setLine(l.id, { detail: v })}
+          placeholder="Métré / détail (ex. 3,20 × 2,10 m — façade + 2 portes). Visible sur le devis seulement si la case est cochée."
+        />
+      </div>
+
+      <div className="line-foot">
+        <div className="toggles">
+          <label className="tog">
+            <input
+              type="checkbox"
+              checked={!!l.showQty}
+              onChange={(e) => setLine(l.id, { showQty: e.target.checked })}
+            />
+            Détailler qté/PU sur le devis
+          </label>
+          <label className="tog">
+            <input
+              type="checkbox"
+              checked={!!l.showDetail}
+              onChange={(e) => setLine(l.id, { showDetail: e.target.checked })}
+            />
+            Afficher le métré sur le devis
+          </label>
+        </div>
+        <div className="line-figs">
+          <span className="fig">
+            Coût <b className="mono">{eur(l.cout)}</b>
+          </span>
+          <span className="fig" style={{ color: margeColor(l.vente > 0 ? (l.marge / l.vente) * 100 : 0) }}>
+            Marge <b className="mono">{eur(l.marge)}</b>
+          </span>
+          <span className="fig fig-sell">
+            Vente HTVA <b className="mono">{eur(l.vente)}</b>
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================================
+   DEVIS CLIENT (printable sheet)
+   ========================================================================= */
+function ClientSheet({ devis, company, calc, onPrint }) {
+  const c = company;
+  const showCoco = devis.clientType === "pro";
+  return (
+    <div className="sheet-stage">
+      <div className="sheet-actions no-print">
+        <span className="muted">
+          Aperçu client — ni coût ni marge ne figurent ici.
+        </span>
+        <button className="btn" onClick={onPrint}>
+          Imprimer / PDF
+        </button>
+      </div>
+
+      <article className="sheet">
+        <header className="s-head">
+          <div>
+            <div className="s-logo">{c.nom}</div>
+            {c.sousTitre ? <div className="s-sub">{c.sousTitre}</div> : null}
+            <div className="s-firm">
+              {c.adresse ? <span>{c.adresse}</span> : null}
+              {c.tel ? <span>Tél. {c.tel}</span> : null}
+              {c.email ? <span>{c.email}</span> : null}
+              {c.tva ? <span>TVA {c.tva}</span> : null}
+              {c.iban ? <span>IBAN {c.iban}</span> : null}
+            </div>
+          </div>
+          <div className="s-meta">
+            <div className="s-title">DEVIS</div>
+            <table className="s-metatab">
+              <tbody>
+                <tr>
+                  <td>N°</td>
+                  <td className="mono">{devis.numero}</td>
+                </tr>
+                <tr>
+                  <td>Date</td>
+                  <td className="mono">{frDate(devis.dateISO)}</td>
+                </tr>
+                <tr>
+                  <td>Validité</td>
+                  <td className="mono">{num(devis.validite)} jours</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </header>
+
+        <section className="s-parties">
+          <div className="s-block">
+            <div className="s-block-lab">Client</div>
+            <div className="s-block-body">
+              <strong>{devis.client.nom || "—"}</strong>
+              {devis.client.adresse ? <div>{devis.client.adresse}</div> : null}
+              {devis.client.tel ? <div>{devis.client.tel}</div> : null}
+              {devis.client.email ? <div>{devis.client.email}</div> : null}
+            </div>
+          </div>
+          <div className="s-block">
+            <div className="s-block-lab">Chantier</div>
+            <div className="s-block-body">
+              {devis.chantier || devis.client.adresse || "—"}
+            </div>
+          </div>
+        </section>
+
+        <table className="s-table">
+          <thead>
+            <tr>
+              <th className="c-desc">Désignation</th>
+              <th className="c-qte">Qté</th>
+              <th className="c-pu">PU HTVA</th>
+              <th className="c-tot">Total HTVA</th>
+            </tr>
+          </thead>
+          <tbody>
+            {calc.rows.length === 0 && (
+              <tr>
+                <td colSpan={4} className="s-empty">
+                  Aucune ligne pour l'instant.
+                </td>
+              </tr>
+            )}
+            {calc.rows.map((l) => (
+              <tr key={l.id}>
+                <td className="c-desc">
+                  <div className="s-desig">{l.designation || "—"}</div>
+                  {l.showDetail && l.detail ? (
+                    <div className="s-detail">{l.detail}</div>
+                  ) : null}
+                </td>
+                <td className="c-qte mono">
+                  {l.showQty
+                    ? `${l.qte.toLocaleString("fr-BE", { maximumFractionDigits: 2 })} ${l.unite}`
+                    : ""}
+                </td>
+                <td className="c-pu mono">{l.showQty ? eur(l.puv) : ""}</td>
+                <td className="c-tot mono">{eur(l.vente)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        <section className="s-totals">
+          <div className="s-tot-line">
+            <span>Total HTVA</span>
+            <span className="mono">{eur(calc.venteHT)}</span>
+          </div>
+          {calc.remise > 0 && (
+            <div className="s-tot-line">
+              <span>Remise</span>
+              <span className="mono">− {eur(calc.remise)}</span>
+            </div>
+          )}
+          {calc.deplacement > 0 && (
+            <div className="s-tot-line">
+              <span>Déplacement</span>
+              <span className="mono">{eur(calc.deplacement)}</span>
+            </div>
+          )}
+          <div className="s-tot-line">
+            <span>Base HTVA</span>
+            <span className="mono">{eur(calc.baseHT)}</span>
+          </div>
+          {showCoco ? (
+            <div className="s-tot-line">
+              <span>TVA — autoliquidation</span>
+              <span className="mono">0,00 €</span>
+            </div>
+          ) : (
+            <div className="s-tot-line">
+              <span>TVA {calc.rate} %</span>
+              <span className="mono">{eur(calc.tva)}</span>
+            </div>
+          )}
+          <div className="s-tot-line s-grand">
+            <span>TOTAL {showCoco ? "HTVA" : "TVAC"}</span>
+            <span className="mono">{eur(calc.ttc)}</span>
+          </div>
+          {num(devis.acompte) > 0 && (
+            <div className="s-tot-line s-acompte">
+              <span>Acompte à la commande ({num(devis.acompte)} %)</span>
+              <span className="mono">{eur(calc.acompte)}</span>
+            </div>
+          )}
+        </section>
+
+        {showCoco && (
+          <p className="s-coco">
+            Autoliquidation — Taxe à acquitter par le cocontractant
+            (art. 20 de l'A.R. n° 1 du Code de la TVA).
+          </p>
+        )}
+
+        {devis.conditions ? <p className="s-cond">{devis.conditions}</p> : null}
+
+        <section className="s-sign">
+          <div className="s-sign-box">
+            <div className="s-sign-lab">Bon pour accord — date et signature du client</div>
+          </div>
+        </section>
+
+        <footer className="s-foot">
+          {c.nom}
+          {c.tva ? ` · TVA ${c.tva}` : ""}
+          {c.iban ? ` · IBAN ${c.iban}` : ""}
+        </footer>
+      </article>
+    </div>
+  );
+}
+
+/* =========================================================================
+   REGLAGES
+   ========================================================================= */
+function Reglages({ company, params, onSave }) {
+  const [c, setC] = useState(company);
+  const [p, setP] = useState(params);
+  const sc = (k) => (v) => setC((x) => ({ ...x, [k]: v }));
+  const sp = (k) => (v) => setP((x) => ({ ...x, [k]: v }));
+  return (
+    <div>
+      <div className="card-eyebrow">Entreprise</div>
+      <div className="grid">
+        <Field label="Nom" wide>
+          <TextIn value={c.nom} onChange={sc("nom")} />
+        </Field>
+        <Field label="Sous-titre" wide>
+          <TextIn value={c.sousTitre} onChange={sc("sousTitre")} />
+        </Field>
+        <Field label="Adresse" wide>
+          <TextIn value={c.adresse} onChange={sc("adresse")} />
+        </Field>
+        <Field label="N° TVA">
+          <TextIn value={c.tva} onChange={sc("tva")} mono />
+        </Field>
+        <Field label="IBAN">
+          <TextIn value={c.iban} onChange={sc("iban")} mono />
+        </Field>
+        <Field label="Téléphone">
+          <TextIn value={c.tel} onChange={sc("tel")} />
+        </Field>
+        <Field label="E-mail">
+          <TextIn value={c.email} onChange={sc("email")} />
+        </Field>
+      </div>
+
+      <div className="card-eyebrow mt">Valeurs par défaut</div>
+      <div className="grid">
+        <Field label="Taux horaire facturé" hint="€/h client">
+          <NumIn value={p.tauxVente} onChange={sp("tauxVente")} suffix="€" />
+        </Field>
+        <Field label="Coût horaire" hint="€/h atelier">
+          <NumIn value={p.coutHoraire} onChange={sp("coutHoraire")} suffix="€" />
+        </Field>
+        <Field label="Marge fournitures">
+          <NumIn value={p.marge} onChange={sp("marge")} suffix="%" />
+        </Field>
+        <Field label="Marge cible" hint="seuil de couleur">
+          <NumIn value={p.margeCible} onChange={sp("margeCible")} suffix="%" />
+        </Field>
+        <Field label="TVA par défaut">
+          <select className="in in-sel" value={p.tvaRate} onChange={(e) => sp("tvaRate")(Number(e.target.value))}>
+            {TVA_OPTIONS.map((o) => (
+              <option key={o.v} value={o.v}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Validité (jours)">
+          <NumIn value={p.validite} onChange={sp("validite")} suffix="j" />
+        </Field>
+        <Field label="Acompte">
+          <NumIn value={p.acompte} onChange={sp("acompte")} suffix="%" />
+        </Field>
+      </div>
+
+      <div className="modal-foot">
+        <button className="btn" onClick={() => onSave(c, p)}>
+          Enregistrer les réglages
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================================
+   MODAL shell
+   ========================================================================= */
+function Modal({ title, children, onClose, wide }) {
+  return (
+    <div className="overlay no-print" onClick={onClose}>
+      <div
+        className={"modal" + (wide ? " modal-wide" : "")}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="modal-head">
+          <h2>{title}</h2>
+          <button className="ico" onClick={onClose}>
+            ✕
+          </button>
+        </div>
+        <div className="modal-body">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================================
+   CSS
+   ========================================================================= */
+const CSS = `
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
+
+:root{
+  --paper:#E7E2D8; --paper-2:#DED8CB;
+  --card:#FBFAF6; --sheet:#FFFFFF;
+  --ink:#211D18; --ink-2:#534B40; --ink-3:#8C8273;
+  --line:#D7CFBF; --line-2:#EAE4D7;
+  --oak:#A8631F; --oak-2:#8A5018; --oak-soft:#F0E2CE;
+  --green:#3D6B4A; --amber:#C08A2E; --brick:#A23D2C;
+  --display:'Archivo',system-ui,sans-serif;
+  --body:'Inter',system-ui,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+.app{
+  min-height:100vh; background:
+    repeating-linear-gradient(90deg, transparent 0 38px, rgba(0,0,0,.012) 38px 39px),
+    var(--paper);
+  color:var(--ink); font-family:var(--body); font-size:14px; line-height:1.5;
+}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--ink-3)}
+.mt{margin-top:18px}
+
+/* top bar */
+.bar{
+  position:sticky; top:0; z-index:30;
+  display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+  padding:12px 18px; background:var(--ink); color:#F4EFE6;
+  border-bottom:3px solid var(--oak);
+}
+.brand{display:flex; align-items:center; gap:11px; margin-right:auto}
+.brand-mark{
+  font-size:20px; letter-spacing:-2px; color:var(--oak);
+  background:#2c271f; padding:4px 8px; border-radius:3px; line-height:1;
+}
+.brand-name{font-family:var(--display);font-weight:800;letter-spacing:.22em;font-size:17px}
+.brand-sub{font-size:11px;color:#b3a892;letter-spacing:.04em;margin-top:1px}
+
+.flip{display:flex; background:#2c271f; border-radius:7px; padding:3px; gap:2px}
+.flip-btn{
+  font-family:var(--display); font-weight:600; font-size:12.5px; letter-spacing:.08em;
+  text-transform:uppercase; color:#c9bda6; background:transparent;
+  border:0; padding:7px 16px; border-radius:5px; cursor:pointer; transition:.18s;
+}
+.flip-btn.on{background:var(--oak); color:#fff; box-shadow:0 1px 0 rgba(0,0,0,.25)}
+.flip-btn:not(.on):hover{color:#fff}
+
+.bar-actions{display:flex; gap:7px; flex-wrap:wrap}
+.btn{
+  font-family:var(--display); font-weight:600; font-size:12.5px; letter-spacing:.02em;
+  background:var(--oak); color:#fff; border:0; padding:8px 14px; border-radius:6px;
+  cursor:pointer; transition:.15s;
+}
+.btn:hover{background:var(--oak-2)}
+.btn.ghost{background:transparent; color:#e8e0d0; border:1px solid #4a4338}
+.btn.ghost:hover{background:#2c271f}
+.btn.sm{padding:5px 10px; font-size:11.5px}
+.btn.add{background:var(--oak-soft); color:var(--oak-2); border:1px dashed var(--oak)}
+.btn.add:hover{background:#e8d5ba}
+.btn.danger{background:transparent; color:var(--brick); border:1px solid var(--brick)}
+.btn.danger:hover{background:#f3e0db}
+
+/* layout */
+.wrap{max-width:1020px; margin:0 auto; padding:22px 18px 80px; display:flex; flex-direction:column; gap:18px}
+.card{
+  background:var(--card); border:1px solid var(--line);
+  border-radius:11px; padding:18px 18px 20px;
+  box-shadow:0 1px 2px rgba(40,30,15,.05);
+}
+.card-eyebrow{
+  font-family:var(--display); font-weight:700; font-size:11px; letter-spacing:.18em;
+  text-transform:uppercase; color:var(--oak-2); margin-bottom:14px;
+  display:flex; align-items:center; gap:8px;
+}
+.card-eyebrow::after{content:""; flex:1; height:1px; background:var(--line)}
+.tip{margin:-6px 0 14px; font-size:12.5px; line-height:1.55}
+
+.grid{display:grid; grid-template-columns:repeat(3,1fr); gap:13px 14px}
+.fld{display:flex; flex-direction:column; gap:5px; min-width:0}
+.fld-wide{grid-column:1/-1}
+.fld-lab{font-size:11.5px; font-weight:600; color:var(--ink-2); letter-spacing:.01em}
+.fld-hint{font-size:10.5px; color:var(--ink-3)}
+.in{
+  font-family:var(--body); font-size:13.5px; color:var(--ink);
+  background:#fff; border:1px solid var(--line); border-radius:7px;
+  padding:8px 10px; width:100%; transition:.12s;
+}
+.in:focus{outline:none; border-color:var(--oak); box-shadow:0 0 0 3px rgba(168,99,31,.13)}
+.in-mono{font-family:var(--mono)}
+.in-num{text-align:right}
+.in-sel{appearance:auto; cursor:pointer; background:#fff}
+.in-area{resize:vertical; min-height:42px; line-height:1.45}
+.numwrap{position:relative; display:block}
+.numsfx{position:absolute; right:10px; top:50%; transform:translateY(-50%); font-size:11px; color:var(--ink-3); font-family:var(--mono); pointer-events:none}
+.numwrap .in{padding-right:26px}
+
+/* lines */
+.empty{padding:22px; text-align:center; color:var(--ink-3); border:1px dashed var(--line); border-radius:9px; font-size:13px}
+.lines{display:flex; flex-direction:column; gap:12px}
+.line{border:1px solid var(--line); border-radius:10px; background:#fff; overflow:hidden}
+.line-head{display:flex; align-items:center; gap:10px; padding:9px 11px; background:var(--line-2); border-bottom:1px solid var(--line)}
+.chip{
+  font-family:var(--display); font-weight:700; font-size:10px; letter-spacing:.1em;
+  text-transform:uppercase; padding:4px 8px; border-radius:5px; white-space:nowrap;
+}
+.chip-fourniture{background:#e8dcc6; color:#7a5a1c}
+.chip-main{background:#d9e3da; color:#39593f}
+.chip-forfait{background:#e2dae6; color:#5b4769}
+.line-title{flex:1; border-color:transparent; background:transparent; font-weight:600; font-size:14px}
+.line-title:focus{background:#fff}
+.line-ord{display:flex; gap:4px}
+.ico{
+  width:28px; height:28px; border:1px solid var(--line); background:#fff; border-radius:6px;
+  cursor:pointer; color:var(--ink-2); font-size:13px; line-height:1; transition:.12s;
+}
+.ico:hover:not(:disabled){border-color:var(--oak); color:var(--oak)}
+.ico:disabled{opacity:.3; cursor:default}
+.ico-del:hover{border-color:var(--brick); color:var(--brick)}
+.line-body{display:grid; grid-template-columns:repeat(4,1fr); gap:11px; padding:13px 12px 4px}
+.line-detail{padding:4px 12px 0}
+.line-foot{display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; padding:10px 12px 12px}
+.toggles{display:flex; gap:16px; flex-wrap:wrap}
+.tog{display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--ink-2); cursor:pointer}
+.tog input{accent-color:var(--oak); width:14px; height:14px}
+.line-figs{display:flex; gap:16px; flex-wrap:wrap; font-size:11.5px; color:var(--ink-3)}
+.fig b{color:var(--ink); margin-left:3px; font-size:12.5px}
+.fig-sell b{color:var(--oak-2)}
+
+.add-row{display:flex; gap:9px; flex-wrap:wrap; margin-top:14px}
+
+/* adjustments */
+.remise{display:flex; gap:7px}
+.remise .in-sel{width:64px; flex:none}
+
+/* summary */
+.summary{background:linear-gradient(180deg,#fffdf8,#f7f2e8); border-color:var(--oak-soft)}
+.sum-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:16px}
+.stat{background:#fff; border:1px solid var(--line); border-radius:9px; padding:12px 13px}
+.stat-big{border-color:var(--oak)}
+.stat-lab{font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-3); font-weight:600}
+.stat-val{font-family:var(--mono); font-weight:600; font-size:19px; margin-top:5px; font-variant-numeric:tabular-nums}
+.stat-big .stat-val{font-size:23px}
+.stat-sub{font-family:var(--mono); font-size:12px; margin-top:2px; font-weight:600}
+
+.margebar{position:relative; height:26px; background:#efe7d7; border-radius:6px; overflow:hidden; margin-bottom:16px}
+.margebar-fill{position:absolute; left:0; top:0; bottom:0; transition:width .35s ease, background .2s; opacity:.9}
+.margebar-lab{position:absolute; left:11px; top:50%; transform:translateY(-50%); font-size:11px; font-weight:600; color:var(--ink); font-family:var(--mono)}
+
+.sum-tot{border-top:1px solid var(--line); padding-top:12px}
+.trow{display:flex; justify-content:space-between; padding:5px 0; font-size:13.5px; color:var(--ink-2)}
+.trow-strong{font-weight:700; color:var(--ink); border-top:1px solid var(--line); margin-top:4px; padding-top:9px; font-size:15px}
+
+/* client sheet */
+.sheet-stage{max-width:880px; margin:0 auto; padding:22px 16px 80px}
+.sheet-actions{display:flex; align-items:center; justify-content:space-between; gap:14px; margin-bottom:16px; flex-wrap:wrap}
+.sheet{
+  background:var(--sheet); color:#1a1a1a; border:1px solid #e3ddd0;
+  border-radius:6px; box-shadow:0 8px 30px rgba(40,30,15,.13);
+  padding:42px 44px; font-size:13px; line-height:1.55;
+}
+.s-head{display:flex; justify-content:space-between; gap:24px; align-items:flex-start; border-bottom:2px solid var(--ink); padding-bottom:18px}
+.s-logo{font-family:var(--display); font-weight:800; font-size:21px; letter-spacing:.01em; color:var(--ink)}
+.s-sub{font-size:12px; color:#6a6258; margin-top:2px}
+.s-firm{display:flex; flex-direction:column; gap:1px; margin-top:10px; font-size:11px; color:#6a6258}
+.s-meta{text-align:right; min-width:190px}
+.s-title{font-family:var(--display); font-weight:800; font-size:26px; letter-spacing:.18em; color:var(--oak)}
+.s-metatab{margin-left:auto; margin-top:8px; border-collapse:collapse; font-size:12px}
+.s-metatab td{padding:2px 0 2px 14px; text-align:right; color:#444}
+.s-metatab td:first-child{color:#8a8276; text-align:left; padding-left:0}
+
+.s-parties{display:grid; grid-template-columns:1fr 1fr; gap:18px; margin:20px 0}
+.s-block-lab{font-family:var(--display); font-size:10px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--oak-2); margin-bottom:5px}
+.s-block-body{font-size:12.5px; color:#2a2a2a}
+.s-block-body strong{font-size:13.5px}
+
+.s-table{width:100%; border-collapse:collapse; margin-top:8px}
+.s-table th{
+  font-family:var(--display); font-size:10.5px; font-weight:700; letter-spacing:.07em;
+  text-transform:uppercase; color:#fff; background:var(--ink); padding:8px 10px; text-align:left;
+}
+.s-table th.c-qte, .s-table th.c-pu, .s-table th.c-tot{text-align:right}
+.s-table td{padding:9px 10px; border-bottom:1px solid #ece7dc; vertical-align:top}
+.c-qte,.c-pu,.c-tot{text-align:right; white-space:nowrap}
+.c-desc{width:54%}
+.s-desig{font-weight:600; color:#1a1a1a}
+.s-detail{font-size:11px; color:#7a7264; margin-top:3px; white-space:pre-wrap}
+.s-empty{text-align:center; color:#9a9284; padding:18px}
+
+.s-totals{margin-left:auto; width:300px; margin-top:16px}
+.s-tot-line{display:flex; justify-content:space-between; padding:5px 0; font-size:12.5px; color:#3a3a3a}
+.s-grand{border-top:2px solid var(--ink); margin-top:6px; padding-top:9px; font-family:var(--display); font-weight:800; font-size:15px; color:var(--ink)}
+.s-acompte{background:var(--oak-soft); margin-top:8px; padding:8px 10px; border-radius:5px; font-weight:600; color:var(--oak-2)}
+
+.s-coco{font-size:10.5px; color:#6a6258; font-style:italic; margin-top:18px; border-left:2px solid var(--oak); padding-left:9px}
+.s-cond{font-size:10.5px; color:#7a7264; margin-top:18px; line-height:1.55; white-space:pre-wrap}
+.s-sign{display:flex; justify-content:flex-end; margin-top:26px}
+.s-sign-box{border:1px solid #d2ccbe; border-radius:5px; padding:14px 18px; width:300px; min-height:74px}
+.s-sign-lab{font-size:10.5px; color:#8a8276}
+.s-foot{margin-top:26px; padding-top:12px; border-top:1px solid #ece7dc; text-align:center; font-size:10px; color:#9a9284}
+
+/* modal */
+.overlay{position:fixed; inset:0; background:rgba(28,24,18,.55); display:flex; align-items:flex-start; justify-content:center; padding:40px 16px; z-index:50; overflow:auto}
+.modal{background:var(--card); border-radius:12px; width:100%; max-width:520px; box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.modal-wide{max-width:780px}
+.modal-head{display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid var(--line)}
+.modal-head h2{font-family:var(--display); font-weight:700; font-size:16px; margin:0; letter-spacing:.02em}
+.modal-body{padding:20px}
+.modal-foot{margin-top:18px; display:flex; justify-content:flex-end}
+
+.qlist{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:9px}
+.qrow{display:flex; align-items:center; justify-content:space-between; gap:12px; border:1px solid var(--line); border-radius:9px; padding:11px 13px; background:#fff}
+.qrow-num{font-family:var(--mono); font-weight:600; font-size:13.5px}
+.qrow-meta{font-size:11.5px; color:var(--ink-3); margin-top:2px}
+.qrow-act{display:flex; gap:7px}
+
+.toast{position:fixed; bottom:22px; left:50%; transform:translateX(-50%); background:var(--ink); color:#fff; padding:11px 20px; border-radius:8px; font-size:13px; font-weight:500; z-index:60; box-shadow:0 8px 24px rgba(0,0,0,.3)}
+
+/* responsive */
+@media (max-width:760px){
+  .grid{grid-template-columns:repeat(2,1fr)}
+  .line-body{grid-template-columns:repeat(2,1fr)}
+  .sum-grid{grid-template-columns:repeat(2,1fr)}
+  .bar{gap:10px}
+  .brand-sub{display:none}
+  .sheet{padding:26px 20px}
+  .s-head{flex-direction:column}
+  .s-meta{text-align:left}
+  .s-metatab{margin-left:0}
+  .s-parties{grid-template-columns:1fr}
+  .s-totals{width:100%}
+}
+
+/* print */
+@media print{
+  @page{margin:14mm}
+  body *{visibility:hidden}
+  .sheet, .sheet *{visibility:visible}
+  .sheet{position:absolute; left:0; top:0; width:100%; box-shadow:none; border:0; border-radius:0; padding:0}
+  .no-print{display:none !important}
+}
+`;
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
