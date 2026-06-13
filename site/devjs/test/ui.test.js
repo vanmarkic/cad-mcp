@@ -1,0 +1,128 @@
+"use strict";
+/* UI tests (Playwright + node:test).
+   Needs: `npm install` (playwright) + `npx playwright install chromium`.
+   The page pulls React/Babel from a CDN, so these tests need outbound network;
+   we use ignoreHTTPSErrors because some sandboxes present an intercept cert.
+   Pure logic is covered offline in core.test.js — this file checks the wiring. */
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const http = require("node:http");
+const fs = require("node:fs");
+const path = require("node:path");
+
+let chromium;
+try { ({ chromium } = require("playwright")); } catch (_) { chromium = null; }
+
+const ROOT = path.join(__dirname, "..");
+const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json" };
+
+function startServer() {
+  const server = http.createServer((req, res) => {
+    let rel = decodeURIComponent(req.url.split("?")[0]);
+    if (rel === "/") rel = "/index.html";
+    const file = path.join(ROOT, rel);
+    if (!file.startsWith(ROOT) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
+      res.writeHead(404); res.end("not found"); return;
+    }
+    res.writeHead(200, { "content-type": TYPES[path.extname(file)] || "application/octet-stream" });
+    fs.createReadStream(file).pipe(res);
+  });
+  return new Promise((resolve) => server.listen(0, "127.0.0.1", () => resolve(server)));
+}
+
+// Skip gracefully (don't fail the suite) when the browser/network is unavailable.
+test("UI", { skip: chromium ? false : "playwright not installed" }, async (t) => {
+  const server = await startServer();
+  const base = `http://127.0.0.1:${server.address().port}/index.html`;
+  const browser = await chromium.launch();
+  const ctx = await browser.newContext({ ignoreHTTPSErrors: true });
+
+  t.after(async () => { await browser.close(); server.close(); });
+
+  const newPage = async () => {
+    const p = await ctx.newPage();
+    const errors = [];
+    p.on("pageerror", (e) => errors.push(e.message));
+    p._errors = errors;
+    await p.goto(base, { waitUntil: "load", timeout: 45000 });
+    await p.waitForSelector(".brand-name", { timeout: 30000 });
+    return p;
+  };
+
+  await t.test("margin input shows the typed % (regression: no value swap)", async () => {
+    const p = await newPage();
+    await p.click('button.add:has-text("Fourniture")');
+    await p.waitForSelector(".line");
+    const pa = p.locator(".line").getByText("Prix d'achat / u").locator("..").locator("input");
+    await pa.fill("200");
+    const marge = p.locator(".line").getByText("Marge", { exact: true }).locator("..").locator("input");
+    await marge.fill("30");
+    await p.waitForTimeout(120);
+    assert.equal(await marge.inputValue(), "30", "margin field must keep what was typed");
+    const figs = await p.locator(".line-figs").innerText();
+    assert.match(figs, /Marge\s+60,00/, "computed € margin = 260 − 200 = 60");
+    assert.deepEqual(p._errors, []);
+    await p.close();
+  });
+
+  await t.test("changing PA does not alter the typed margin %", async () => {
+    const p = await newPage();
+    await p.click('button.add:has-text("Fourniture")');
+    await p.waitForSelector(".line");
+    const pa = p.locator(".line").getByText("Prix d'achat / u").locator("..").locator("input");
+    const marge = p.locator(".line").getByText("Marge", { exact: true }).locator("..").locator("input");
+    await marge.fill("40");
+    await pa.fill("999");
+    await p.waitForTimeout(120);
+    assert.equal(await marge.inputValue(), "40");
+    await p.close();
+  });
+
+  await t.test("calepinage: counts whole panels, draws layout, builds cut list, adds devis line", async () => {
+    const p = await newPage();
+    await p.click('button:has-text("Calepinage")');
+    await p.waitForSelector(".cl");
+    const price = p.locator(".cl .grid").getByText("Prix matière").locator("..").locator("input");
+    await price.fill("25");
+    await p.click('button.add:has-text("Ajouter une pièce")');
+    await p.waitForSelector(".cl-prow:not(.cl-prow-head)");
+    const row = p.locator(".cl-prow:not(.cl-prow-head)").first();
+    await row.locator("input").nth(0).fill("Étagère");
+    await row.locator("input").nth(1).fill("600");
+    await row.locator("input").nth(2).fill("400");
+    await row.locator("input").nth(3).fill("10");
+    await p.waitForTimeout(300);
+
+    const stats = await p.locator(".cl-stats").innerText();
+    assert.match(stats, /PANNEAUX À ACHETER[\s\S]*\b1\b/i, "10×(600×400) fit on one 2500×1250 panel");
+    assert.match(stats, /78,13/, "cost = 3,125 m² × 25 €/m²");
+    assert.equal(await p.locator(".cl-svg").count(), 1, "one panel diagram");
+    assert.equal(await p.locator(".cl-svg g rect").count(), 10, "ten placed pieces drawn");
+
+    const list = await p.locator(".cl-list").inputValue();
+    assert.match(list, /Qté\tDésignation\tLongueur \(mm\)\tLargeur \(mm\)/);
+    assert.match(list, /10\tÉtagère\t600\t400/);
+
+    await p.click('button:has-text("Ajouter au devis")');
+    await p.waitForSelector(".line");
+    assert.equal(await p.locator(".line").count(), 1);
+    assert.equal(await p.locator(".line-title").first().inputValue(), "Panneau — débit calepiné");
+    assert.deepEqual(p._errors, []);
+    await p.close();
+  });
+
+  await t.test("calepinage: oversized piece is flagged, not silently dropped", async () => {
+    const p = await newPage();
+    await p.click('button:has-text("Calepinage")');
+    await p.waitForSelector(".cl");
+    await p.click('button.add:has-text("Ajouter une pièce")');
+    const row = p.locator(".cl-prow:not(.cl-prow-head)").first();
+    await row.locator("input").nth(1).fill("3000"); // > 2500
+    await row.locator("input").nth(2).fill("400");
+    await row.locator("input").nth(3).fill("1");
+    await p.waitForTimeout(300);
+    await p.waitForSelector(".cl-warn");
+    assert.match(await p.locator(".cl-warn").innerText(), /ne tiennent pas/);
+    await p.close();
+  });
+});
