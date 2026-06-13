@@ -125,4 +125,48 @@ test("UI", { skip: chromium ? false : "playwright not installed" }, async (t) =>
     assert.match(await p.locator(".cl-warn").innerText(), /ne tiennent pas/);
     await p.close();
   });
+
+  await t.test("calepinage: deux matériaux distincts → deux lignes de devis en un coup", async () => {
+    const p = await newPage();
+    await p.click('button:has-text("Calepinage")');
+    await p.waitForSelector(".cl");
+
+    // Matière 1 : MDF 18 à 30 €/m², une pièce qui tient sur un panneau.
+    const name = () => p.locator(".cl .grid").getByText("Matière / désignation").locator("..").locator("input");
+    const price = () => p.locator(".cl .grid").getByText("Prix matière").locator("..").locator("input");
+    await name().fill("MDF 18");
+    await price().fill("30");
+    await p.click('button.add:has-text("Ajouter une pièce")');
+    let row = p.locator(".cl-prow:not(.cl-prow-head)").first();
+    await row.locator("input").nth(1).fill("600");
+    await row.locator("input").nth(2).fill("400");
+    await row.locator("input").nth(3).fill("4");
+
+    // Nouvelle matière : aglo 8 à 15 €/m².
+    await p.click("button.cl-mat-add");
+    await p.waitForTimeout(150);
+    await name().fill("Aglo 8");
+    await price().fill("15");
+    await p.click('button.add:has-text("Ajouter une pièce")');
+    row = p.locator(".cl-prow:not(.cl-prow-head)").first();
+    await row.locator("input").nth(1).fill("800");
+    await row.locator("input").nth(2).fill("500");
+    await row.locator("input").nth(3).fill("2");
+    await p.waitForTimeout(300);
+
+    // Deux onglets, et le bandeau de total tous matériaux apparaît.
+    assert.equal(await p.locator(".cl-mat").count(), 2, "deux onglets matière");
+    await p.waitForSelector(".cl-grand");
+    assert.match(await p.locator(".cl-grand").innerText(), /2 lignes/);
+
+    // « Ajouter tout au devis » → une ligne fourniture par matière.
+    await p.click('button:has-text("Ajouter tout au devis")');
+    await p.waitForSelector(".line");
+    assert.equal(await p.locator(".line").count(), 2, "une ligne par matériau");
+    const titles = await p.locator(".line-title").evaluateAll((els) => els.map((e) => e.value));
+    assert.ok(titles.includes("MDF 18 — débit calepiné"), "ligne MDF présente");
+    assert.ok(titles.includes("Aglo 8 — débit calepiné"), "ligne aglo présente");
+    assert.deepEqual(p._errors, []);
+    await p.close();
+  });
 });
