@@ -32,7 +32,7 @@ window.storage = {
 
 <script type="text/babel" data-presets="react">
 const { useState, useEffect, useMemo, useRef } = React;
-const { num, computeLine, calculateCutlist, panelMetrics, cutListText } = window.EtabliCore;
+const { num, computeLine, tvaBreakdown, calculateCutlist, panelMetrics, cutListText } = window.EtabliCore;
 
 /* =========================================================================
    ÉTABLI — Générateur de devis pour menuisier
@@ -156,6 +156,7 @@ const newDevis = (company, p) => ({
   chantier: "",
   clientType: "particulier", // 'particulier' | 'pro'
   tvaRate: p.tvaRate,
+  tvaFournitures: "", // "" = même taux que tvaRate ; sinon taux dédié aux fournitures
   remiseType: "eur",
   remiseVal: "",
   deplacement: "",
@@ -372,11 +373,33 @@ function App() {
         ? venteHT * (num(devis.remiseVal) / 100)
         : num(devis.remiseVal);
     const deplacement = num(devis.deplacement);
-    const baseHT = Math.max(0, venteHT - remise + deplacement);
     const coutTotal = cout + num(devis.deplacementCout);
-    const rate = devis.clientType === "pro" ? 0 : devis.tvaRate;
-    const tva = baseHT * (rate / 100);
-    const ttc = baseHT + tva;
+
+    // Taux effectif par poste : pro (cocontractant) → 0 partout ; sinon les
+    // fournitures prennent leur taux dédié si défini, le reste suit le taux
+    // principal (la « facture finale »). Le déplacement suit le taux principal.
+    const coco = devis.clientType === "pro";
+    const mainRate = num(devis.tvaRate);
+    const fournRate =
+      devis.tvaFournitures === "" || devis.tvaFournitures == null
+        ? null
+        : num(devis.tvaFournitures);
+    const taxRows = rows.map((l) => ({
+      vente: l.vente,
+      rate: coco ? 0 : l.type === "fourniture" && fournRate != null ? fournRate : mainRate,
+    }));
+    const t = tvaBreakdown(taxRows, {
+      remise,
+      deplacement,
+      deplacementRate: coco ? 0 : mainRate,
+    });
+    // Toujours au moins un groupe à afficher (devis vide → taux principal à 0 €).
+    const tvaGroups = t.groups.length
+      ? t.groups
+      : [{ rate: coco ? 0 : mainRate, base: 0, tva: 0 }];
+    const baseHT = t.baseHT;
+    const tva = t.tva;
+    const ttc = t.ttc;
     const marge = baseHT - coutTotal;
     const margePct = baseHT > 0 ? (marge / baseHT) * 100 : 0;
     const acompte = ttc * (num(devis.acompte) / 100);
@@ -387,7 +410,9 @@ function App() {
       remise,
       deplacement,
       baseHT,
-      rate,
+      coco,
+      tvaGroups,
+      tvaMixed: tvaGroups.length > 1,
       tva,
       ttc,
       marge,
@@ -753,12 +778,30 @@ function Atelier({
             </select>
           </Field>
           {devis.clientType === "particulier" && (
-            <Field label="Taux de TVA">
+            <Field label="Taux de TVA" hint="taux principal — main-d'œuvre, forfaits, déplacement">
               <select
                 className="in in-sel"
                 value={devis.tvaRate}
                 onChange={(e) => set({ tvaRate: Number(e.target.value) })}
               >
+                {TVA_OPTIONS.map((o) => (
+                  <option key={o.v} value={o.v}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+          {devis.clientType === "particulier" && (
+            <Field label="TVA fournitures" hint="vide = même taux que ci-dessus (ex. 21 % matériel, 6 % chantier)">
+              <select
+                className="in in-sel"
+                value={devis.tvaFournitures ?? ""}
+                onChange={(e) =>
+                  set({ tvaFournitures: e.target.value === "" ? "" : Number(e.target.value) })
+                }
+              >
+                <option value="">Même taux ({num(devis.tvaRate)} %)</option>
                 {TVA_OPTIONS.map((o) => (
                   <option key={o.v} value={o.v}>
                     {o.label}
@@ -806,14 +849,17 @@ function Atelier({
 
         <div className="sum-tot">
           <Row k="Total HTVA" v={eur(calc.baseHT)} />
-          <Row
-            k={
-              calc.rate === 0
-                ? "TVA — autoliquidation (0 %)"
-                : `TVA ${calc.rate} %`
-            }
-            v={eur(calc.tva)}
-          />
+          {calc.coco ? (
+            <Row k="TVA — autoliquidation (0 %)" v={eur(0)} />
+          ) : (
+            calc.tvaGroups.map((g) => (
+              <Row
+                key={g.rate}
+                k={calc.tvaMixed ? `TVA ${g.rate} % (sur ${eur(g.base)})` : `TVA ${g.rate} %`}
+                v={eur(g.tva)}
+              />
+            ))
+          )}
           <Row k="Total TVAC" v={eur(calc.ttc)} strong />
           <Row k={`Acompte (${num(devis.acompte)} %)`} v={eur(calc.acompte)} />
         </div>
@@ -1090,10 +1136,14 @@ function ClientSheet({ devis, company, calc, onPrint }) {
               <span className="mono">0,00 €</span>
             </div>
           ) : (
-            <div className="s-tot-line">
-              <span>TVA {calc.rate} %</span>
-              <span className="mono">{eur(calc.tva)}</span>
-            </div>
+            calc.tvaGroups.map((g) => (
+              <div className="s-tot-line" key={g.rate}>
+                <span>
+                  TVA {g.rate} %{calc.tvaMixed ? ` (sur ${eur(g.base)} HTVA)` : ""}
+                </span>
+                <span className="mono">{eur(g.tva)}</span>
+              </div>
+            ))
           )}
           <div className="s-tot-line s-grand">
             <span>TOTAL {showCoco ? "HTVA" : "TVAC"}</span>

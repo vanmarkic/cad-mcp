@@ -61,6 +61,72 @@ test("computeLine: empty marge means 0% markup, not NaN", () => {
   assert.equal(r.vente, 200);
 });
 
+/* -------------------------------------------------- tvaBreakdown() */
+test("tvaBreakdown: taux unique → un seul groupe", () => {
+  const r = C.tvaBreakdown([{ vente: 1000, rate: 6 }, { vente: 500, rate: 6 }], {});
+  assert.equal(r.groups.length, 1);
+  assert.equal(r.groups[0].rate, 6);
+  assert.equal(r.groups[0].base, 1500);
+  assert.ok(Math.abs(r.groups[0].tva - 90) < 1e-9); // 1500 × 6 %
+  assert.equal(r.baseHT, 1500);
+  assert.ok(Math.abs(r.tva - 90) < 1e-9);
+  assert.ok(Math.abs(r.ttc - 1590) < 1e-9);
+});
+
+test("tvaBreakdown: fournitures 21 % + reste 6 % → deux groupes (trié décroissant)", () => {
+  // l'exemple de Jérémie : 6 % sur la facture finale, 21 % sur les fournitures.
+  const r = C.tvaBreakdown([{ vente: 1000, rate: 6 }, { vente: 500, rate: 21 }], {});
+  assert.equal(r.groups.length, 2);
+  assert.equal(r.groups[0].rate, 21); // taux le plus haut en premier
+  assert.equal(r.groups[1].rate, 6);
+  assert.ok(Math.abs(r.groups[0].tva - 105) < 1e-9); // 500 × 21 %
+  assert.ok(Math.abs(r.groups[1].tva - 60) < 1e-9);  // 1000 × 6 %
+  assert.equal(r.baseHT, 1500);
+  assert.ok(Math.abs(r.tva - 165) < 1e-9);
+  assert.ok(Math.abs(r.ttc - 1665) < 1e-9);
+});
+
+test("tvaBreakdown: la remise est répartie au prorata du HT par taux", () => {
+  const r = C.tvaBreakdown(
+    [{ vente: 1000, rate: 6 }, { vente: 1000, rate: 21 }],
+    { remise: 200 } // venteHT 2000 → facteur 0,9 → chaque base ×0,9
+  );
+  assert.equal(r.baseHT, 1800);
+  assert.ok(Math.abs(r.groups[0].base - 900) < 1e-9); // 21 %
+  assert.ok(Math.abs(r.groups[1].base - 900) < 1e-9); // 6 %
+  assert.ok(Math.abs(r.tva - (900 * 0.21 + 900 * 0.06)) < 1e-9); // 243
+  assert.ok(Math.abs(r.ttc - 2043) < 1e-9);
+});
+
+test("tvaBreakdown: le déplacement est facturé à son propre taux", () => {
+  const r = C.tvaBreakdown(
+    [{ vente: 1000, rate: 21 }],
+    { deplacement: 100, deplacementRate: 6 }
+  );
+  assert.equal(r.groups.length, 2);
+  const g6 = r.groups.find((g) => g.rate === 6);
+  const g21 = r.groups.find((g) => g.rate === 21);
+  assert.equal(g6.base, 100);
+  assert.equal(g21.base, 1000);
+  assert.ok(Math.abs(r.tva - (1000 * 0.21 + 100 * 0.06)) < 1e-9); // 216
+});
+
+test("tvaBreakdown: cocontractant (taux 0) → aucune TVA", () => {
+  const r = C.tvaBreakdown([{ vente: 1000, rate: 0 }, { vente: 500, rate: 0 }], {});
+  assert.equal(r.groups.length, 1);
+  assert.equal(r.groups[0].rate, 0);
+  assert.equal(r.tva, 0);
+  assert.equal(r.ttc, 1500);
+});
+
+test("tvaBreakdown: devis vide → pas de groupe, totaux à 0", () => {
+  const r = C.tvaBreakdown([], {});
+  assert.equal(r.groups.length, 0);
+  assert.equal(r.baseHT, 0);
+  assert.equal(r.tva, 0);
+  assert.equal(r.ttc, 0);
+});
+
 /* -------------------------------------------------- calculateCutlist() */
 const CFG = (over) => Object.assign({ width: 2500, height: 1250, kerf: 3, grainDirection: false, oversizeTolerance: 0 }, over || {});
 
