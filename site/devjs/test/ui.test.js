@@ -78,6 +78,38 @@ test("UI", { skip: chromium ? false : "playwright not installed" }, async (t) =>
     await p.close();
   });
 
+  await t.test("TVA fournitures: taux distinct → ventilation 6 %/21 % sur le devis", async () => {
+    const p = await newPage();
+
+    // une fourniture (HTVA 100, marge 0) + de la main-d'œuvre (HTVA 550)
+    await p.click('button.add:has-text("Fourniture")');
+    await p.waitForSelector(".line");
+    const f = p.locator(".line").first();
+    await f.getByText("Prix d'achat / u").locator("..").locator("input").fill("100");
+    await f.getByText("Marge", { exact: true }).locator("..").locator("input").fill("0");
+
+    await p.click('button.add:has-text("Main-d")');
+    await p.waitForTimeout(120);
+    const m = p.locator(".line").nth(1);
+    await m.getByText("Heures").locator("..").locator("input").fill("10");
+    await m.getByText("Taux facturé / h").locator("..").locator("input").fill("55");
+
+    // taux principal 6 % (défaut), fournitures à 21 %
+    await p.getByText("TVA fournitures").locator("..").locator("select").selectOption("21");
+    await p.waitForTimeout(120);
+
+    // côté client : deux lignes de TVA distinctes (21 % et 6 %)
+    await p.click('button:has-text("Devis client")');
+    await p.waitForSelector(".s-totals");
+    const totals = await p.locator(".s-totals").innerText();
+    assert.match(totals, /TVA 21 %/, "TVA fournitures à 21 %");
+    assert.match(totals, /TVA 6 %/, "TVA principale à 6 %");
+    assert.match(totals, /21,00/, "100 € × 21 % = 21,00 €");
+    assert.match(totals, /33,00/, "550 € × 6 % = 33,00 €");
+    assert.deepEqual(p._errors, []);
+    await p.close();
+  });
+
   await t.test("calepinage: counts whole panels, draws layout, builds cut list, adds devis line", async () => {
     const p = await newPage();
     await p.click('button:has-text("Calepinage")');

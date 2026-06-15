@@ -4,6 +4,22 @@ Application d'une seule page (`index.html`, React via CDN, sans build) pour
 générer des devis de menuiserie. Deux faces : **Atelier** (coûts, marge, métré —
 back-office) et **Devis client** (imprimable, sans coût ni marge).
 
+## TVA à taux mixtes (fournitures ≠ facture)
+
+Dans **« 03 — Ajustements »**, deux taux de TVA :
+
+- **Taux de TVA** — taux principal (main-d'œuvre, forfaits, déplacement),
+  p. ex. **6 %** rénovation d'un logement > 10 ans ;
+- **TVA fournitures** — taux dédié aux lignes *fourniture*, p. ex. **21 %**
+  pour du matériel livré sans pose. Laisser sur *« Même taux »* applique le
+  taux principal partout (comportement d'origine).
+
+Quand les deux taux diffèrent, le devis (atelier **et** feuille client) affiche
+la **ventilation de la TVA par taux** — base HTVA + TVA pour chaque taux —,
+comme l'exige une facture belge à taux mixtes. Une remise globale est répartie
+au prorata du HT entre les taux. Pour un client **professionnel
+(cocontractant)**, l'autoliquidation (0 %) prime sur tout.
+
 ## Calepinage de panneaux (cutlist)
 
 Bouton **« Calepinage »** dans la barre du haut. Les panneaux s'achètent
@@ -38,8 +54,9 @@ et adapté au **système métrique** (mm + €/m²).
   devis, Calepinage).
 - `lib/etabli-core.js` — **noyau de calcul sans DOM**, partagé par l'UI
   (`window.EtabliCore`) et les tests (`module.exports`) : `num`, `computeLine`,
-  `calculateCutlist`, `panelMetrics`, `cutListText`. Source unique de vérité
-  pour la logique métier.
+  `tvaBreakdown`, `calculateCutlist`, `panelMetrics`, `cutListText`. Source
+  unique de vérité pour la logique métier (`tvaBreakdown` ventile la TVA par
+  taux : remise au prorata, déplacement à son taux).
 
 ## Tests
 
@@ -52,11 +69,14 @@ npm test                          # tout
 ```
 
 - `test/core.test.js` — tests unitaires de `lib/etabli-core.js` (marge,
-  calepinage : panneaux entiers, trait de scie, rotation/sens du fil, pièces
-  trop grandes, coût €/m², liste de débit, **chiffrage multi-matériaux**).
+  **ventilation TVA** : taux unique, taux mixtes 6 %/21 %, remise au prorata,
+  déplacement, cocontractant, devis vide ; calepinage : panneaux entiers, trait
+  de scie, rotation/sens du fil, pièces trop grandes, coût €/m², liste de débit,
+  **chiffrage multi-matériaux**).
 - `test/ui.test.js` — tests UI : non-régression de l'input « % marge » (le champ
-  garde la valeur tapée), parcours complet du calepinage, et **deux matériaux
-  distincts → deux lignes de devis** (« Ajouter tout au devis »).
+  garde la valeur tapée), **TVA fournitures distincte → ventilation 6 %/21 % sur
+  le devis**, parcours complet du calepinage, et **deux matériaux distincts →
+  deux lignes de devis** (« Ajouter tout au devis »).
 
 Les tests UI chargent React/Babel depuis un CDN → connexion réseau requise
 (et `ignoreHTTPSErrors` pour les bacs à sable qui interceptent le TLS). La

@@ -40,6 +40,63 @@
     return { cout: cout, vente: vente, puv: puv, qte: num(l.qte), unite: l.unite || "u" };
   }
 
+  /* ---------- ventilation de la TVA par taux ----------
+     Une facture belge à taux mixtes (p. ex. 6 % main-d'œuvre + 21 % fournitures)
+     doit montrer la base ET la TVA par taux. Fonction pure, sans notion de
+     « ligne » : l'appelant a déjà résolu le taux effectif de chaque poste.
+       rows : [{ vente:Number, rate:Number }]  (rate = taux % du poste ; 0 = exonéré)
+       opts : { remise:Number=0, deplacement:Number=0, deplacementRate:Number=0 }
+         - remise (€) répartie au prorata du HT de chaque poste ;
+         - deplacement (€) ajouté au taux deplacementRate.
+     Retour : { venteHT, baseHT, tva, ttc, groups:[{ rate, base, tva }] } —
+     groups trié par taux décroissant, base/tva déjà cumulées par taux. */
+  function tvaBreakdown(rows, opts) {
+    opts = opts || {};
+    rows = rows || [];
+    var remise = num(opts.remise);
+    var deplacement = num(opts.deplacement);
+    var deplacementRate = num(opts.deplacementRate);
+
+    var venteHT = 0, i;
+    for (i = 0; i < rows.length; i++) venteHT += num(rows[i].vente);
+
+    // la remise rogne chaque poste au prorata (jamais en-dessous de 0)
+    var afterRemise = venteHT - remise;
+    if (afterRemise < 0) afterRemise = 0;
+    var factor = venteHT > 0 ? afterRemise / venteHT : 0;
+
+    var bases = {};
+    function addBase(rate, amount) {
+      var key = String(rate);
+      if (!bases.hasOwnProperty(key)) bases[key] = 0;
+      bases[key] += amount;
+    }
+    for (i = 0; i < rows.length; i++) {
+      addBase(num(rows[i].rate), num(rows[i].vente) * factor);
+    }
+    if (deplacement !== 0) addBase(deplacementRate, deplacement);
+
+    var rates = Object.keys(bases).map(Number).sort(function (a, b) { return b - a; });
+    var groups = [], baseHT = 0, tva = 0;
+    for (i = 0; i < rates.length; i++) {
+      var rt = rates[i];
+      var base = bases[String(rt)];
+      var t = base * (rt / 100);
+      baseHT += base;
+      tva += t;
+      groups.push({ rate: rt, base: base, tva: t });
+    }
+    return {
+      venteHT: venteHT,
+      remise: remise,
+      deplacement: deplacement,
+      baseHT: baseHT,
+      tva: tva,
+      ttc: baseHT + tva,
+      groups: groups,
+    };
+  }
+
   /* =========================================================================
      CALEPINAGE — bin packing « guillotine » tenant compte du trait de scie.
      Toutes les longueurs partagent la même unité (l'UI utilise le mm).
@@ -281,6 +338,7 @@
   return {
     num: num,
     computeLine: computeLine,
+    tvaBreakdown: tvaBreakdown,
     calculateCutlist: calculateCutlist,
     panelMetrics: panelMetrics,
     cutListText: cutListText,
