@@ -110,6 +110,35 @@ test("UI", { skip: chromium ? false : "playwright not installed" }, async (t) =>
     await p.close();
   });
 
+  await t.test("TVA par ligne: override sur une fourniture, l'autre suit le défaut", async () => {
+    const p = await newPage();
+
+    // fourniture 1 : HTVA 100, override TVA de la ligne → 21 %
+    await p.click('button.add:has-text("Fourniture")');
+    await p.waitForSelector(".line");
+    const f1 = p.locator(".line").nth(0);
+    await f1.getByText("Prix d'achat / u").locator("..").locator("input").fill("100");
+    await f1.getByText("Marge", { exact: true }).locator("..").locator("input").fill("0");
+    await f1.getByText("TVA de cette ligne").locator("..").locator("select").selectOption("21");
+
+    // fourniture 2 : HTVA 200, laissée au taux par défaut (6 %)
+    await p.click('button.add:has-text("Fourniture")');
+    await p.waitForTimeout(120);
+    const f2 = p.locator(".line").nth(1);
+    await f2.getByText("Prix d'achat / u").locator("..").locator("input").fill("200");
+    await f2.getByText("Marge", { exact: true }).locator("..").locator("input").fill("0");
+
+    await p.click('button:has-text("Devis client")');
+    await p.waitForSelector(".s-totals");
+    const totals = await p.locator(".s-totals").innerText();
+    assert.match(totals, /TVA 21 %/, "ligne 1 forcée à 21 %");
+    assert.match(totals, /TVA 6 %/, "ligne 2 au défaut 6 %");
+    assert.match(totals, /21,00/, "100 € × 21 % = 21,00 €");
+    assert.match(totals, /12,00/, "200 € × 6 % = 12,00 €");
+    assert.deepEqual(p._errors, []);
+    await p.close();
+  });
+
   await t.test("calepinage: counts whole panels, draws layout, builds cut list, adds devis line", async () => {
     const p = await newPage();
     await p.click('button:has-text("Calepinage")');

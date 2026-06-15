@@ -144,6 +144,7 @@ const newLine = (type, p) => ({
   qte: type === "fourniture" ? "1" : "",
   unite: "u",
   pa: "",
+  tvaRate: "", // "" = taux fournitures du devis ; sinon override de TVA de la ligne
   marge: type === "forfait" || type === "fourniture" ? p.marge : "",
   heures: "",
   tauxVente: type === "main" ? p.tauxVente : "",
@@ -271,6 +272,7 @@ function buildCalepLine(mat, comp, marge) {
     qte: String(metrics.totalSheets),
     unite: "panneau",
     pa: (Math.round(metrics.costPerPanel * 100) / 100).toString(),
+    tvaRate: "",
     marge,
     heures: "",
     tauxVente: "",
@@ -384,10 +386,18 @@ function App() {
       devis.tvaFournitures === "" || devis.tvaFournitures == null
         ? null
         : num(devis.tvaFournitures);
-    const taxRows = rows.map((l) => ({
-      vente: l.vente,
-      rate: coco ? 0 : l.type === "fourniture" && fournRate != null ? fournRate : mainRate,
-    }));
+    // Priorité du taux : cocontractant (0) > override de la ligne >
+    // taux fournitures du devis (pour les fournitures) > taux principal.
+    const lineOverride = (l) =>
+      l.tvaRate === "" || l.tvaRate == null ? null : num(l.tvaRate);
+    const taxRows = rows.map((l) => {
+      let rate;
+      if (coco) rate = 0;
+      else if (lineOverride(l) != null) rate = lineOverride(l);
+      else if (l.type === "fourniture" && fournRate != null) rate = fournRate;
+      else rate = mainRate;
+      return { vente: l.vente, rate };
+    });
     const t = tvaBreakdown(taxRows, {
       remise,
       deplacement,
@@ -652,6 +662,14 @@ function Atelier({
   const setClient = (patch) =>
     setDevis((d) => ({ ...d, client: { ...d.client, ...patch } }));
 
+  // Taux qu'une fourniture applique faute d'override de ligne : la « TVA
+  // fournitures » du devis si elle est définie, sinon le taux principal.
+  const tvaApplies = devis.clientType === "particulier";
+  const fournDefaultRate =
+    devis.tvaFournitures === "" || devis.tvaFournitures == null
+      ? num(devis.tvaRate)
+      : num(devis.tvaFournitures);
+
   return (
     <main className="wrap no-print">
       {/* meta + client */}
@@ -723,6 +741,8 @@ function Atelier({
               delLine={delLine}
               moveLine={moveLine}
               margeColor={margeColor}
+              tvaApplies={tvaApplies}
+              fournDefaultRate={fournDefaultRate}
             />
           ))}
         </div>
@@ -889,7 +909,7 @@ function Row({ k, v, strong }) {
 }
 
 /* ---------- single line card ---------- */
-function LineCard({ line, index, last, setLine, delLine, moveLine, margeColor }) {
+function LineCard({ line, index, last, setLine, delLine, moveLine, margeColor, tvaApplies, fournDefaultRate }) {
   const l = line;
   const typeLabel =
     l.type === "main" ? "Main-d'œuvre" : l.type === "forfait" ? "Forfait" : "Fourniture";
@@ -932,6 +952,24 @@ function LineCard({ line, index, last, setLine, delLine, moveLine, margeColor })
             <Field label="Marge">
               <NumIn value={l.marge} onChange={(v) => setLine(l.id, { marge: v })} suffix="%" />
             </Field>
+            {tvaApplies && (
+              <Field label="TVA de cette ligne" hint="vide = taux fournitures du devis">
+                <select
+                  className="in in-sel"
+                  value={l.tvaRate ?? ""}
+                  onChange={(e) =>
+                    setLine(l.id, { tvaRate: e.target.value === "" ? "" : Number(e.target.value) })
+                  }
+                >
+                  <option value="">Défaut ({num(fournDefaultRate)} %)</option>
+                  {TVA_OPTIONS.map((o) => (
+                    <option key={o.v} value={o.v}>
+                      {o.v} %
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            )}
           </>
         )}
         {l.type === "main" && (
