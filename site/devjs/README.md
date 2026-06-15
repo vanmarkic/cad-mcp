@@ -14,7 +14,12 @@ Dans **« 03 — Ajustements »**, deux taux de TVA :
   pour du matériel livré sans pose. Laisser sur *« Même taux »* applique le
   taux principal partout (comportement d'origine).
 
-Quand les deux taux diffèrent, le devis (atelier **et** feuille client) affiche
+Et **au cas par cas** : chaque ligne *fourniture* a un champ **« TVA de cette
+ligne »** (vide = taux fournitures du devis) pour forcer un taux sur une seule
+fourniture. Priorité : cocontractant (0 %) > override de la ligne > TVA
+fournitures du devis > taux principal.
+
+Quand les taux diffèrent, le devis (atelier **et** feuille client) affiche
 la **ventilation de la TVA par taux** — base HTVA + TVA pour chaque taux —,
 comme l'exige une facture belge à taux mixtes. Une remise globale est répartie
 au prorata du HT entre les taux. Pour un client **professionnel
@@ -74,9 +79,10 @@ npm test                          # tout
   de scie, rotation/sens du fil, pièces trop grandes, coût €/m², liste de débit,
   **chiffrage multi-matériaux**).
 - `test/ui.test.js` — tests UI : non-régression de l'input « % marge » (le champ
-  garde la valeur tapée), **TVA fournitures distincte → ventilation 6 %/21 % sur
-  le devis**, parcours complet du calepinage, et **deux matériaux distincts →
-  deux lignes de devis** (« Ajouter tout au devis »).
+  garde la valeur tapée), **TVA fournitures distincte → ventilation 6 %/21 %**,
+  **override de TVA sur une seule fourniture** (l'autre suit le défaut), parcours
+  complet du calepinage, et **deux matériaux distincts → deux lignes de devis**
+  (« Ajouter tout au devis »).
 
 Les tests UI chargent React/Babel depuis un CDN → connexion réseau requise
 (et `ignoreHTTPSErrors` pour les bacs à sable qui interceptent le TLS). La
