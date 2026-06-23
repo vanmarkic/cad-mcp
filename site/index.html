@@ -256,10 +256,172 @@ footer b{color:var(--ink)}
   </div>
 </header>
 
-<!-- ============ 01 · PLANS CORRIGÉS ============ -->
+<!-- ============ 01 · ANNEXES ============ -->
+<section id="annexes">
+  <div class="sec-head">
+    <span class="sec-num">01</span><h2>Annexes &amp; vérifications</h2>
+    <span class="note">as-built NavVis · superpositions</span>
+  </div>
+  <div class="plates">
+    <a class="plate" href="files/facades_coupes_aligned.pdf" download>
+      <figure>
+        <div class="img"><img src="previews/facades.png" alt="Façades et coupes as-built" loading="lazy"></div>
+        <figcaption><span class="code">AN-01</span><span class="name">Façades &amp; coupes</span><span class="dl">PDF ↓ 2,7 Mo</span></figcaption>
+      </figure>
+    </a>
+    <a class="plate" href="files/260612_plansdedivision_archi.pdf" download>
+      <figure>
+        <div class="img"><img src="previews/archi260612.png" alt="Plan de division architecte 12/06 — niveau +0" loading="lazy"></div>
+        <figcaption><span class="code">AN-02</span><span class="name">Division (archi 12/06)</span><span class="dl">PDF ↓</span></figcaption>
+      </figure>
+    </a>
+    <a class="plate" href="files/260612_surfaces.pdf" download>
+      <figure>
+        <div class="img"><img src="previews/surfaces260612.png" alt="Tableau des surfaces architecte 12/06" loading="lazy"></div>
+        <figcaption><span class="code">AN-03</span><span class="name">Surfaces (archi 12/06)</span><span class="dl">PDF ↓</span></figcaption>
+      </figure>
+    </a>
+    <a class="plate" href="files/overlay_6190_navvis_N0.png" target="_blank" rel="noopener">
+      <figure>
+        <div class="img"><img src="previews/overlay_N0.png" alt="Superposition géomètre 6190 sur scan NavVis — niveau 0" loading="lazy"></div>
+        <figcaption><span class="code">AN-04</span><span class="name">Superposition 6190 / scan — N0</span><span class="dl">PNG ⤢</span></figcaption>
+      </figure>
+    </a>
+    <a class="plate" href="files/overlay_6190_navvis_N1.png" target="_blank" rel="noopener">
+      <figure>
+        <div class="img"><img src="previews/overlay_N1.png" alt="Superposition géomètre 6190 sur scan NavVis — niveau 1" loading="lazy"></div>
+        <figcaption><span class="code">AN-05</span><span class="name">Superposition 6190 / scan — N1</span><span class="dl">PNG ⤢</span></figcaption>
+      </figure>
+    </a>
+  </div>
+  <details class="method">
+    <summary>Méthode &amp; précision — annexes</summary>
+    <div class="mbody"><ul>
+      <li><span class="m-k">Façades/coupes</span>Rendu orthographique du <b>nuage de points</b> (63,7 M points, scan ImmoPass du 04/06/2026) via l'API NavVis « pointcloud/crop ». Chaque boîte de coupe est alignée sur l'axe propre des murs du bâtiment (Aile O 15,9° · Aile SE 15,6° · Maison pr. 14,5° · Atelier 5,1° · Chapelle 4,5°) → élévations vraies, murs verticaux. Fenêtre z −2…+15 m : <b>Aile Ouest et Maison principale écrêtées</b> (hauteur réelle &gt; 15 m).</li>
+      <li><span class="m-k">Hauteurs</span>Extraction vérifiée (protocole v2 du 12/06) : détection de sommet, médiane glissante 0,5 m, cohérence inter-élévations 0,02–0,27 m. Faîtages vérifiés : Aile SE 12,9 m · Atelier 13,6–13,7 m · Chapelle 11,83–11,87 m. Les hauteurs d'égout v1 sont <b>retirées</b> (l'enveloppe pleine profondeur ne les isole pas). <span class="warn">Valeurs indicatives, non contractuelles.</span></li>
+      <li><span class="m-k">Superpositions</span>Recalage du plan géomètre 6190 sur l'empreinte du scan par <b>ICP</b> (rotation + translation, échelle fixée à 1,0 — deux levés métriques) : rms70 = 0,64 m (N0) / 0,46 m (N1), médiane ≈ 0,38 m. Surfaces et identifiants du géomètre repris verbatim — seules les positions sont recalées. La pièce F1 figurant hors emprise est une anomalie de la source, laissée visible volontairement.</li>
+      <li><span class="m-k">Docs archi</span>Plans et tableau 260612 : documents Carton123 du 12/06/2026, repris tels quels.</li>
+    </ul></div>
+  </details>
+</section>
+
+<!-- ============ 02 · ORTHOPHOTOS ============ -->
+<section id="orthophotos">
+  <div class="sec-head">
+    <span class="sec-num">02</span><h2>Orthophotos — as-built</h2>
+    <span class="note">scan NavVis (ImmoPass) · vues orthographiques par bâtiment</span>
+  </div>
+  <div class="plates">
+    <figure class="plate">
+      <a class="img" href="files/orthophotos/png/plan_AileOuest_0.png" target="_blank" rel="noopener"><img src="previews/ortho/plan_AileOuest_0.png" alt="Orthophoto Aile Ouest — niveau 0" loading="lazy"></a>
+      <figcaption><span class="code">OR-01</span><span class="name">Aile Ouest · N0</span><span class="res">23 mm/px</span>
+        <span class="acts"><a class="view" href="files/orthophotos/png/plan_AileOuest_0.png" target="_blank" rel="noopener">PNG ⤢</a><a class="tif" href="files/orthophotos/plan_AileOuest_0.tiff" download>TIFF ↓ 6,7 Mo</a></span></figcaption>
+    </figure>
+    <figure class="plate">
+      <a class="img" href="files/orthophotos/png/plan_AileOuest_1.png" target="_blank" rel="noopener"><img src="previews/ortho/plan_AileOuest_1.png" alt="Orthophoto Aile Ouest — niveau 1" loading="lazy"></a>
+      <figcaption><span class="code">OR-02</span><span class="name">Aile Ouest · N1</span><span class="res">23 mm/px</span>
+        <span class="acts"><a class="view" href="files/orthophotos/png/plan_AileOuest_1.png" target="_blank" rel="noopener">PNG ⤢</a><a class="tif" href="files/orthophotos/plan_AileOuest_1.tiff" download>TIFF ↓ 1,7 Mo</a></span></figcaption>
+    </figure>
+    <figure class="plate">
+      <a class="img" href="files/orthophotos/png/plan_AileSudEst_0.png" target="_blank" rel="noopener"><img src="previews/ortho/plan_AileSudEst_0.png" alt="Orthophoto Aile Sud-Est — niveau 0" loading="lazy"></a>
+      <figcaption><span class="code">OR-03</span><span class="name">Aile Sud-Est · N0</span><span class="res">14 mm/px</span>
+        <span class="acts"><a class="view" href="files/orthophotos/png/plan_AileSudEst_0.png" target="_blank" rel="noopener">PNG ⤢</a><a class="tif" href="files/orthophotos/plan_AileSudEst_0.tiff" download>TIFF ↓ 16 Mo</a></span></figcaption>
+    </figure>
+    <figure class="plate">
+      <a class="img" href="files/orthophotos/png/plan_AileSudEst_1.png" target="_blank" rel="noopener"><img src="previews/ortho/plan_AileSudEst_1.png" alt="Orthophoto Aile Sud-Est — niveau 1" loading="lazy"></a>
+      <figcaption><span class="code">OR-04</span><span class="name">Aile Sud-Est · N1</span><span class="res">14 mm/px</span>
+        <span class="acts"><a class="view" href="files/orthophotos/png/plan_AileSudEst_1.png" target="_blank" rel="noopener">PNG ⤢</a><a class="tif" href="files/orthophotos/plan_AileSudEst_1.tiff" download>TIFF ↓ 4,2 Mo</a></span></figcaption>
+    </figure>
+    <figure class="plate">
+      <a class="img" href="files/orthophotos/png/plan_Maisonprincipale_0.png" target="_blank" rel="noopener"><img src="previews/ortho/plan_Maisonprincipale_0.png" alt="Orthophoto Maison principale — niveau 0" loading="lazy"></a>
+      <figcaption><span class="code">OR-05</span><span class="name">Maison principale · N0</span><span class="res">10 mm/px</span>
+        <span class="acts"><a class="view" href="files/orthophotos/png/plan_Maisonprincipale_0.png" target="_blank" rel="noopener">PNG ⤢</a><a class="tif" href="files/orthophotos/plan_Maisonprincipale_0.tiff" download>TIFF ↓ 1,7 Mo</a></span></figcaption>
+    </figure>
+    <figure class="plate">
+      <a class="img" href="files/orthophotos/png/plan_Maisonprincipale_1.png" target="_blank" rel="noopener"><img src="previews/ortho/plan_Maisonprincipale_1.png" alt="Orthophoto Maison principale — niveau 1" loading="lazy"></a>
+      <figcaption><span class="code">OR-06</span><span class="name">Maison principale · N1</span><span class="res">10 mm/px</span>
+        <span class="acts"><a class="view" href="files/orthophotos/png/plan_Maisonprincipale_1.png" target="_blank" rel="noopener">PNG ⤢</a><a class="tif" href="files/orthophotos/plan_Maisonprincipale_1.tiff" download>TIFF ↓ 1,5 Mo</a></span></figcaption>
+    </figure>
+    <figure class="plate">
+      <a class="img" href="files/orthophotos/png/plan_Atelier_0.png" target="_blank" rel="noopener"><img src="previews/ortho/plan_Atelier_0.png" alt="Orthophoto Atelier — niveau 0" loading="lazy"></a>
+      <figcaption><span class="code">OR-07</span><span class="name">Atelier · N0</span><span class="res">15 mm/px</span>
+        <span class="acts"><a class="view" href="files/orthophotos/png/plan_Atelier_0.png" target="_blank" rel="noopener">PNG ⤢</a><a class="tif" href="files/orthophotos/plan_Atelier_0.tiff" download>TIFF ↓ 3,2 Mo</a></span></figcaption>
+    </figure>
+    <figure class="plate">
+      <a class="img" href="files/orthophotos/png/plan_Atelier_1.png" target="_blank" rel="noopener"><img src="previews/ortho/plan_Atelier_1.png" alt="Orthophoto Atelier — niveau 1" loading="lazy"></a>
+      <figcaption><span class="code">OR-08</span><span class="name">Atelier · N1</span><span class="res">15 mm/px</span>
+        <span class="acts"><a class="view" href="files/orthophotos/png/plan_Atelier_1.png" target="_blank" rel="noopener">PNG ⤢</a><a class="tif" href="files/orthophotos/plan_Atelier_1.tiff" download>TIFF ↓ 5,4 Mo</a></span></figcaption>
+    </figure>
+    <figure class="plate">
+      <a class="img" href="files/orthophotos/png/plan_Chapelle_0.png" target="_blank" rel="noopener"><img src="previews/ortho/plan_Chapelle_0.png" alt="Orthophoto Chapelle — niveau 0" loading="lazy"></a>
+      <figcaption><span class="code">OR-09</span><span class="name">Chapelle · N0</span><span class="res">10 mm/px</span>
+        <span class="acts"><a class="view" href="files/orthophotos/png/plan_Chapelle_0.png" target="_blank" rel="noopener">PNG ⤢</a><a class="tif" href="files/orthophotos/plan_Chapelle_0.tiff" download>TIFF ↓ 6,4 Mo</a></span></figcaption>
+    </figure>
+    <figure class="plate">
+      <a class="img" href="files/orthophotos/png/plan_Chapelle_1.png" target="_blank" rel="noopener"><img src="previews/ortho/plan_Chapelle_1.png" alt="Orthophoto Chapelle — niveau 1" loading="lazy"></a>
+      <figcaption><span class="code">OR-10</span><span class="name">Chapelle · N1</span><span class="res">10 mm/px</span>
+        <span class="acts"><a class="view" href="files/orthophotos/png/plan_Chapelle_1.png" target="_blank" rel="noopener">PNG ⤢</a><a class="tif" href="files/orthophotos/plan_Chapelle_1.tiff" download>TIFF ↓ 3,2 Mo</a></span></figcaption>
+    </figure>
+  </div>
+  <p class="foot-note" style="margin-top:22px">
+    Repère local NavVis en <b style="color:var(--ink)">mètres</b> (vues orthographiques géoréférencées).
+    Limites monde &amp; résolution de chaque planche : <a class="get" href="files/orthophotos/georef.json" download>georef.json ↓</a> —
+    conversion pixel→monde&nbsp;: <span style="font-family:var(--mono);font-size:11.5px">wx = xmin + col·(m/px) ; wy = ymax − row·(m/px)</span>.
+  </p>
+  <details class="method">
+    <summary>Méthode &amp; limites — orthophotos</summary>
+    <div class="mbody"><ul>
+      <li><span class="m-k">Rendu</span>Vue orthographique <b>du dessus</b> du nuage de points (même API « pointcloud/crop » que les façades), tranche horizontale ≈ 0,85–1,35 m au-dessus du sol de chaque niveau — absorbe les sols irréguliers et gravats de la ruine.</li>
+      <li><span class="m-k">Géoréf.</span>Repère local NavVis natif en mètres (aucun recalage secondaire) ; balises GeoTIFF (ModelPixelScale / ModelTiepoint) intégrées — chargement direct dans QGIS/ArcGIS ; résolution 10–23 mm/px selon le bâtiment.</li>
+      <li><span class="m-k">Couverture</span>Niveau +0 ≈ 90–100 % ; niveau <b>+1 ≈ 11–20 % seulement</b> (ruine sans toiture, murs d'étage partiels). Intérieur de la Maison principale non capté par le scan → emprise extérieure seule.</li>
+      <li><span class="m-k warn">⚠ Usage</span><span class="warn">Référence d'implantation et de vérification visuelle — trop bruité pour tracer des cloisons au niveau d'exigence cadastral ; ne pas utiliser pour le mesurage final des lots.</span></li>
+    </ul></div>
+  </details>
+</section>
+
+<!-- ============ 03 · OUTIL INTERACTIF ============ -->
+<section id="outil">
+  <div class="sec-head">
+    <span class="sec-num">03</span><h2>Outil de coupes &amp; plans partiels</h2>
+    <span class="note">interactif · dans le navigateur</span>
+  </div>
+  <a href="outil.html" style="text-decoration:none;color:inherit;display:block">
+  <div class="layers" style="display:flex;gap:26px;align-items:center;flex-wrap:wrap;transition:transform .2s" onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='none'">
+    <div style="flex:1;min-width:280px">
+      <h3 style="color:var(--red)">Générer une coupe ou un plan partiel à la demande →</h3>
+      <p style="font-size:14px;line-height:1.6;margin-top:8px">
+        Outil interactif sur le relevé as-built NavVis : choisissez un bâtiment, tracez une ligne sur le plan,
+        la <b>coupe verticale</b> s'affiche avec ses cotes. Tranche de plan à une hauteur donnée, mesure à deux clics,
+        export <b>PNG</b> et <b>DXF</b>. Tout est calculé <b>dans le navigateur</b> — aucune donnée ni identifiant
+        ne quitte votre poste.
+      </p>
+      <p style="font-family:var(--mono);font-size:11px;color:var(--ink-soft);margin-top:10px">
+        4 bâtiments · Aile Sud-Est · Aile Ouest · Atelier · Chapelle —
+        <span style="color:var(--red)">ouvrir l'outil ↗</span>
+      </p>
+    </div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--ink-soft);border-left:1px solid var(--hair);padding-left:22px;line-height:1.7">
+      ✎ ligne de coupe → élévation<br>
+      ↔ mesure réelle en mètres<br>
+      ⤓ export PNG / DXF<br>
+      nuage ~3 cm · scan 04/06/2026
+    </div>
+  </div>
+  </a>
+  <details class="method">
+    <summary>Méthode &amp; limites — outil interactif</summary>
+    <div class="mbody"><ul>
+      <li><span class="m-k">Données</span>Nuage de points NavVis décodé localement (POTREE2), échantillonné à ~3 cm et embarqué dans la page (uint16). Le navigateur extrait les tranches plan/coupe à la volée — pas de serveur, pas d'API, pas d'identifiant en ligne.</li>
+      <li><span class="m-k">Couverture</span>4 bâtiments scannés. <b>Maison principale exclue</b> (intérieur non capté par le scan). Étages partiellement scannés (ruine sans toiture) : certaines coupes d'étage sont creuses.</li>
+      <li><span class="m-k warn">⚠ Précision</span><span class="warn">Mesures ~2–3 cm, <b>indicatives et non contractuelles</b> — le mesurage cadastral reste du ressort du géomètre.</span></li>
+    </ul></div>
+  </details>
+</section>
+
+<!-- ============ 04 · PLANS CORRIGÉS ============ -->
 <section id="plans">
   <div class="sec-head">
-    <span class="sec-num">01</span><h2>Plans corrigés</h2>
+    <span class="sec-num">04</span><h2>Plans corrigés</h2>
     <span class="note">étiquettes de surface, base architecte 260608</span>
   </div>
   <div class="plates">
@@ -287,10 +449,10 @@ footer b{color:var(--ink)}
   </details>
 </section>
 
-<!-- ============ 02 · TÉLÉCHARGEMENTS ============ -->
+<!-- ============ 05 · TÉLÉCHARGEMENTS ============ -->
 <section id="fichiers">
   <div class="sec-head">
-    <span class="sec-num">02</span><h2>Téléchargements</h2>
+    <span class="sec-num">05</span><h2>Téléchargements</h2>
     <span class="note">DXF · DWG · PDF</span>
   </div>
 
@@ -418,10 +580,10 @@ footer b{color:var(--ink)}
   </details>
 </section>
 
-<!-- ============ 03 · CORRECTIONS ============ -->
+<!-- ============ 06 · CORRECTIONS ============ -->
 <section id="corrections">
   <div class="sec-head">
-    <span class="sec-num">03</span><h2>Corrections de surfaces</h2>
+    <span class="sec-num">06</span><h2>Corrections de surfaces</h2>
     <span class="note">m² — détail complet : CORRECTION_applied.md</span>
   </div>
   <div class="cor-grid">
@@ -471,168 +633,6 @@ footer b{color:var(--ink)}
       <li><span class="m-k">Somme</span>Σ corrigée = 1 390,5 m² vs 1 391 m² au PDF — l'écart de 0,5 m² est le seul cas L11 (106,5 mesuré dans le fichier vs 107 arrondi PDF) ; la valeur mesurée est conservée.</li>
       <li><span class="m-k warn">⚠ Conventions</span><span class="warn">Ces étiquettes sont des surfaces <b>nettes</b> par niveau. Le tableau architecte 260610/260612 est en surfaces <b>brutes</b> (murs extérieurs + ½ mitoyennetés) — les deux séries ne sont pas directement comparables.</span></li>
       <li><span class="m-k">Traçabilité</span>Détail complet par étiquette (avant/après, source, confiance) : CORRECTION_PROPOSAL / CORRECTION_applied / XCHECK_REPORT dans le dossier de travail.</li>
-    </ul></div>
-  </details>
-</section>
-
-<!-- ============ 04 · ANNEXES ============ -->
-<section id="annexes">
-  <div class="sec-head">
-    <span class="sec-num">04</span><h2>Annexes &amp; vérifications</h2>
-    <span class="note">as-built NavVis · superpositions</span>
-  </div>
-  <div class="plates">
-    <a class="plate" href="files/facades_coupes_aligned.pdf" download>
-      <figure>
-        <div class="img"><img src="previews/facades.png" alt="Façades et coupes as-built" loading="lazy"></div>
-        <figcaption><span class="code">AN-01</span><span class="name">Façades &amp; coupes</span><span class="dl">PDF ↓ 2,7 Mo</span></figcaption>
-      </figure>
-    </a>
-    <a class="plate" href="files/260612_plansdedivision_archi.pdf" download>
-      <figure>
-        <div class="img"><img src="previews/archi260612.png" alt="Plan de division architecte 12/06 — niveau +0" loading="lazy"></div>
-        <figcaption><span class="code">AN-02</span><span class="name">Division (archi 12/06)</span><span class="dl">PDF ↓</span></figcaption>
-      </figure>
-    </a>
-    <a class="plate" href="files/260612_surfaces.pdf" download>
-      <figure>
-        <div class="img"><img src="previews/surfaces260612.png" alt="Tableau des surfaces architecte 12/06" loading="lazy"></div>
-        <figcaption><span class="code">AN-03</span><span class="name">Surfaces (archi 12/06)</span><span class="dl">PDF ↓</span></figcaption>
-      </figure>
-    </a>
-    <a class="plate" href="files/overlay_6190_navvis_N0.png" target="_blank" rel="noopener">
-      <figure>
-        <div class="img"><img src="previews/overlay_N0.png" alt="Superposition géomètre 6190 sur scan NavVis — niveau 0" loading="lazy"></div>
-        <figcaption><span class="code">AN-04</span><span class="name">Superposition 6190 / scan — N0</span><span class="dl">PNG ⤢</span></figcaption>
-      </figure>
-    </a>
-    <a class="plate" href="files/overlay_6190_navvis_N1.png" target="_blank" rel="noopener">
-      <figure>
-        <div class="img"><img src="previews/overlay_N1.png" alt="Superposition géomètre 6190 sur scan NavVis — niveau 1" loading="lazy"></div>
-        <figcaption><span class="code">AN-05</span><span class="name">Superposition 6190 / scan — N1</span><span class="dl">PNG ⤢</span></figcaption>
-      </figure>
-    </a>
-  </div>
-  <details class="method">
-    <summary>Méthode &amp; précision — annexes</summary>
-    <div class="mbody"><ul>
-      <li><span class="m-k">Façades/coupes</span>Rendu orthographique du <b>nuage de points</b> (63,7 M points, scan ImmoPass du 04/06/2026) via l'API NavVis « pointcloud/crop ». Chaque boîte de coupe est alignée sur l'axe propre des murs du bâtiment (Aile O 15,9° · Aile SE 15,6° · Maison pr. 14,5° · Atelier 5,1° · Chapelle 4,5°) → élévations vraies, murs verticaux. Fenêtre z −2…+15 m : <b>Aile Ouest et Maison principale écrêtées</b> (hauteur réelle &gt; 15 m).</li>
-      <li><span class="m-k">Hauteurs</span>Extraction vérifiée (protocole v2 du 12/06) : détection de sommet, médiane glissante 0,5 m, cohérence inter-élévations 0,02–0,27 m. Faîtages vérifiés : Aile SE 12,9 m · Atelier 13,6–13,7 m · Chapelle 11,83–11,87 m. Les hauteurs d'égout v1 sont <b>retirées</b> (l'enveloppe pleine profondeur ne les isole pas). <span class="warn">Valeurs indicatives, non contractuelles.</span></li>
-      <li><span class="m-k">Superpositions</span>Recalage du plan géomètre 6190 sur l'empreinte du scan par <b>ICP</b> (rotation + translation, échelle fixée à 1,0 — deux levés métriques) : rms70 = 0,64 m (N0) / 0,46 m (N1), médiane ≈ 0,38 m. Surfaces et identifiants du géomètre repris verbatim — seules les positions sont recalées. La pièce F1 figurant hors emprise est une anomalie de la source, laissée visible volontairement.</li>
-      <li><span class="m-k">Docs archi</span>Plans et tableau 260612 : documents Carton123 du 12/06/2026, repris tels quels.</li>
-    </ul></div>
-  </details>
-</section>
-
-<!-- ============ 05 · ORTHOPHOTOS ============ -->
-<section id="orthophotos">
-  <div class="sec-head">
-    <span class="sec-num">05</span><h2>Orthophotos — as-built</h2>
-    <span class="note">scan NavVis (ImmoPass) · vues orthographiques par bâtiment</span>
-  </div>
-  <div class="plates">
-    <figure class="plate">
-      <a class="img" href="files/orthophotos/png/plan_AileOuest_0.png" target="_blank" rel="noopener"><img src="previews/ortho/plan_AileOuest_0.png" alt="Orthophoto Aile Ouest — niveau 0" loading="lazy"></a>
-      <figcaption><span class="code">OR-01</span><span class="name">Aile Ouest · N0</span><span class="res">23 mm/px</span>
-        <span class="acts"><a class="view" href="files/orthophotos/png/plan_AileOuest_0.png" target="_blank" rel="noopener">PNG ⤢</a><a class="tif" href="files/orthophotos/plan_AileOuest_0.tiff" download>TIFF ↓ 6,7 Mo</a></span></figcaption>
-    </figure>
-    <figure class="plate">
-      <a class="img" href="files/orthophotos/png/plan_AileOuest_1.png" target="_blank" rel="noopener"><img src="previews/ortho/plan_AileOuest_1.png" alt="Orthophoto Aile Ouest — niveau 1" loading="lazy"></a>
-      <figcaption><span class="code">OR-02</span><span class="name">Aile Ouest · N1</span><span class="res">23 mm/px</span>
-        <span class="acts"><a class="view" href="files/orthophotos/png/plan_AileOuest_1.png" target="_blank" rel="noopener">PNG ⤢</a><a class="tif" href="files/orthophotos/plan_AileOuest_1.tiff" download>TIFF ↓ 1,7 Mo</a></span></figcaption>
-    </figure>
-    <figure class="plate">
-      <a class="img" href="files/orthophotos/png/plan_AileSudEst_0.png" target="_blank" rel="noopener"><img src="previews/ortho/plan_AileSudEst_0.png" alt="Orthophoto Aile Sud-Est — niveau 0" loading="lazy"></a>
-      <figcaption><span class="code">OR-03</span><span class="name">Aile Sud-Est · N0</span><span class="res">14 mm/px</span>
-        <span class="acts"><a class="view" href="files/orthophotos/png/plan_AileSudEst_0.png" target="_blank" rel="noopener">PNG ⤢</a><a class="tif" href="files/orthophotos/plan_AileSudEst_0.tiff" download>TIFF ↓ 16 Mo</a></span></figcaption>
-    </figure>
-    <figure class="plate">
-      <a class="img" href="files/orthophotos/png/plan_AileSudEst_1.png" target="_blank" rel="noopener"><img src="previews/ortho/plan_AileSudEst_1.png" alt="Orthophoto Aile Sud-Est — niveau 1" loading="lazy"></a>
-      <figcaption><span class="code">OR-04</span><span class="name">Aile Sud-Est · N1</span><span class="res">14 mm/px</span>
-        <span class="acts"><a class="view" href="files/orthophotos/png/plan_AileSudEst_1.png" target="_blank" rel="noopener">PNG ⤢</a><a class="tif" href="files/orthophotos/plan_AileSudEst_1.tiff" download>TIFF ↓ 4,2 Mo</a></span></figcaption>
-    </figure>
-    <figure class="plate">
-      <a class="img" href="files/orthophotos/png/plan_Maisonprincipale_0.png" target="_blank" rel="noopener"><img src="previews/ortho/plan_Maisonprincipale_0.png" alt="Orthophoto Maison principale — niveau 0" loading="lazy"></a>
-      <figcaption><span class="code">OR-05</span><span class="name">Maison principale · N0</span><span class="res">10 mm/px</span>
-        <span class="acts"><a class="view" href="files/orthophotos/png/plan_Maisonprincipale_0.png" target="_blank" rel="noopener">PNG ⤢</a><a class="tif" href="files/orthophotos/plan_Maisonprincipale_0.tiff" download>TIFF ↓ 1,7 Mo</a></span></figcaption>
-    </figure>
-    <figure class="plate">
-      <a class="img" href="files/orthophotos/png/plan_Maisonprincipale_1.png" target="_blank" rel="noopener"><img src="previews/ortho/plan_Maisonprincipale_1.png" alt="Orthophoto Maison principale — niveau 1" loading="lazy"></a>
-      <figcaption><span class="code">OR-06</span><span class="name">Maison principale · N1</span><span class="res">10 mm/px</span>
-        <span class="acts"><a class="view" href="files/orthophotos/png/plan_Maisonprincipale_1.png" target="_blank" rel="noopener">PNG ⤢</a><a class="tif" href="files/orthophotos/plan_Maisonprincipale_1.tiff" download>TIFF ↓ 1,5 Mo</a></span></figcaption>
-    </figure>
-    <figure class="plate">
-      <a class="img" href="files/orthophotos/png/plan_Atelier_0.png" target="_blank" rel="noopener"><img src="previews/ortho/plan_Atelier_0.png" alt="Orthophoto Atelier — niveau 0" loading="lazy"></a>
-      <figcaption><span class="code">OR-07</span><span class="name">Atelier · N0</span><span class="res">15 mm/px</span>
-        <span class="acts"><a class="view" href="files/orthophotos/png/plan_Atelier_0.png" target="_blank" rel="noopener">PNG ⤢</a><a class="tif" href="files/orthophotos/plan_Atelier_0.tiff" download>TIFF ↓ 3,2 Mo</a></span></figcaption>
-    </figure>
-    <figure class="plate">
-      <a class="img" href="files/orthophotos/png/plan_Atelier_1.png" target="_blank" rel="noopener"><img src="previews/ortho/plan_Atelier_1.png" alt="Orthophoto Atelier — niveau 1" loading="lazy"></a>
-      <figcaption><span class="code">OR-08</span><span class="name">Atelier · N1</span><span class="res">15 mm/px</span>
-        <span class="acts"><a class="view" href="files/orthophotos/png/plan_Atelier_1.png" target="_blank" rel="noopener">PNG ⤢</a><a class="tif" href="files/orthophotos/plan_Atelier_1.tiff" download>TIFF ↓ 5,4 Mo</a></span></figcaption>
-    </figure>
-    <figure class="plate">
-      <a class="img" href="files/orthophotos/png/plan_Chapelle_0.png" target="_blank" rel="noopener"><img src="previews/ortho/plan_Chapelle_0.png" alt="Orthophoto Chapelle — niveau 0" loading="lazy"></a>
-      <figcaption><span class="code">OR-09</span><span class="name">Chapelle · N0</span><span class="res">10 mm/px</span>
-        <span class="acts"><a class="view" href="files/orthophotos/png/plan_Chapelle_0.png" target="_blank" rel="noopener">PNG ⤢</a><a class="tif" href="files/orthophotos/plan_Chapelle_0.tiff" download>TIFF ↓ 6,4 Mo</a></span></figcaption>
-    </figure>
-    <figure class="plate">
-      <a class="img" href="files/orthophotos/png/plan_Chapelle_1.png" target="_blank" rel="noopener"><img src="previews/ortho/plan_Chapelle_1.png" alt="Orthophoto Chapelle — niveau 1" loading="lazy"></a>
-      <figcaption><span class="code">OR-10</span><span class="name">Chapelle · N1</span><span class="res">10 mm/px</span>
-        <span class="acts"><a class="view" href="files/orthophotos/png/plan_Chapelle_1.png" target="_blank" rel="noopener">PNG ⤢</a><a class="tif" href="files/orthophotos/plan_Chapelle_1.tiff" download>TIFF ↓ 3,2 Mo</a></span></figcaption>
-    </figure>
-  </div>
-  <p class="foot-note" style="margin-top:22px">
-    Repère local NavVis en <b style="color:var(--ink)">mètres</b> (vues orthographiques géoréférencées).
-    Limites monde &amp; résolution de chaque planche : <a class="get" href="files/orthophotos/georef.json" download>georef.json ↓</a> —
-    conversion pixel→monde&nbsp;: <span style="font-family:var(--mono);font-size:11.5px">wx = xmin + col·(m/px) ; wy = ymax − row·(m/px)</span>.
-  </p>
-  <details class="method">
-    <summary>Méthode &amp; limites — orthophotos</summary>
-    <div class="mbody"><ul>
-      <li><span class="m-k">Rendu</span>Vue orthographique <b>du dessus</b> du nuage de points (même API « pointcloud/crop » que les façades), tranche horizontale ≈ 0,85–1,35 m au-dessus du sol de chaque niveau — absorbe les sols irréguliers et gravats de la ruine.</li>
-      <li><span class="m-k">Géoréf.</span>Repère local NavVis natif en mètres (aucun recalage secondaire) ; balises GeoTIFF (ModelPixelScale / ModelTiepoint) intégrées — chargement direct dans QGIS/ArcGIS ; résolution 10–23 mm/px selon le bâtiment.</li>
-      <li><span class="m-k">Couverture</span>Niveau +0 ≈ 90–100 % ; niveau <b>+1 ≈ 11–20 % seulement</b> (ruine sans toiture, murs d'étage partiels). Intérieur de la Maison principale non capté par le scan → emprise extérieure seule.</li>
-      <li><span class="m-k warn">⚠ Usage</span><span class="warn">Référence d'implantation et de vérification visuelle — trop bruité pour tracer des cloisons au niveau d'exigence cadastral ; ne pas utiliser pour le mesurage final des lots.</span></li>
-    </ul></div>
-  </details>
-</section>
-
-<!-- ============ 06 · OUTIL INTERACTIF ============ -->
-<section id="outil">
-  <div class="sec-head">
-    <span class="sec-num">06</span><h2>Outil de coupes &amp; plans partiels</h2>
-    <span class="note">interactif · dans le navigateur</span>
-  </div>
-  <a href="outil.html" style="text-decoration:none;color:inherit;display:block">
-  <div class="layers" style="display:flex;gap:26px;align-items:center;flex-wrap:wrap;transition:transform .2s" onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform='none'">
-    <div style="flex:1;min-width:280px">
-      <h3 style="color:var(--red)">Générer une coupe ou un plan partiel à la demande →</h3>
-      <p style="font-size:14px;line-height:1.6;margin-top:8px">
-        Outil interactif sur le relevé as-built NavVis : choisissez un bâtiment, tracez une ligne sur le plan,
-        la <b>coupe verticale</b> s'affiche avec ses cotes. Tranche de plan à une hauteur donnée, mesure à deux clics,
-        export <b>PNG</b> et <b>DXF</b>. Tout est calculé <b>dans le navigateur</b> — aucune donnée ni identifiant
-        ne quitte votre poste.
-      </p>
-      <p style="font-family:var(--mono);font-size:11px;color:var(--ink-soft);margin-top:10px">
-        4 bâtiments · Aile Sud-Est · Aile Ouest · Atelier · Chapelle —
-        <span style="color:var(--red)">ouvrir l'outil ↗</span>
-      </p>
-    </div>
-    <div style="font-family:var(--mono);font-size:10px;color:var(--ink-soft);border-left:1px solid var(--hair);padding-left:22px;line-height:1.7">
-      ✎ ligne de coupe → élévation<br>
-      ↔ mesure réelle en mètres<br>
-      ⤓ export PNG / DXF<br>
-      nuage ~3 cm · scan 04/06/2026
-    </div>
-  </div>
-  </a>
-  <details class="method">
-    <summary>Méthode &amp; limites — outil interactif</summary>
-    <div class="mbody"><ul>
-      <li><span class="m-k">Données</span>Nuage de points NavVis décodé localement (POTREE2), échantillonné à ~3 cm et embarqué dans la page (uint16). Le navigateur extrait les tranches plan/coupe à la volée — pas de serveur, pas d'API, pas d'identifiant en ligne.</li>
-      <li><span class="m-k">Couverture</span>4 bâtiments scannés. <b>Maison principale exclue</b> (intérieur non capté par le scan). Étages partiellement scannés (ruine sans toiture) : certaines coupes d'étage sont creuses.</li>
-      <li><span class="m-k warn">⚠ Précision</span><span class="warn">Mesures ~2–3 cm, <b>indicatives et non contractuelles</b> — le mesurage cadastral reste du ressort du géomètre.</span></li>
     </ul></div>
   </details>
 </section>
