@@ -249,3 +249,80 @@ test("cutListText: groups identical pieces and counts totals", () => {
   assert.match(out.text, /2\tMontant\t1800\t300/);
   assert.doesNotMatch(out.text, /Vide/);
 });
+
+/* =====================================================================
+   BIBLIOTHÈQUE DE RÉFÉRENCES — forme de la base, extraction, fusion.
+   ===================================================================== */
+test("emptyRefsDB: shape", () => {
+  const db = C.emptyRefsDB();
+  assert.deepEqual(db.materials, []);
+  assert.deepEqual(db.pieces, []);
+  assert.equal(db.version, 1);
+  assert.equal(db.updatedAt, null);
+});
+
+test("makeMaterialRef: extracts calep fields with a deterministic id", () => {
+  const mat = { id: "transient-uid", material: "MDF 18 mm", panelW: "2500", panelH: "1250", kerf: "3", pricePerM2: "30", grainDirection: true, pieces: [{}] };
+  const ref = C.makeMaterialRef(mat, "2026-06-26T10:00:00Z");
+  assert.equal(ref.material, "MDF 18 mm");
+  assert.equal(ref.panelW, "2500");
+  assert.equal(ref.grainDirection, true);
+  assert.equal(ref.pieces, undefined); // not carried into the library
+  assert.equal(ref.updatedAt, "2026-06-26T10:00:00Z");
+  // same content → same id on any machine (basis for cross-machine dedup)
+  assert.equal(ref.id, C.makeMaterialRef({ ...mat, id: "other" }, "x").id);
+});
+
+test("makePieceRef: defaults qty to 1, deterministic id", () => {
+  const ref = C.makePieceRef({ label: "Étagère", w: "600", h: "300", qty: "" }, "t");
+  assert.equal(ref.qty, "1");
+  assert.equal(ref.id, C.pieceSignature({ label: "étagère", w: 600, h: 300, qty: 1 }));
+});
+
+test("upsertRef: replaces by id, else appends", () => {
+  const a = C.makeMaterialRef({ material: "MDF", panelW: 2500, panelH: 1250 }, "t1");
+  let list = C.upsertRef([], a);
+  assert.equal(list.length, 1);
+  const a2 = { ...a, updatedAt: "t2" };
+  list = C.upsertRef(list, a2);              // same id → replace
+  assert.equal(list.length, 1);
+  assert.equal(list[0].updatedAt, "t2");
+  const b = C.makeMaterialRef({ material: "Aglo", panelW: 2800, panelH: 2070 }, "t3");
+  list = C.upsertRef(list, b);               // new id → append
+  assert.equal(list.length, 2);
+});
+
+test("removeRef: drops by id", () => {
+  const a = C.makePieceRef({ label: "x", w: 1, h: 1 }, "t");
+  const list = C.removeRef([a], a.id);
+  assert.equal(list.length, 0);
+});
+
+test("mergeRefLists: union by id, newest updatedAt wins, sorted recent-first", () => {
+  const r1 = C.makeMaterialRef({ material: "MDF", panelW: 2500, panelH: 1250 }, "2026-01-01T00:00:00Z");
+  const r1b = { ...r1, pricePerM2: "30", updatedAt: "2026-02-01T00:00:00Z" }; // same id, newer
+  const r2 = C.makeMaterialRef({ material: "Aglo", panelW: 2800, panelH: 2070 }, "2026-03-01T00:00:00Z");
+  const merged = C.mergeRefLists([r1], [r1b, r2]);
+  assert.equal(merged.length, 2);                 // r1 collapsed with r1b
+  const mdf = merged.find((m) => m.id === r1.id);
+  assert.equal(mdf.updatedAt, "2026-02-01T00:00:00Z"); // newer kept
+  assert.equal(merged[0].id, r2.id);              // most recent first
+});
+
+test("validateRefsDB: coerces junk and drops non-objects", () => {
+  const db = C.validateRefsDB({ materials: [{ material: "MDF", panelW: 2500 }, null, 7], pieces: "nope" });
+  assert.equal(db.materials.length, 1);
+  assert.equal(db.materials[0].material, "MDF");
+  assert.deepEqual(db.pieces, []);
+  assert.equal(db.version, 1);
+  assert.deepEqual(C.validateRefsDB(null), C.emptyRefsDB());
+});
+
+test("mergeRefsDB: merges materials and pieces, stamps updatedAt", () => {
+  const remote = { materials: [C.makeMaterialRef({ material: "MDF", panelW: 2500, panelH: 1250 }, "t1")], pieces: [] };
+  const local = { materials: [C.makeMaterialRef({ material: "Aglo", panelW: 2800, panelH: 2070 }, "t2")], pieces: [C.makePieceRef({ label: "côté", w: 700, h: 400 }, "t3")] };
+  const db = C.mergeRefsDB(remote, local, "2026-06-26T12:00:00Z");
+  assert.equal(db.materials.length, 2);
+  assert.equal(db.pieces.length, 1);
+  assert.equal(db.updatedAt, "2026-06-26T12:00:00Z");
+});

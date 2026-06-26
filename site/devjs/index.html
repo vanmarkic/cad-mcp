@@ -29,10 +29,15 @@ window.storage = {
 
 <!-- shared, framework-free calculation core (also unit-tested under test/) -->
 <script src="lib/etabli-core.js"></script>
+<!-- GitHub Contents API client : push de la bibliothèque vers une branche « base » -->
+<script src="lib/gh-sync.js"></script>
 
 <script type="text/babel" data-presets="react">
 const { useState, useEffect, useMemo, useRef } = React;
-const { num, computeLine, tvaBreakdown, calculateCutlist, panelMetrics, cutListText } = window.EtabliCore;
+const { num, computeLine, tvaBreakdown, calculateCutlist, panelMetrics, cutListText,
+  emptyRefsDB, validateRefsDB, makeMaterialRef, makePieceRef, upsertRef, removeRef,
+  mergeRefsDB } = window.EtabliCore;
+const { createGhSync } = window.EtabliGhSync;
 
 /* =========================================================================
    ÉTABLI — Générateur de devis pour menuisier
@@ -51,6 +56,7 @@ const eur = (n) =>
 const pct = (n) =>
   (isFinite(n) ? n : 0).toLocaleString("fr-BE", { maximumFractionDigits: 1 }) + " %";
 const todayISO = () => new Date().toISOString().slice(0, 10);
+const nowISO = () => new Date().toISOString();
 const frDate = (iso) => {
   if (!iso) return "";
   const [y, m, d] = iso.split("-");
@@ -133,6 +139,16 @@ const DEFAULT_PARAMS = {
   validite: "30",
   acompte: "30",
   margeCible: "25",
+};
+// Cible de synchro de la bibliothèque : une branche DÉDIÉE du dépôt sert de
+// base de données (jamais `main` → pas de rebuild du site Pages). Le token est
+// saisi par l'utilisateur (jamais en dur) et reste dans ce navigateur.
+const DEFAULT_GH = {
+  token: "",
+  owner: "vanmarkic",
+  repo: "cad-mcp",
+  branch: "etabli-db",
+  path: "etabli/refs.json",
 };
 const newLine = (type, p) => ({
   id: uid(),
@@ -289,9 +305,13 @@ function App() {
   const [params, setParams] = useState(DEFAULT_PARAMS);
   const [devis, setDevis] = useState(() => newDevis(DEFAULT_COMPANY, DEFAULT_PARAMS));
   const [saved, setSaved] = useState([]);
-  const [modal, setModal] = useState(null); // 'reglages' | 'mesdevis' | 'calepinage' | null
+  const [modal, setModal] = useState(null); // 'reglages' | 'mesdevis' | 'calepinage' | 'biblio' | null
   const [toast, setToast] = useState("");
   const [calep, setCalep] = useState(DEFAULT_CALEP);
+  const [refs, setRefs] = useState(emptyRefsDB);      // bibliothèque de références
+  const [gh, setGh] = useState(DEFAULT_GH);            // cible de synchro git
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState(null);       // { text, err } | null
   const loaded = useRef(false);
 
   /* load persisted state */
@@ -309,6 +329,10 @@ function App() {
           if (q && q.value) setSaved(JSON.parse(q.value) || []);
           const cp = await window.storage.get("etabli:calepinage").catch(() => null);
           if (cp && cp.value) setCalep(migrateCalep(JSON.parse(cp.value)));
+          const rf = await window.storage.get("etabli:refs").catch(() => null);
+          if (rf && rf.value) setRefs(validateRefsDB(JSON.parse(rf.value)));
+          const g = await window.storage.get("etabli:gh").catch(() => null);
+          if (g && g.value) setGh((cur) => ({ ...cur, ...JSON.parse(g.value) }));
         }
       } catch (e) {
         /* ignore — first run */
@@ -326,6 +350,16 @@ function App() {
         window.storage.set("etabli:calepinage", JSON.stringify(calep));
     } catch (e) {}
   }, [calep]);
+
+  /* persist the reference library + the git sync config (after first load) */
+  useEffect(() => {
+    if (!loaded.current) return;
+    try { if (window.storage) window.storage.set("etabli:refs", JSON.stringify(refs)); } catch (e) {}
+  }, [refs]);
+  useEffect(() => {
+    if (!loaded.current) return;
+    try { if (window.storage) window.storage.set("etabli:gh", JSON.stringify(gh)); } catch (e) {}
+  }, [gh]);
 
   const flash = (m) => {
     setToast(m);
@@ -506,6 +540,98 @@ function App() {
     flash(lines.length > 1 ? `${lines.length} lignes ajoutées au devis` : "Calepinage ajouté au devis");
   };
 
+  /* ---------- bibliothèque de références (réemploi) ---------- */
+  // Enregistrer : depuis le calepinage, garder une matière / des pièces pour
+  // les réinsérer plus tard. L'id déterministe (cf. core) dédoublonne d'office.
+  const saveMaterialToLibrary = (mat) => {
+    if (!mat) return;
+    setRefs((r) => ({ ...r, materials: upsertRef(r.materials, makeMaterialRef(mat, nowISO())), updatedAt: nowISO() }));
+    flash("Matière enregistrée dans la bibliothèque");
+  };
+  const savePiecesToLibrary = (pieces) => {
+    const list = (pieces || []).filter((p) => num(p.w) > 0 && num(p.h) > 0);
+    if (!list.length) { flash("Aucune pièce chiffrée à enregistrer"); return; }
+    setRefs((r) => {
+      let pcs = r.pieces;
+      list.forEach((p) => { pcs = upsertRef(pcs, makePieceRef(p, nowISO())); });
+      return { ...r, pieces: pcs, updatedAt: nowISO() };
+    });
+    flash(list.length + " pièce(s) enregistrée(s)");
+  };
+  const deleteMaterialRef = (id) => setRefs((r) => ({ ...r, materials: removeRef(r.materials, id), updatedAt: nowISO() }));
+  const deletePieceRef = (id) => setRefs((r) => ({ ...r, pieces: removeRef(r.pieces, id), updatedAt: nowISO() }));
+
+  // Insérer : instancier une référence dans le calepinage (id frais, couleur).
+  // On bascule sur la modale calepinage pour montrer le résultat.
+  const insertMaterialRef = (ref) => {
+    setCalep((c) => {
+      const m = {
+        ...newMaterial(c.materials.length), id: uid(), pieces: [],
+        material: ref.material, pricePerM2: ref.pricePerM2,
+        panelW: ref.panelW, panelH: ref.panelH, kerf: ref.kerf,
+        grainDirection: !!ref.grainDirection,
+      };
+      return { ...c, materials: [...c.materials, m], activeId: m.id };
+    });
+    setModal("calepinage");
+    flash("Matière insérée : " + (ref.material || "matière"));
+  };
+  const insertPieceRef = (ref) => {
+    setCalep((c) => {
+      const activeId = c.materials.some((m) => m.id === c.activeId)
+        ? c.activeId : (c.materials[0] && c.materials[0].id);
+      return {
+        ...c,
+        materials: c.materials.map((m) =>
+          m.id === activeId
+            ? { ...m, pieces: [...m.pieces, { ...newPiece(m.pieces.length), id: uid(), label: ref.label, w: ref.w, h: ref.h, qty: ref.qty }] }
+            : m
+        ),
+      };
+    });
+    setModal("calepinage");
+    flash("Pièce insérée : " + (ref.label || "pièce"));
+  };
+
+  /* ---------- synchro git : la branche dédiée comme base de données ---------- */
+  const ghCommitMsg = (db) =>
+    "établi: bibliothèque — " + db.materials.length + " matières, " + db.pieces.length + " pièces";
+  const ghPush = async () => {
+    setSyncing(true); setSyncMsg(null);
+    try {
+      const client = createGhSync({});
+      const res = await client.push(
+        gh, refs,
+        (remote, local) => mergeRefsDB(remote, local, nowISO()),
+        ghCommitMsg(refs)
+      );
+      setRefs(res.db);
+      setSyncMsg({ err: false, text:
+        (res.branchCreated ? "Branche « " + gh.branch + " » créée. " : "") +
+        "Poussé : " + res.db.materials.length + " matières, " + res.db.pieces.length + " pièces." });
+      flash("Bibliothèque poussée vers « " + gh.branch + " »");
+    } catch (e) {
+      setSyncMsg({ err: true, text: (e && e.message) || String(e) });
+    } finally { setSyncing(false); }
+  };
+  const ghPull = async () => {
+    setSyncing(true); setSyncMsg(null);
+    try {
+      const client = createGhSync({});
+      const res = await client.pull(gh);
+      if (!res.db) {
+        setSyncMsg({ err: false, text: "Aucune base sur « " + gh.branch + " » — pousse d'abord." });
+        return;
+      }
+      const merged = mergeRefsDB(res.db, refs, nowISO());
+      setRefs(merged);
+      setSyncMsg({ err: false, text: "Tiré : " + merged.materials.length + " matières, " + merged.pieces.length + " pièces." });
+      flash("Bibliothèque tirée depuis « " + gh.branch + " »");
+    } catch (e) {
+      setSyncMsg({ err: true, text: (e && e.message) || String(e) });
+    } finally { setSyncing(false); }
+  };
+
   /* ============================ RENDER ============================ */
   return (
     <div className="app">
@@ -539,6 +665,9 @@ function App() {
         <div className="bar-actions">
           <button className="btn ghost" onClick={() => setModal("calepinage")}>
             Calepinage
+          </button>
+          <button className="btn ghost" onClick={() => setModal("biblio")}>
+            Bibliothèque {(refs.materials.length + refs.pieces.length) ? `(${refs.materials.length + refs.pieces.length})` : ""}
           </button>
           <button className="btn ghost" onClick={() => setModal("reglages")}>
             Réglages
@@ -585,6 +714,28 @@ function App() {
             params={params}
             onAddToDevis={addCalepToDevis}
             flash={flash}
+            refs={refs}
+            onSaveMaterial={saveMaterialToLibrary}
+            onSavePieces={savePiecesToLibrary}
+            onInsertMaterial={insertMaterialRef}
+            onInsertPiece={insertPieceRef}
+          />
+        </Modal>
+      )}
+      {modal === "biblio" && (
+        <Modal title="Bibliothèque — matières &amp; pièces (réemploi)" onClose={() => setModal(null)} wide>
+          <Bibliotheque
+            refs={refs}
+            gh={gh}
+            setGh={setGh}
+            syncing={syncing}
+            syncMsg={syncMsg}
+            onInsertMaterial={insertMaterialRef}
+            onInsertPiece={insertPieceRef}
+            onDeleteMaterial={deleteMaterialRef}
+            onDeletePiece={deletePieceRef}
+            onPush={ghPush}
+            onPull={ghPull}
           />
         </Modal>
       )}
@@ -1318,6 +1469,122 @@ function Modal({ title, children, onClose, wide }) {
 }
 
 /* =========================================================================
+   BIBLIOTHÈQUE DE RÉFÉRENCES (réemploi) — UI
+   ========================================================================= */
+// Petit sélecteur « insérer une référence » : un <select> qui se vide après
+// chaque choix (agit comme un menu d'action, pas comme un champ d'état).
+function RefSelect({ placeholder, items, fmt, onPick }) {
+  if (!items || !items.length) return null;
+  return (
+    <select
+      className="in ref-select"
+      value=""
+      onChange={(e) => {
+        const it = items.find((x) => x.id === e.target.value);
+        if (it) onPick(it);
+        e.target.value = "";
+      }}
+    >
+      <option value="">{placeholder}</option>
+      {items.map((it) => (
+        <option key={it.id} value={it.id}>{fmt(it)}</option>
+      ))}
+    </select>
+  );
+}
+
+function Bibliotheque({ refs, gh, setGh, syncing, syncMsg, onInsertMaterial, onInsertPiece, onDeleteMaterial, onDeletePiece, onPush, onPull }) {
+  const setG = (patch) => setGh((g) => ({ ...g, ...patch }));
+  const mats = refs.materials || [];
+  const pcs = refs.pieces || [];
+  return (
+    <div className="biblio">
+      <p className="muted tip">
+        Catalogue réutilisable de <strong>matières</strong> et de <strong>pièces</strong> :
+        enregistre-les depuis le calepinage, réinsère-les dans n'importe quel devis.
+        La bibliothèque vit dans ce navigateur <em>et</em> peut être poussée vers une
+        branche git dédiée — partagée entre postes.
+      </p>
+
+      <div className="card-eyebrow">Matières ({mats.length})</div>
+      {mats.length === 0 ? (
+        <div className="empty">Aucune matière. Depuis le calepinage : « ★ Enregistrer la matière ».</div>
+      ) : (
+        <ul className="reflist">
+          {mats.map((m) => (
+            <li key={m.id} className="refrow">
+              <div className="refrow-main">
+                <span className="refrow-name">{m.material || "Matière"}</span>
+                <span className="refrow-meta mono">
+                  {num(m.panelW)}×{num(m.panelH)} mm · {num(m.pricePerM2)} €/m² · scie {num(m.kerf)} mm
+                  {m.grainDirection ? " · fil bloqué" : ""}
+                </span>
+              </div>
+              <div className="refrow-act">
+                <button className="btn ghost sm" onClick={() => onInsertMaterial(m)}>Insérer</button>
+                <button className="ico ico-del" title="Supprimer de la bibliothèque" onClick={() => onDeleteMaterial(m.id)}>✕</button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="card-eyebrow mt">Pièces ({pcs.length})</div>
+      {pcs.length === 0 ? (
+        <div className="empty">Aucune pièce. Depuis le calepinage : « ★ Enregistrer ces pièces ».</div>
+      ) : (
+        <ul className="reflist">
+          {pcs.map((p) => (
+            <li key={p.id} className="refrow">
+              <div className="refrow-main">
+                <span className="refrow-name">{p.label || "Pièce"}</span>
+                <span className="refrow-meta mono">{num(p.w)}×{num(p.h)} mm · ×{num(p.qty)}</span>
+              </div>
+              <div className="refrow-act">
+                <button className="btn ghost sm" onClick={() => onInsertPiece(p)}>Insérer</button>
+                <button className="ico ico-del" title="Supprimer de la bibliothèque" onClick={() => onDeletePiece(p.id)}>✕</button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="card-eyebrow mt">Synchronisation git — la branche dédiée comme base</div>
+      <p className="muted tip">
+        Pousse la bibliothèque dans un fichier JSON sur une <strong>branche dédiée</strong> du
+        dépôt (jamais <code>main</code> → pas de rebuild du site). La branche est créée au
+        premier envoi. Utilise un <strong>token GitHub « fine-grained »</strong> limité à ce
+        dépôt, permission <em>Contents : lecture et écriture</em>. Le token reste dans ce
+        navigateur (localStorage) — ne l'utilise pas sur un poste partagé.
+      </p>
+      <div className="grid">
+        <Field label="Token GitHub (PAT)" wide hint="fine-grained · Contents R/W · ce dépôt">
+          <input
+            className="in in-mono"
+            type="password"
+            autoComplete="off"
+            value={gh.token}
+            placeholder="github_pat_…"
+            onChange={(e) => setG({ token: e.target.value })}
+          />
+        </Field>
+        <Field label="Propriétaire"><TextIn value={gh.owner} onChange={(v) => setG({ owner: v })} /></Field>
+        <Field label="Dépôt"><TextIn value={gh.repo} onChange={(v) => setG({ repo: v })} /></Field>
+        <Field label="Branche (base)"><TextIn value={gh.branch} onChange={(v) => setG({ branch: v })} /></Field>
+        <Field label="Chemin du fichier" wide><TextIn value={gh.path} onChange={(v) => setG({ path: v })} mono /></Field>
+      </div>
+      <div className="add-row cl-actions">
+        {syncMsg ? <span className={"sync-msg" + (syncMsg.err ? " err" : "")}>{syncMsg.text}</span> : null}
+        <button type="button" className="btn ghost" onClick={onPull} disabled={syncing}>Tirer (pull)</button>
+        <button type="button" className="btn" onClick={onPush} disabled={syncing}>
+          {syncing ? "Synchronisation…" : "Pousser (push)"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================================
    CALEPINAGE — débit de panneaux (cutlist)
    ========================================================================= */
 function SheetSVG({ layout, panelW, panelH, index }) {
@@ -1355,7 +1622,7 @@ function SheetSVG({ layout, panelW, panelH, index }) {
   );
 }
 
-function Calepinage({ calep, setCalep, params, onAddToDevis, flash }) {
+function Calepinage({ calep, setCalep, params, onAddToDevis, flash, refs, onSaveMaterial, onSavePieces, onInsertMaterial, onInsertPiece }) {
   // Liste des matériaux + matériau actif (avec garde si l'état est incomplet).
   const materials = calep.materials && calep.materials.length ? calep.materials : [newMaterial(0)];
   const activeId = materials.some((m) => m.id === calep.activeId) ? calep.activeId : materials[0].id;
@@ -1504,6 +1771,19 @@ function Calepinage({ calep, setCalep, params, onAddToDevis, flash }) {
         </Field>
       </div>
 
+      {/* bibliothèque : enregistrer / réinsérer une matière (réemploi) */}
+      <div className="add-row cl-libbar">
+        <button type="button" className="btn add" onClick={() => onSaveMaterial(activeMat)}>
+          ★ Enregistrer la matière
+        </button>
+        <RefSelect
+          placeholder="Insérer une matière…"
+          items={refs.materials}
+          fmt={(m) => (m.material || "Matière") + " · " + num(m.panelW) + "×" + num(m.panelH) + " mm"}
+          onPick={onInsertMaterial}
+        />
+      </div>
+
       {/* pièces (matériau actif) */}
       <div className="card-eyebrow mt">Pièces à débiter</div>
       {activeMat.pieces.length === 0 && (
@@ -1534,6 +1814,15 @@ function Calepinage({ calep, setCalep, params, onAddToDevis, flash }) {
       )}
       <div className="add-row">
         <button className="btn add" onClick={addPiece}>+ Ajouter une pièce</button>
+        <button className="btn add" onClick={() => onSavePieces(activeMat.pieces)} disabled={!activeMat.pieces.length}>
+          ★ Enregistrer ces pièces
+        </button>
+        <RefSelect
+          placeholder="Insérer une pièce…"
+          items={refs.pieces}
+          fmt={(p) => (p.label || "Pièce") + " " + num(p.w) + "×" + num(p.h)}
+          onPick={onInsertPiece}
+        />
       </div>
 
       {/* résultats (matériau actif) */}
@@ -1854,6 +2143,19 @@ const CSS = `
 .cl-mat-x{display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; color:var(--ink-3); font-size:11px; border-radius:5px}
 .cl-mat-x:hover{background:var(--brick); color:#fff}
 .cl-mat-add{padding:7px 11px}
+
+/* bibliothèque de références */
+.cl-libbar{margin-top:10px; align-items:center}
+.ref-select{width:auto; min-width:170px; max-width:260px; padding:8px 10px; cursor:pointer; background:#fff}
+.btn.sm{padding:5px 10px; font-size:12px}
+.reflist{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px}
+.refrow{display:flex; align-items:center; gap:10px; padding:9px 11px; border:1px solid var(--line); border-radius:8px; background:#fff}
+.refrow-main{display:flex; flex-direction:column; gap:2px; min-width:0; flex:1}
+.refrow-name{font-weight:600; font-size:13.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.refrow-meta{font-size:11.5px; color:var(--ink-3)}
+.refrow-act{display:flex; align-items:center; gap:7px; flex:none}
+.sync-msg{margin-right:auto; font-size:12px; color:var(--ink-2)}
+.sync-msg.err{color:var(--brick)}
 .cl-grand{display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-top:18px; padding:13px 15px; border:1px solid var(--oak-2); border-radius:9px; background:var(--oak-soft)}
 .cl-grand-sum{display:flex; flex-direction:column; gap:2px; font-size:13px; color:var(--ink-2)}
 .cl-grand-cost{font-family:var(--mono); font-size:16px; font-weight:700; color:var(--oak-2)}

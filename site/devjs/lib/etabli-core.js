@@ -335,6 +335,127 @@
     return { text: lines.join("\n"), totalPieces: totalPieces, distinct: order.length };
   }
 
+  /* =========================================================================
+     BIBLIOTHÈQUE DE RÉFÉRENCES — matières & pièces réutilisables.
+     But : ne plus ressaisir un panneau ou une pièce d'un devis à l'autre. La
+     bibliothèque vit en localStorage ET se pousse vers une branche git dédiée
+     (la « base »), via l'API Contents de GitHub (cf. lib/gh-sync.js). Ici :
+     uniquement la logique PURE (forme de la base, fusion, dédoublonnage) — sans
+     DOM ni réseau —, testée et partagée avec le navigateur.
+
+     Une « matière » de bibliothèque reprend les champs du calepinage
+     (material, panelW, panelH, kerf, pricePerM2, grainDirection) ; une « pièce »
+     reprend (label, w, h, qty). L'id est DÉTERMINISTE (dérivé du contenu) : deux
+     postes qui enregistrent la même matière obtiennent le même id → la fusion
+     les dédoublonne d'office, et « ré-enregistrer » met simplement à jour la date.
+     ========================================================================= */
+  var REFS_VERSION = 1;
+
+  function str(v) { return v == null ? "" : String(v); }
+
+  function emptyRefsDB() {
+    return { version: REFS_VERSION, materials: [], pieces: [], updatedAt: null };
+  }
+
+  // signature de contenu (sert d'id stable et de clé de dédoublonnage)
+  function materialSignature(m) {
+    return "m-" + [
+      str(m.material).trim().toLowerCase(),
+      num(m.panelW), num(m.panelH), num(m.kerf), num(m.pricePerM2),
+      m.grainDirection ? 1 : 0,
+    ].join("|");
+  }
+  function pieceSignature(p) {
+    return "p-" + [
+      str(p.label).trim().toLowerCase(), num(p.w), num(p.h), num(p.qty),
+    ].join("|");
+  }
+
+  // extraction d'une référence depuis une matière / pièce du calepinage
+  function makeMaterialRef(m, now, id) {
+    m = m || {};
+    return {
+      id: id || materialSignature(m),
+      material: str(m.material),
+      panelW: str(m.panelW), panelH: str(m.panelH),
+      kerf: str(m.kerf), pricePerM2: str(m.pricePerM2),
+      grainDirection: !!m.grainDirection,
+      updatedAt: now || null,
+    };
+  }
+  function makePieceRef(p, now, id) {
+    p = p || {};
+    // on normalise la quantité (vide → 1) AVANT d'en dériver l'id, pour que la
+    // signature reflète exactement les champs stockés (id ⇆ contenu cohérents).
+    var qty = str(p.qty === "" || p.qty == null ? "1" : p.qty);
+    var norm = { label: p.label, w: p.w, h: p.h, qty: qty };
+    return {
+      id: id || pieceSignature(norm),
+      label: str(p.label),
+      w: str(p.w), h: str(p.h), qty: qty,
+      updatedAt: now || null,
+    };
+  }
+
+  // upsert/suppression par id (immuables)
+  function upsertRef(list, ref) {
+    var out = [], replaced = false;
+    for (var i = 0; i < (list || []).length; i++) {
+      if (list[i].id === ref.id) { out.push(ref); replaced = true; }
+      else out.push(list[i]);
+    }
+    if (!replaced) out.push(ref);
+    return out;
+  }
+  function removeRef(list, id) {
+    var out = [];
+    for (var i = 0; i < (list || []).length; i++) if (list[i].id !== id) out.push(list[i]);
+    return out;
+  }
+
+  // union par id ; à id égal, le updatedAt le plus récent gagne ; tri récent→ancien.
+  function mergeRefLists(a, b) {
+    var byId = {};
+    function add(r) {
+      if (!r || !r.id) return;
+      var ex = byId[r.id];
+      if (!ex || str(r.updatedAt) > str(ex.updatedAt)) byId[r.id] = r;
+    }
+    (a || []).forEach(add);
+    (b || []).forEach(add);
+    return Object.keys(byId).map(function (k) { return byId[k]; })
+      .sort(function (x, y) { return str(y.updatedAt).localeCompare(str(x.updatedAt)); });
+  }
+
+  // normalise une base potentiellement abîmée (lue du disque ou du distant)
+  function validateRefsDB(obj) {
+    var db = emptyRefsDB();
+    if (!obj || typeof obj !== "object") return db;
+    if (Array.isArray(obj.materials)) {
+      db.materials = obj.materials
+        .filter(function (m) { return m && typeof m === "object"; })
+        .map(function (m) { return makeMaterialRef(m, m.updatedAt || null, m.id); });
+    }
+    if (Array.isArray(obj.pieces)) {
+      db.pieces = obj.pieces
+        .filter(function (p) { return p && typeof p === "object"; })
+        .map(function (p) { return makePieceRef(p, p.updatedAt || null, p.id); });
+    }
+    db.updatedAt = obj.updatedAt || null;
+    return db;
+  }
+
+  // fusionne deux bases (distante + locale) — base de la synchro git.
+  function mergeRefsDB(a, b, now) {
+    var na = validateRefsDB(a), nb = validateRefsDB(b);
+    return {
+      version: REFS_VERSION,
+      materials: mergeRefLists(na.materials, nb.materials),
+      pieces: mergeRefLists(na.pieces, nb.pieces),
+      updatedAt: now || na.updatedAt || nb.updatedAt || null,
+    };
+  }
+
   return {
     num: num,
     computeLine: computeLine,
@@ -343,5 +464,16 @@
     panelMetrics: panelMetrics,
     cutListText: cutListText,
     expandPieces: expandPieces,
+    // bibliothèque de références
+    emptyRefsDB: emptyRefsDB,
+    materialSignature: materialSignature,
+    pieceSignature: pieceSignature,
+    makeMaterialRef: makeMaterialRef,
+    makePieceRef: makePieceRef,
+    upsertRef: upsertRef,
+    removeRef: removeRef,
+    mergeRefLists: mergeRefLists,
+    validateRefsDB: validateRefsDB,
+    mergeRefsDB: mergeRefsDB,
   };
 });

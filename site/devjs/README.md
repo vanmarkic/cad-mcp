@@ -1,4 +1,4 @@
-# ÉTABLI — devis menuisier (+ calepinage)
+# ÉTABLI — devis menuisier (+ calepinage + bibliothèque de réemploi)
 
 Application d'une seule page (`index.html`, React via CDN, sans build) pour
 générer des devis de menuiserie. Deux faces : **Atelier** (coûts, marge, métré —
@@ -53,15 +53,62 @@ L'algorithme est un *bin packing « guillotine »* tenant compte du trait de
 scie, porté depuis [bdfinst/cutlist](https://github.com/bdfinst/cutlist) (MIT)
 et adapté au **système métrique** (mm + €/m²).
 
+## Bibliothèque de références (réemploi) + base de données git
+
+Bouton **« Bibliothèque »** dans la barre du haut. C'est un **catalogue
+réutilisable** des **matières** (types de panneaux : cote, prix €/m², trait de
+scie, sens du fil) et des **pièces** (désignation, longueur × largeur, quantité)
+— pour ne plus les ressaisir d'un devis à l'autre.
+
+- **Enregistrer** : depuis le calepinage, « ★ Enregistrer la matière » garde la
+  matière active ; « ★ Enregistrer ces pièces » garde la liste de pièces du
+  matériau actif. L'**id d'une référence est déterministe** (dérivé de son
+  contenu) : ré-enregistrer la même matière ne crée pas de doublon, et deux
+  postes qui enregistrent la même matière obtiennent le même id (→ fusion sans
+  doublon).
+- **Réinsérer** : le sélecteur « Insérer une matière… / une pièce… » (dans le
+  calepinage **et** dans la modale Bibliothèque) instancie la référence avec un
+  id frais. Insérer une pièce l'ajoute au matériau actif ; insérer une matière
+  crée un nouvel onglet matière.
+
+### La branche git dédiée comme base de données
+
+La bibliothèque vit en `localStorage` **et** se pousse vers un **fichier JSON sur
+une branche git dédiée** (`etabli-db` par défaut, `etabli/refs.json`) via l'**API
+Contents de GitHub** — le « push depuis le site statique » demandé, **sans
+serveur**.
+
+- **Pousser** (`push`) : crée la branche au premier envoi (depuis la branche par
+  défaut du dépôt), **relit la base distante, fusionne** (union par id, le
+  `updatedAt` le plus récent gagne), puis écrit — donc deux postes ne s'écrasent
+  pas. **Tirer** (`pull`) fusionne le distant dans le local.
+- **Branche séparée de `main`** → aucun rebuild du site Pages, et l'historique
+  des références reste hors du fil principal.
+- **Authentification** : un **token GitHub « fine-grained »** limité à ce dépôt,
+  permission **Contents : lecture et écriture**, saisi dans la modale. Il reste
+  **dans le navigateur** (`localStorage`, clé `etabli:gh`).
+  ⚠️ Le site est `noindex`, mais un PAT en `localStorage` reste sensible :
+  **ne pas l'utiliser sur un poste partagé**, préférer un token à courte durée et
+  au périmètre minimal, le révoquer au besoin. Pour aller en ligne sur
+  `…/cad-mcp/devjs/`, le workflow Pages doit servir la branche/chemin courants
+  (ici via `site/`).
+
 ## Architecture
 
 - `index.html` — UI React (faces Atelier / Client + modales Réglages, Mes
-  devis, Calepinage).
+  devis, Calepinage, **Bibliothèque**). Composants ajoutés : `RefSelect` (menu
+  « insérer une référence »), `Bibliotheque` (catalogue + synchro git).
 - `lib/etabli-core.js` — **noyau de calcul sans DOM**, partagé par l'UI
   (`window.EtabliCore`) et les tests (`module.exports`) : `num`, `computeLine`,
   `tvaBreakdown`, `calculateCutlist`, `panelMetrics`, `cutListText`. Source
   unique de vérité pour la logique métier (`tvaBreakdown` ventile la TVA par
-  taux : remise au prorata, déplacement à son taux).
+  taux : remise au prorata, déplacement à son taux). **+ bibliothèque** :
+  `emptyRefsDB`, `makeMaterialRef`/`makePieceRef` (extraction + id déterministe),
+  `upsertRef`/`removeRef`, `mergeRefLists`/`mergeRefsDB`, `validateRefsDB`.
+- `lib/gh-sync.js` — **client API Contents de GitHub** (`window.EtabliGhSync`,
+  `module.exports`) : `getDB`, `ensureBranch`, `putDB`, `push`, `pull`. `fetch`
+  et l'encodage base64 sont **injectables** → mêmes fonctions dans le navigateur
+  et sous Node (tests). Aucun secret en dur.
 
 ## Tests
 
@@ -77,7 +124,12 @@ npm test                          # tout
   **ventilation TVA** : taux unique, taux mixtes 6 %/21 %, remise au prorata,
   déplacement, cocontractant, devis vide ; calepinage : panneaux entiers, trait
   de scie, rotation/sens du fil, pièces trop grandes, coût €/m², liste de débit,
-  **chiffrage multi-matériaux**).
+  **chiffrage multi-matériaux** ; **bibliothèque** : extraction + id
+  déterministe, upsert/remove, **fusion** newest-wins, validation).
+- `test/gh-sync.test.js` — `lib/gh-sync.js` avec un `fetch` simulé (hors-ligne) :
+  décodage base64 du JSON, fichier absent → `404`, **création de la branche**
+  dédiée depuis la branche par défaut, `PUT` (base64 + `sha` + `branch`),
+  remontée des erreurs GitHub, **`push` = fusion distant+local puis écriture**.
 - `test/ui.test.js` — tests UI : non-régression de l'input « % marge » (le champ
   garde la valeur tapée), **TVA fournitures distincte → ventilation 6 %/21 %**,
   **override de TVA sur une seule fourniture** (l'autre suit le défaut), parcours
