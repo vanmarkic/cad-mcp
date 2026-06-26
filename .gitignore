@@ -8,3 +8,5 @@ __pycache__/
 navvis_export/ACCESS.md
 navvis_export/raw/network_requests_full.txt
 navvis_storage_probe.json
+# Cover email carries the shared immovision login (to send to contractors, not to commit)
+deliverables/bordereau_toiture_maison_principale/EMAIL_couvreur_FR.md

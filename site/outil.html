@@ -18,7 +18,7 @@
 body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:14px;-webkit-font-smoothing:antialiased}
 .wrap{max-width:1320px;margin:0 auto;padding:24px 20px 60px}
 a{color:var(--red)}
-header.top{border:1.5px solid var(--ink);background:var(--card);padding:0;margin-bottom:20px;position:relative}
+header.top{border:1.5px solid var(--ink);background:var(--card);padding:0;margin-bottom:16px;position:relative}
 header.top .row{display:flex;justify-content:space-between;align-items:center;padding:16px 22px;gap:18px;flex-wrap:wrap}
 .kicker{font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-soft)}
 .kicker .dot{color:var(--red)}
@@ -26,36 +26,46 @@ h1{font-family:var(--serif);font-weight:600;font-size:clamp(22px,3.2vw,30px);let
 .backlink{font-family:var(--mono);font-size:11px}
 .warn-strip{font-family:var(--mono);font-size:11px;background:#f6e9e2;color:var(--red);border-top:1px solid var(--red);padding:8px 22px;letter-spacing:.02em}
 
-.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;font-family:var(--mono);font-size:11.5px}
-.toolbar .grp{display:flex;gap:6px;align-items:center;border:1px solid var(--hair-2);background:var(--card);padding:6px 10px}
+.toolbar{display:flex;gap:8px;align-items:stretch;flex-wrap:wrap;margin-bottom:12px;font-family:var(--mono);font-size:11.5px}
+.toolbar .grp{display:flex;gap:7px;align-items:center;border:1px solid var(--hair-2);background:var(--card);padding:6px 10px}
 .toolbar .lbl{color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;font-size:10px}
-button.tool{font-family:var(--mono);font-size:11.5px;border:1px solid var(--ink);background:var(--paper);color:var(--ink);padding:5px 11px;cursor:pointer;letter-spacing:.04em}
+button.tool{font-family:var(--mono);font-size:11.5px;border:1px solid var(--ink);background:var(--paper);color:var(--ink);padding:5px 10px;cursor:pointer;letter-spacing:.03em;white-space:nowrap}
 button.tool:hover{background:var(--paper-2)}
 button.tool.on{background:var(--ink);color:var(--card)}
 button.tool.red{border-color:var(--red);color:var(--red)}
 button.tool.red.on{background:var(--red);color:var(--card)}
+button.tool.sm{padding:3px 8px;font-size:10.5px}
 input[type=range]{accent-color:var(--blue);vertical-align:middle}
+input[type=number]{font-family:var(--mono);font-size:11px;width:52px;border:1px solid var(--hair-2);background:var(--paper);padding:3px 4px}
 select{font-family:var(--mono);font-size:11.5px;border:1px solid var(--hair-2);background:var(--paper);padding:4px 6px}
+.seg{display:inline-flex;border:1px solid var(--hair-2)}
+.seg button{border:none;border-right:1px solid var(--hair-2)}
+.seg button:last-child{border-right:none}
 
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 @media(max-width:980px){.grid{grid-template-columns:1fr}}
 .pane{border:1px solid var(--hair-2);background:var(--card);position:relative;display:flex;flex-direction:column}
-.pane h2{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-soft);padding:10px 12px;border-bottom:1px solid var(--hair);display:flex;justify-content:space-between;align-items:center}
-.pane h2 .hint{font-weight:400;letter-spacing:.04em;text-transform:none;color:var(--ink-soft)}
-.canvas-stack{position:relative;width:100%;aspect-ratio:1/1;background:#fbfaf6}
+.pane h2{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-soft);padding:10px 12px;border-bottom:1px solid var(--hair);display:flex;justify-content:space-between;align-items:center;gap:10px}
+.pane h2 .hint{font-weight:400;letter-spacing:.04em;text-transform:none;color:var(--ink-soft);text-align:right}
+.canvas-stack{position:relative;width:100%;aspect-ratio:1/1;background:#fbfaf6;overflow:hidden}
 .canvas-stack canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 .canvas-stack .gl{z-index:1}
-.canvas-stack .ov{z-index:2;cursor:crosshair}
+.canvas-stack .ov{z-index:2;cursor:crosshair;touch-action:none}
+.canvas-stack.panning .ov{cursor:grabbing}
+.pane .ctl{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:7px 10px;border-bottom:1px solid var(--hair);font-family:var(--mono);font-size:11px;color:var(--ink-soft)}
 .pane .foot{font-family:var(--mono);font-size:11px;color:var(--ink-soft);padding:8px 12px;border-top:1px solid var(--hair);min-height:34px;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
 .pane .foot .read{color:var(--ink)}
 .pane .foot b{color:var(--red)}
-.loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;color:var(--ink-soft);z-index:3;background:var(--card)}
+.loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;color:var(--ink-soft);z-index:3;background:var(--card);gap:4px}
 .loading.hidden{display:none}
-.note{font-family:var(--mono);font-size:10.5px;color:var(--ink-soft);margin-top:14px;line-height:1.6}
-.note b{color:var(--ink)}
 .bar{height:5px;width:200px;background:var(--paper-2);border:1px solid var(--hair-2);margin-top:8px;overflow:hidden}
 .bar>i{display:block;height:100%;width:0;background:var(--blue)}
+.note{font-family:var(--mono);font-size:10.5px;color:var(--ink-soft);margin-top:14px;line-height:1.6}
+.note b{color:var(--ink)}
 .kbd{font-family:var(--mono);font-size:10px;border:1px solid var(--hair-2);border-radius:3px;padding:1px 5px;background:var(--paper-2);color:var(--ink-soft)}
+.mlist{font-family:var(--mono);font-size:10px;color:var(--ink-soft);max-height:46px;overflow:auto;text-align:right;line-height:1.5}
+.mlist .seg-i{color:var(--red)}
+.glwarn{padding:40px;text-align:center;font-family:var(--mono);font-size:12px;color:var(--red)}
 </style>
 </head>
 <body>
@@ -75,44 +85,66 @@ select{font-family:var(--mono);font-size:11.5px;border:1px solid var(--hair-2);b
   <div class="grp"><span class="lbl">Bâtiment</span>
     <select id="building"><option value="AsE">Aile Sud-Est (L7·L8·L9·L12·L13)</option><option value="AO">Aile Ouest (L2·L3·L4)</option><option value="AT">Atelier</option><option value="CH">Chapelle</option></select>
   </div>
-  <div class="grp"><span class="lbl">Plan : tranche</span>
-    <button class="tool on" id="m-full">tout</button>
-    <button class="tool" id="m-slab">à la hauteur</button>
-    <span id="slabwrap" style="display:none">z=<span id="hval">1.20</span>m
-      <input type="range" id="height" min="-1" max="13" step="0.05" value="1.2" style="width:120px">
-      ±<input type="range" id="thick" min="0.05" max="1.5" step="0.05" value="0.25" style="width:70px"><span id="tval">0.25</span></span>
+  <div class="grp"><span class="lbl">Couleur</span>
+    <span class="seg" id="colormode">
+      <button class="tool sm on" data-cm="0">altitude</button>
+      <button class="tool sm" data-cm="2">niveau</button>
+      <button class="tool sm" data-cm="1">encre</button>
+    </span>
   </div>
-  <div class="grp"><span class="lbl">Coupe : épaisseur</span>
-    ±<input type="range" id="cthick" min="0.1" max="3" step="0.1" value="0.6" style="width:90px"><span id="ctval">0.6</span>m
+  <div class="grp"><span class="lbl">Affichage</span>
+    <button class="tool sm on" id="t-grid">grille</button>
+    <span>pts <input type="range" id="psize" min="1" max="6" step="0.5" value="2.4" style="width:64px"></span>
+  </div>
+  <div class="grp"><span class="lbl">Plan : tranche</span>
+    <button class="tool sm on" id="m-full">tout</button>
+    <button class="tool sm" id="m-slab">à la hauteur</button>
+    <span id="slabwrap" style="display:none">z=<span id="hval">1.20</span>m
+      <input type="range" id="height" min="-2" max="14" step="0.05" value="1.2" style="width:110px">
+      ±<input type="range" id="thick" min="0.05" max="1.5" step="0.05" value="0.25" style="width:64px"><span id="tval">0.25</span></span>
   </div>
 </div>
 
 <div class="grid">
   <!-- PLAN -->
   <div class="pane">
-    <h2>Plan (vue de dessus) <span class="hint" id="planmode">tracez une ligne de coupe ✎</span></h2>
+    <h2>Plan (vue de dessus) <span class="hint" id="planmode">tracez une ligne de coupe ✎ · glisser = déplacer · molette = zoom</span></h2>
+    <div class="ctl">
+      <span class="lbl">Coupe auto</span>
+      <button class="tool sm" id="oc-transv">⊣ transversale</button>
+      <button class="tool sm" id="oc-longit">∥ longitudinale</button>
+      <span>décalage <input type="range" id="oc-off" min="0" max="1" step="0.001" value="0.5" style="width:120px"></span>
+      <span>angle <input type="number" id="oc-angle" step="0.1" value="0"><span style="color:var(--ink-soft)">°</span></span>
+    </div>
     <div class="canvas-stack" id="planstack">
       <canvas class="gl" id="planGL"></canvas>
       <canvas class="ov" id="planOV"></canvas>
       <div class="loading" id="planLoad">chargement du nuage de points…<div class="bar"><i id="planBar"></i></div></div>
     </div>
     <div class="foot">
-      <span><button class="tool red" id="t-section">✎ ligne de coupe</button>
+      <span><button class="tool red on" id="t-section">✎ ligne de coupe</button>
             <button class="tool" id="t-measure-p">↔ mesurer</button>
-            <button class="tool" id="t-clear-p">effacer</button></span>
+            <button class="tool sm" id="t-fit-p" title="recadrer (R)">⟲</button>
+            <button class="tool sm" id="t-clear-p">effacer</button></span>
       <span class="read" id="planRead">—</span>
     </div>
   </div>
   <!-- COUPE -->
   <div class="pane">
     <h2>Coupe / élévation <span class="hint" id="coupehint">— tracez d'abord une ligne sur le plan</span></h2>
+    <div class="ctl">
+      <span class="lbl">Coupe : épaisseur</span>
+      ±<input type="range" id="cthick" min="0.1" max="3" step="0.1" value="0.6" style="width:100px"><span id="ctval">0.6</span>m
+      <button class="tool sm on" id="t-heights" title="cotes de niveaux">cotes niveaux</button>
+    </div>
     <div class="canvas-stack" id="coupestack">
       <canvas class="gl" id="coupeGL"></canvas>
       <canvas class="ov" id="coupeOV"></canvas>
     </div>
     <div class="foot">
       <span><button class="tool" id="t-measure-c">↔ mesurer</button>
-            <button class="tool" id="t-clear-c">effacer</button>
+            <button class="tool sm" id="t-fit-c" title="recadrer">⟲</button>
+            <button class="tool sm" id="t-clear-c">effacer</button>
             <button class="tool" id="t-png">⤓ PNG</button>
             <button class="tool" id="t-dxf">⤓ DXF</button></span>
       <span class="read" id="coupeRead">—</span>
@@ -121,292 +153,462 @@ select{font-family:var(--mono);font-size:11.5px;border:1px solid var(--hair-2);b
 </div>
 
 <p class="note">
-  <b>Plan</b> : vue orthographique de dessus, couleur = altitude. Cliquez deux points pour tracer la <b>ligne de coupe</b> → la coupe verticale s'affiche à droite (toute la profondeur ±épaisseur). <span class="kbd">↔ mesurer</span> : deux clics donnent la distance réelle en mètres. <b>⤓ PNG</b>/<b>⤓ DXF</b> exportent la coupe courante (échelle &amp; cotes incluses).<br>
-  Repère local NavVis en mètres. Le nuage est échantillonné à ~3 cm pour l'usage web ; le mesurage légal reste du ressort du géomètre.
+  <b>Plan</b> : vue de dessus, couleur = altitude / par niveau / encre. <b>✎ ligne de coupe</b> (2 clics) → la coupe verticale s'affiche à droite ; ou <b>coupe auto</b> transversale/longitudinale (alignée sur les murs). <b>↔ mesurer</b> : clics successifs = polyligne cotée (double-clic / Entrée = terminer). <b>Naviguer</b> : glisser = déplacer, molette / pincement = zoom, <b>⟲</b> ou <span class="kbd">R</span> = recadrer. Raccourcis : <span class="kbd">C</span> coupe · <span class="kbd">M</span> mesure · <span class="kbd">Z</span> annuler · <span class="kbd">Échap</span> effacer. Export <b>⤓ PNG</b> (cartouche) et <b>⤓ DXF</b> (profils vectorisés + cotes).<br>
+  Repère local NavVis en mètres. Nuage échantillonné à ~3 cm pour l'usage web ; le mesurage légal reste du ressort du géomètre.
 </p>
 </div>
 
 <script>
-const DATA = 'cuts-data/';
-let M=null, P=null, N=0;           // manifest, Float32 positions (x,y,z) flat, count
-const views = {};                  // plan/coupe view state
+const DATA='cuts-data/';
+let M=null, P=null, N=0, QBUF=null;   // manifest, Float32 world xyz, count, raw Uint16 buffer
+const PAL=[[0.18,0.34,0.49],[0.29,0.49,0.35],[0.73,0.57,0.18],[0.70,0.28,0.12],[0.42,0.31,0.55],[0.36,0.33,0.29]];
 
-// ---------- WebGL point renderer ----------
-function makeGL(canvas){
-  const gl = canvas.getContext('webgl', {antialias:true, preserveDrawingBuffer:true});
-  const vs = `attribute vec2 a_xy; attribute float a_c;
-    uniform vec2 u_scale; uniform vec2 u_off; uniform float u_size;
-    varying float v_c;
-    void main(){ vec2 p = a_xy*u_scale + u_off; gl_Position=vec4(p,0.,1.); gl_PointSize=u_size; v_c=a_c; }`;
-  const fs = `precision mediump float; varying float v_c;
-    vec3 ramp(float t){ // paper-friendly terrain ramp
-      vec3 a=vec3(0.18,0.34,0.49), b=vec3(0.30,0.55,0.45), c=vec3(0.78,0.70,0.36), d=vec3(0.70,0.30,0.20);
-      if(t<0.5){ return mix(a,b,t*2.0);} return mix(c,d,(t-0.5)*2.0);}
-    void main(){ vec2 q=gl_PointCoord-0.5; if(dot(q,q)>0.25) discard; gl_FragColor=vec4(ramp(v_c),1.0);}`;
-  function sh(t,s){const o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);
-    if(!gl.getShaderParameter(o,gl.COMPILE_STATUS))throw gl.getShaderInfoLog(o);return o;}
-  const pr=gl.createProgram();gl.attachShader(pr,sh(gl.VERTEX_SHADER,vs));gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,fs));
-  gl.linkProgram(pr);gl.useProgram(pr);
-  const buf=gl.createBuffer(), cbuf=gl.createBuffer();
-  const loc={xy:gl.getAttribLocation(pr,'a_xy'),c:gl.getAttribLocation(pr,'a_c'),
-    scale:gl.getUniformLocation(pr,'u_scale'),off:gl.getUniformLocation(pr,'u_off'),size:gl.getUniformLocation(pr,'u_size')};
+/* ============================ WebGL engines ============================ */
+const RAMP=`vec3 ramp(float t){vec3 a=vec3(0.18,0.34,0.49),b=vec3(0.30,0.55,0.45),c=vec3(0.78,0.70,0.36),d=vec3(0.70,0.30,0.20);return t<0.5?mix(a,b,t*2.0):mix(c,d,(t-0.5)*2.0);}`;
+const PALGLSL=PAL.map((c,i)=>`if(i==${i})return vec3(${c[0]},${c[1]},${c[2]});`).join('');
+const FS=`precision mediump float;varying float v_t;varying float v_wz;
+uniform int u_mode;uniform float u_lb[6];uniform int u_nlb;
+${RAMP}
+vec3 levcol(int i){${PALGLSL}return vec3(0.36,0.33,0.29);}
+void main(){vec2 q=gl_PointCoord-0.5;if(dot(q,q)>0.25)discard;vec3 col;
+ if(u_mode==1){col=vec3(0.13,0.11,0.086);}
+ else if(u_mode==2){int idx=0;for(int i=0;i<6;i++){if(i<u_nlb){if(v_wz>=u_lb[i])idx++;}}col=levcol(idx);}
+ else{col=ramp(v_t);}
+ gl_FragColor=vec4(col,1.0);}`;
+
+function compile(gl,type,src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);
+  if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw gl.getShaderInfoLog(s);return s;}
+function program(gl,vs,fs){const p=gl.createProgram();gl.attachShader(p,compile(gl,gl.VERTEX_SHADER,vs));
+  gl.attachShader(p,compile(gl,gl.FRAGMENT_SHADER,fs));gl.linkProgram(p);
+  if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw gl.getProgramInfoLog(p);return p;}
+
+// PLAN engine: static uint16 VBO, dequant + project + slab-filter + colour in shader
+function makePlanGL(canvas){
+  const gl=canvas.getContext('webgl',{antialias:true,preserveDrawingBuffer:true});
+  if(!gl)return null;
+  const vs=`attribute vec3 a_q;uniform vec3 u_min,u_range;uniform vec2 u_center,u_scale;
+   uniform float u_zlo,u_zhi,u_size,u_zmin,u_zspan;varying float v_t,v_wz;
+   void main(){vec3 w=u_min+a_q*u_range;
+    if(w.z<u_zlo||w.z>u_zhi){gl_Position=vec4(2.,2.,2.,1.);gl_PointSize=0.0;return;}
+    vec2 p=(w.xy-u_center)*u_scale;gl_Position=vec4(p,0.,1.);gl_PointSize=u_size;
+    v_t=clamp((w.z-u_zmin)/u_zspan,0.,1.);v_wz=w.z;}`;
+  const pr=program(gl,vs,FS);gl.useProgram(pr);
+  const buf=gl.createBuffer();
+  const L={a_q:gl.getAttribLocation(pr,'a_q')};
+  ['u_min','u_range','u_center','u_scale','u_zlo','u_zhi','u_size','u_zmin','u_zspan','u_mode','u_nlb'].forEach(u=>L[u]=gl.getUniformLocation(pr,u));
+  L.u_lb=gl.getUniformLocation(pr,'u_lb[0]');
   gl.clearColor(0.984,0.980,0.965,1);
-  return {gl,pr,buf,cbuf,loc,
-    draw(xy,col,vp,ptsize){
-      const c=canvas; const dpr=Math.min(window.devicePixelRatio||1,2);
-      c.width=c.clientWidth*dpr; c.height=c.clientHeight*dpr;
-      gl.viewport(0,0,c.width,c.height); gl.clear(gl.COLOR_BUFFER_BIT);
-      if(!xy||!xy.length){return;}
-      gl.bindBuffer(gl.ARRAY_BUFFER,buf); gl.bufferData(gl.ARRAY_BUFFER,xy,gl.DYNAMIC_DRAW);
-      gl.enableVertexAttribArray(loc.xy); gl.vertexAttribPointer(loc.xy,2,gl.FLOAT,false,0,0);
-      gl.bindBuffer(gl.ARRAY_BUFFER,cbuf); gl.bufferData(gl.ARRAY_BUFFER,col,gl.DYNAMIC_DRAW);
-      gl.enableVertexAttribArray(loc.c); gl.vertexAttribPointer(loc.c,1,gl.FLOAT,false,0,0);
-      // vp: {mppx, cx, cy, w, h} -> clip = (world - center)/(mppx) * (2/pixels)
-      const sx=2/c.width*dpr/vp.mppx, sy=2/c.height*dpr/vp.mppx;
-      gl.uniform2f(loc.scale, sx, sy);
-      gl.uniform2f(loc.off, -vp.cx*sx, -vp.cy*sy);
-      gl.uniform1f(loc.size, (ptsize||1.4)*dpr);
-      gl.drawArrays(gl.POINTS, 0, xy.length/2);
-    }};
+  let count=0;
+  return {gl,
+    setData(q16,mn,range){count=q16.length/3;gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+      gl.bufferData(gl.ARRAY_BUFFER,q16,gl.STATIC_DRAW);
+      gl.uniform3f(L.u_min,mn[0],mn[1],mn[2]);gl.uniform3f(L.u_range,range[0],range[1],range[2]);
+      gl.uniform1f(L.u_zmin,mn[2]);gl.uniform1f(L.u_zspan,(range[2]*65535)||1);},
+    setLevels(lb){const a=new Float32Array(6);for(let i=0;i<6;i++)a[i]=lb[i]!==undefined?lb[i]:1e9;
+      gl.uniform1fv(L.u_lb,a);gl.uniform1i(L.u_nlb,Math.min(lb.length,6));},
+    draw(vp,zlo,zhi,size,mode){const dpr=Math.min(window.devicePixelRatio||1,2);
+      canvas.width=canvas.clientWidth*dpr;canvas.height=canvas.clientHeight*dpr;
+      gl.viewport(0,0,canvas.width,canvas.height);gl.clear(gl.COLOR_BUFFER_BIT);if(!count)return;
+      gl.bindBuffer(gl.ARRAY_BUFFER,buf);gl.enableVertexAttribArray(L.a_q);
+      gl.vertexAttribPointer(L.a_q,3,gl.UNSIGNED_SHORT,false,0,0);
+      gl.uniform2f(L.u_center,vp.cx,vp.cy);
+      gl.uniform2f(L.u_scale,2/(canvas.clientWidth*vp.mppx),2/(canvas.clientHeight*vp.mppx));
+      gl.uniform1f(L.u_zlo,zlo);gl.uniform1f(L.u_zhi,zhi);
+      gl.uniform1f(L.u_size,size*dpr);gl.uniform1i(L.u_mode,mode);
+      gl.drawArrays(gl.POINTS,0,count);}};
+}
+// COUPE engine: per-cut float32 (u,z) VBO
+function makeCoupeGL(canvas){
+  const gl=canvas.getContext('webgl',{antialias:true,preserveDrawingBuffer:true});
+  if(!gl)return null;
+  const vs=`attribute vec2 a_uz;uniform vec2 u_center,u_scale;uniform float u_size,u_zmin,u_zspan;
+   varying float v_t,v_wz;void main(){vec2 p=(a_uz-u_center)*u_scale;gl_Position=vec4(p,0.,1.);
+   gl_PointSize=u_size;v_t=clamp((a_uz.y-u_zmin)/u_zspan,0.,1.);v_wz=a_uz.y;}`;
+  const pr=program(gl,vs,FS);gl.useProgram(pr);
+  const buf=gl.createBuffer();const L={a_uz:gl.getAttribLocation(pr,'a_uz')};
+  ['u_center','u_scale','u_size','u_zmin','u_zspan','u_mode','u_nlb'].forEach(u=>L[u]=gl.getUniformLocation(pr,u));
+  L.u_lb=gl.getUniformLocation(pr,'u_lb[0]');
+  gl.clearColor(0.984,0.980,0.965,1);let count=0;
+  return {gl,
+    setData(uz,zmin,zmax){count=uz.length/2;gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+      gl.bufferData(gl.ARRAY_BUFFER,uz,gl.STATIC_DRAW);
+      gl.uniform1f(L.u_zmin,zmin);gl.uniform1f(L.u_zspan,(zmax-zmin)||1);},
+    setLevels(lb){const a=new Float32Array(6);for(let i=0;i<6;i++)a[i]=lb[i]!==undefined?lb[i]:1e9;
+      gl.uniform1fv(L.u_lb,a);gl.uniform1i(L.u_nlb,Math.min(lb.length,6));},
+    draw(vp,size,mode){const dpr=Math.min(window.devicePixelRatio||1,2);
+      canvas.width=canvas.clientWidth*dpr;canvas.height=canvas.clientHeight*dpr;
+      gl.viewport(0,0,canvas.width,canvas.height);gl.clear(gl.COLOR_BUFFER_BIT);if(!count)return;
+      gl.bindBuffer(gl.ARRAY_BUFFER,buf);gl.enableVertexAttribArray(L.a_uz);
+      gl.vertexAttribPointer(L.a_uz,2,gl.FLOAT,false,0,0);
+      gl.uniform2f(L.u_center,vp.cx,vp.cy);
+      gl.uniform2f(L.u_scale,2/(canvas.clientWidth*vp.mppx),2/(canvas.clientHeight*vp.mppx));
+      gl.uniform1f(L.u_size,size*dpr);gl.uniform1i(L.u_mode,mode);
+      gl.drawArrays(gl.POINTS,0,count);}};
 }
 
-// world<->screen for overlay/measurement (matches GL vp; y flips for screen)
-function worldToScreen(vp, c, wx, wy){
-  const x = (wx - vp.cx)/vp.mppx + c.clientWidth/2;
-  const y = c.clientHeight/2 - (wy - vp.cy)/vp.mppx;
-  return [x,y];
-}
-function screenToWorld(vp, c, sx, sy){
-  const wx = (sx - c.clientWidth/2)*vp.mppx + vp.cx;
-  const wy = (c.clientHeight/2 - sy)*vp.mppx + vp.cy;
-  return [wx,wy];
-}
-function fitView(c, x0,x1,y0,y1, pad=1.06){
-  const w=c.clientWidth,h=c.clientHeight, dx=(x1-x0)*pad, dy=(y1-y0)*pad;
-  const mppx=Math.max(dx/w, dy/h);
-  return {mppx, cx:(x0+x1)/2, cy:(y0+y1)/2};
-}
+/* ============================ view math ============================ */
+function worldToScreen(vp,c,wx,wy){return [(wx-vp.cx)/vp.mppx+c.clientWidth/2, c.clientHeight/2-(wy-vp.cy)/vp.mppx];}
+function screenToWorld(vp,c,sx,sy){return [(sx-c.clientWidth/2)*vp.mppx+vp.cx, (c.clientHeight/2-sy)*vp.mppx+vp.cy];}
+function fitView(c,x0,x1,y0,y1,pad=1.06){const w=c.clientWidth,h=c.clientHeight;
+  const mppx=Math.max((x1-x0)*pad/w,(y1-y0)*pad/h)||0.01;return {mppx,cx:(x0+x1)/2,cy:(y0+y1)/2};}
+function niceStep(mppx,px){const t=px*mppx,pow=Math.pow(10,Math.floor(Math.log10(t)));
+  for(const m of [1,2,5,10])if(pow*m>=t)return pow*m;return pow*10;}
 
-// ---------- overlay drawing (measurements, section line, scale bar) ----------
-function niceScale(mppx, px){ // choose round metre length ~px wide
-  const target=px*mppx; const pow=Math.pow(10,Math.floor(Math.log10(target)));
-  for(const m of [1,2,5,10]){ if(pow*m>=target) return pow*m; } return pow*10;
+/* ============================ overlay drawing ============================ */
+function clearOV(c){const dpr=Math.min(window.devicePixelRatio||1,2);c.width=c.clientWidth*dpr;c.height=c.clientHeight*dpr;
+  const ctx=c.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,c.clientWidth,c.clientHeight);return ctx;}
+function drawGrid(ctx,vp,c,xlab,ylab){
+  const step=niceStep(vp.mppx,82);
+  const p0=screenToWorld(vp,c,0,c.clientHeight),p1=screenToWorld(vp,c,c.clientWidth,0);
+  const x0=Math.floor(p0[0]/step)*step,x1=p1[0],y0=Math.floor(p0[1]/step)*step,y1=p1[1];
+  ctx.lineWidth=1;ctx.font='9.5px "IBM Plex Mono",monospace';
+  for(let x=x0;x<=x1;x+=step){const s=worldToScreen(vp,c,x,0);
+    ctx.strokeStyle='rgba(33,29,22,.10)';ctx.beginPath();ctx.moveTo(s[0],0);ctx.lineTo(s[0],c.clientHeight);ctx.stroke();
+    ctx.fillStyle='rgba(92,85,74,.85)';ctx.fillText(x.toFixed(step<1?1:0),s[0]+2,c.clientHeight-4);}
+  for(let y=y0;y<=y1;y+=step){const s=worldToScreen(vp,c,0,y);
+    ctx.strokeStyle='rgba(33,29,22,.10)';ctx.beginPath();ctx.moveTo(0,s[1]);ctx.lineTo(c.clientWidth,s[1]);ctx.stroke();
+    ctx.fillStyle='rgba(92,85,74,.85)';ctx.fillText(y.toFixed(step<1?1:0),3,s[1]-2);}
+  ctx.fillStyle='rgba(92,85,74,.7)';ctx.fillText(xlab,c.clientWidth-58,c.clientHeight-4);
+  ctx.save();ctx.translate(11,52);ctx.rotate(-Math.PI/2);ctx.fillText(ylab,0,0);ctx.restore();
 }
 function drawScaleBar(ctx,vp,c,label){
-  const px=120, m=niceScale(vp.mppx,px), wpx=m/vp.mppx;
-  const x=14, y=c.clientHeight-18;
-  ctx.strokeStyle='#211d16'; ctx.fillStyle='#211d16'; ctx.lineWidth=2; ctx.font='11px "IBM Plex Mono",monospace';
-  ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+wpx,y); ctx.moveTo(x,y-4);ctx.lineTo(x,y+4); ctx.moveTo(x+wpx,y-4);ctx.lineTo(x+wpx,y+4); ctx.stroke();
-  ctx.fillText((m>=1?m+' m':(m*100)+' cm'), x, y-7);
+  const m=niceStep(vp.mppx,120),wpx=m/vp.mppx,x=14,y=c.clientHeight-20;
+  ctx.strokeStyle='#211d16';ctx.fillStyle='#211d16';ctx.lineWidth=2;ctx.font='11px "IBM Plex Mono",monospace';
+  ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+wpx,y);ctx.moveTo(x,y-4);ctx.lineTo(x,y+4);ctx.moveTo(x+wpx,y-4);ctx.lineTo(x+wpx,y+4);ctx.stroke();
+  ctx.fillText(m>=1?m+' m':(m*100)+' cm',x,y-6);
   if(label){ctx.textAlign='right';ctx.fillText(label,c.clientWidth-12,18);ctx.textAlign='left';}
 }
-function drawMeasure(ctx,pts,toS,dist,unit='m'){
-  if(pts.length<1)return;
-  ctx.strokeStyle='#b3271e';ctx.fillStyle='#b3271e';ctx.lineWidth=1.5;ctx.font='12px "IBM Plex Mono",monospace';
-  const a=toS(pts[0]); ctx.beginPath();ctx.arc(a[0],a[1],3,0,7);ctx.fill();
-  if(pts.length===2){const b=toS(pts[1]);
-    ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.stroke();
-    ctx.beginPath();ctx.arc(b[0],b[1],3,0,7);ctx.fill();
-    const mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2;
-    const t=dist.toFixed(2)+' '+unit; ctx.save();
-    ctx.fillStyle='#faf8f2';const tw=ctx.measureText(t).width+8;ctx.fillRect(mx-tw/2,my-16,tw,16);
-    ctx.fillStyle='#b3271e';ctx.textAlign='center';ctx.fillText(t,mx,my-4);ctx.restore();ctx.textAlign='left';
-  }
+// draw a polyline measurement; coupe=true adds slope readout
+function drawMeasures(ctx,list,active,vp,c,coupe){
+  const cols=['#b3271e','#2e567c','#4a7c59'];
+  const all=active!=null?list.concat([active]):list;
+  all.forEach((mz,mi)=>{if(!mz||!mz.pts.length)return;const col=cols[mi%3];
+    ctx.strokeStyle=col;ctx.fillStyle=col;ctx.lineWidth=1.5;ctx.font='12px "IBM Plex Mono",monospace';
+    let tot=0;
+    mz.pts.forEach((p,i)=>{const s=worldToScreen(vp,c,p[0],p[1]);
+      ctx.beginPath();ctx.arc(s[0],s[1],3,0,7);ctx.fill();
+      if(i>0){const q=mz.pts[i-1],sp=worldToScreen(vp,c,q[0],q[1]);
+        ctx.beginPath();ctx.moveTo(sp[0],sp[1]);ctx.lineTo(s[0],s[1]);ctx.stroke();
+        const d=Math.hypot(p[0]-q[0],p[1]-q[1]);tot+=d;
+        const mx=(s[0]+sp[0])/2,my=(s[1]+sp[1])/2;let t=d.toFixed(2)+' m';
+        if(coupe){const ang=Math.atan2(Math.abs(p[1]-q[1]),Math.abs(p[0]-q[0]))*180/Math.PI;t+=' · '+ang.toFixed(0)+'°';}
+        ctx.save();ctx.fillStyle='rgba(250,248,242,.9)';const tw=ctx.measureText(t).width+6;
+        ctx.fillRect(mx-tw/2,my-15,tw,15);ctx.fillStyle=col;ctx.textAlign='center';ctx.fillText(t,mx,my-4);
+        ctx.restore();ctx.textAlign='left';}});
+    if(mz.pts.length>2){const last=worldToScreen(vp,c,mz.pts[mz.pts.length-1][0],mz.pts[mz.pts.length-1][1]);
+      ctx.save();ctx.fillStyle=col;ctx.font='10px "IBM Plex Mono"';ctx.fillText('Σ '+tot.toFixed(2)+' m',last[0]+6,last[1]+12);ctx.restore();}
+  });
 }
 
-// ---------- application state ----------
-const state={ planMode:'section', coupeMode:null, slab:false,
-  section:[], measP:[], measC:[], coupe:null };
+/* ============================ application state ============================ */
+const state={planMode:'section',coupeMode:null,slab:false,grid:true,colorMode:0,heights:true,
+  section:[],coupe:null,
+  measP:[],measC:[],activeP:null,activeC:null,
+  ocKind:null};
+const panes={};
 
-function dequant(){ // uint16 -> Float32 world
-  // filled in load()
-}
-
+/* ============================ load ============================ */
 async function load(key){
   document.getElementById('planLoad').classList.remove('hidden');
-  M = await (await fetch(DATA+key+'.json')).json();
-  const resp = await fetch(DATA+key+'.bin');
-  const reader = resp.body.getReader();
-  const len = +resp.headers.get('content-length')||M.count*6;
-  let recv=0, chunks=[];
-  while(true){const {done,value}=await reader.read(); if(done)break; chunks.push(value); recv+=value.length;
-    document.getElementById('planBar').style.width=(recv/len*100)+'%';}
-  const buf=new Uint8Array(recv); let o=0; for(const ch of chunks){buf.set(ch,o);o+=ch.length;}
-  const q=new Uint16Array(buf.buffer);
-  N=M.count; P=new Float32Array(N*3);
-  const mn=M.min, mx=M.max, rx=(mx[0]-mn[0])/65535, ry=(mx[1]-mn[1])/65535, rz=(mx[2]-mn[2])/65535;
-  for(let i=0;i<N;i++){ P[i*3]=mn[0]+q[i*3]*rx; P[i*3+1]=mn[1]+q[i*3+1]*ry; P[i*3+2]=mn[2]+q[i*3+2]*rz; }
+  document.getElementById('planBar').style.width='0%';
+  M=await(await fetch(DATA+key+'.json')).json();
+  const resp=await fetch(DATA+key+'.bin');const reader=resp.body.getReader();
+  const len=+resp.headers.get('content-length')||M.count*6;let recv=0,chunks=[];
+  while(true){const {done,value}=await reader.read();if(done)break;chunks.push(value);recv+=value.length;
+    document.getElementById('planBar').style.width=Math.min(100,recv/len*100)+'%';}
+  const u8=new Uint8Array(recv);let o=0;for(const ch of chunks){u8.set(ch,o);o+=ch.length;}
+  QBUF=new Uint16Array(u8.buffer,0,M.count*3);
+  N=M.count;P=new Float32Array(N*3);
+  const mn=M.min,mx=M.max,range=[(mx[0]-mn[0])/65535,(mx[1]-mn[1])/65535,(mx[2]-mn[2])/65535];
+  for(let i=0;i<N;i++){P[i*3]=mn[0]+QBUF[i*3]*range[0];P[i*3+1]=mn[1]+QBUF[i*3+1]*range[1];P[i*3+2]=mn[2]+QBUF[i*3+2]*range[2];}
+  // level lower-bounds for colour-by-level
+  const lb=[];if(M.levels){for(const k in M.levels)lb.push(M.levels[k][0]);lb.sort((a,b)=>a-b);}
+  panes.plan.gl.setData(QBUF,mn,range);panes.plan.gl.setLevels(lb);
+  panes.coupe.gl.setLevels(lb);panes.coupe.gl.setData(new Float32Array(0),0,1);panes.coupe.gl.draw({mppx:1,cx:0,cy:0},1,state.colorMode);
+  buildSnap();
   document.getElementById('planLoad').classList.add('hidden');
-  views.plan.vp = fitView(views.plan.c, M.min[0],M.max[0],M.min[1],M.max[1]);
-  renderPlan();
+  // height slider range
+  const hs=document.getElementById('height');hs.min=(mn[2]).toFixed(1);hs.max=(mx[2]).toFixed(1);
+  if(+hs.value<mn[2]||+hs.value>mx[2])hs.value=(mn[2]+1.2).toFixed(2);
+  document.getElementById('oc-angle').value=(M.axis_deg!=null?M.axis_deg:0);
+  panes.plan.vp=fitView(panes.plan.gl.gl.canvas,mn[0],mx[0],mn[1],mx[1]);panes.plan.refMppx=panes.plan.vp.mppx;
+  drawPlan();
 }
 
-// build plan arrays (xy + colour by z), optionally slab-filtered
-function renderPlan(){
-  const zmin=M.min[2], zspan=(M.max[2]-zmin)||1;
-  let xy, col;
-  if(state.slab){
-    const h=+document.getElementById('height').value, t=+document.getElementById('thick').value;
-    const idx=[]; for(let i=0;i<N;i++){const z=P[i*3+2]; if(z>=h-t&&z<=h+t) idx.push(i);}
-    xy=new Float32Array(idx.length*2); col=new Float32Array(idx.length);
-    idx.forEach((i,k)=>{xy[k*2]=P[i*3];xy[k*2+1]=P[i*3+1];col[k]=(P[i*3+2]-zmin)/zspan;});
-  } else {
-    xy=new Float32Array(N*2); col=new Float32Array(N);
-    for(let i=0;i<N;i++){xy[i*2]=P[i*3];xy[i*2+1]=P[i*3+1];col[i]=(P[i*3+2]-zmin)/zspan;}
-  }
-  views.plan.gl.draw(xy,col,views.plan.vp, state.slab?2.2:1.5);
-  overlayPlan();
-}
+/* spatial hash for snap (plan only; coupe builds its own per cut) */
+let SNAP=null;
+function buildSnap(){const cell=0.25,map=new Map();
+  for(let i=0;i<N;i++){const gx=Math.floor(P[i*3]/cell),gy=Math.floor(P[i*3+1]/cell);
+    const k=gx+'_'+gy;let a=map.get(k);if(!a){a=[];map.set(k,a);}if(a.length<8)a.push(i);}
+  SNAP={cell,map};}
+function snapPlan(wx,wy,rad){if(!SNAP)return [wx,wy];const c=SNAP.cell;let best=null,bd=rad*rad;
+  const gx=Math.floor(wx/c),gy=Math.floor(wy/c);
+  for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++){const a=SNAP.map.get((gx+dx)+'_'+(gy+dy));if(!a)continue;
+    for(const i of a){const ddx=P[i*3]-wx,ddy=P[i*3+1]-wy,d=ddx*ddx+ddy*ddy;if(d<bd){bd=d;best=[P[i*3],P[i*3+1]];}}}
+  return best||[wx,wy];}
 
-function overlayPlan(){
-  const c=views.plan.ov, ctx=c.getContext('2d');
-  const dpr=Math.min(window.devicePixelRatio||1,2); c.width=c.clientWidth*dpr;c.height=c.clientHeight*dpr;
-  ctx.scale(dpr,dpr); ctx.clearRect(0,0,c.clientWidth,c.clientHeight);
-  const vp=views.plan.vp, toS=(p)=>worldToScreen(vp,c,p[0],p[1]);
-  drawScaleBar(ctx,vp,c,M.building+' · plan');
-  // section line
-  if(state.section.length){ctx.strokeStyle='#b3271e';ctx.fillStyle='#b3271e';ctx.lineWidth=2;
-    const a=toS(state.section[0]);ctx.beginPath();ctx.arc(a[0],a[1],4,0,7);ctx.fill();
-    ctx.font='11px "IBM Plex Mono"';ctx.fillText('A',a[0]+6,a[1]-6);
+/* ============================ plan render ============================ */
+function slabRange(){if(!state.slab)return [-1e9,1e9];
+  const h=+document.getElementById('height').value,t=+document.getElementById('thick').value;return [h-t,h+t];}
+function pointSize(vp,refMppx){const base=+document.getElementById('psize').value;
+  return base*Math.min(2.2,Math.max(0.7,Math.sqrt((refMppx||vp.mppx)/vp.mppx)));}
+function drawPlan(){if(!M)return;const [zlo,zhi]=slabRange();
+  panes.plan.gl.draw(panes.plan.vp,zlo,zhi,pointSize(panes.plan.vp,panes.plan.refMppx),state.colorMode);
+  overlayPlan();}
+function overlayPlan(){const c=panes.plan.ov,ctx=clearOV(c),vp=panes.plan.vp;
+  if(state.grid)drawGrid(ctx,vp,c,'X (m)','Y (m)');
+  drawScaleBar(ctx,vp,c,M?M.building+' · plan':'');
+  // section line + thickness ribbon
+  if(state.section.length){const toS=p=>worldToScreen(vp,c,p[0],p[1]);
+    ctx.strokeStyle='#b3271e';ctx.fillStyle='#b3271e';ctx.lineWidth=2;ctx.font='11px "IBM Plex Mono"';
+    const a=toS(state.section[0]);ctx.beginPath();ctx.arc(a[0],a[1],4,0,7);ctx.fill();ctx.fillText('A',a[0]+6,a[1]-6);
     if(state.section.length===2){const b=toS(state.section[1]);
       ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.stroke();
       ctx.beginPath();ctx.arc(b[0],b[1],4,0,7);ctx.fill();ctx.fillText('B',b[0]+6,b[1]-6);
-      // thickness ribbon
       const ct=+document.getElementById('cthick').value;
-      const dx=state.section[1][0]-state.section[0][0], dy=state.section[1][1]-state.section[0][1];
-      const L=Math.hypot(dx,dy)||1, nx=-dy/L*ct, ny=dx/L*ct;
+      const dx=state.section[1][0]-state.section[0][0],dy=state.section[1][1]-state.section[0][1];
+      const L=Math.hypot(dx,dy)||1,nx=-dy/L*ct,ny=dx/L*ct;
       ctx.strokeStyle='rgba(179,39,30,.35)';ctx.setLineDash([4,3]);
-      [ct,-ct].forEach(()=>{});
-      const off=(ox,oy)=>{const p0=toS([state.section[0][0]+ox,state.section[0][1]+oy]),p1=toS([state.section[1][0]+ox,state.section[1][1]+oy]);ctx.beginPath();ctx.moveTo(p0[0],p0[1]);ctx.lineTo(p1[0],p1[1]);ctx.stroke();};
-      off(nx,ny);off(-nx,-ny);ctx.setLineDash([]);
-    }}
-  if(state.measP.length){const d=state.measP.length===2?Math.hypot(state.measP[0][0]-state.measP[1][0],state.measP[0][1]-state.measP[1][1]):0;
-    drawMeasure(ctx,state.measP,toS,d);}
+      const off=(ox,oy)=>{const p0=toS([state.section[0][0]+ox,state.section[0][1]+oy]),p1=toS([state.section[1][0]+ox,state.section[1][1]+oy]);
+        ctx.beginPath();ctx.moveTo(p0[0],p0[1]);ctx.lineTo(p1[0],p1[1]);ctx.stroke();};
+      off(nx,ny);off(-nx,-ny);ctx.setLineDash([]);}}
+  drawMeasures(ctx,state.measP,state.activeP,vp,c,false);
 }
 
-// ---------- coupe extraction ----------
-function buildCoupe(){
-  if(state.section.length<2){return;}
-  const A=state.section[0], B=state.section[1];
-  const dx=B[0]-A[0], dy=B[1]-A[1], L=Math.hypot(dx,dy)||1, ux=dx/L, uy=dy/L;
+/* ============================ coupe extraction & render ============================ */
+function buildCoupe(){if(state.section.length<2)return;
+  const A=state.section[0],B=state.section[1];
+  const dx=B[0]-A[0],dy=B[1]-A[1],L=Math.hypot(dx,dy)||1,ux=dx/L,uy=dy/L;
   const t=+document.getElementById('cthick').value;
-  const us=[], zs=[]; let zmin=1e9,zmax=-1e9;
-  for(let i=0;i<N;i++){const px=P[i*3]-A[0], py=P[i*3+1]-A[1];
-    const u=px*ux+py*uy; if(u<-0.2||u>L+0.2)continue;
-    const perp=Math.abs(-uy*px+ux*py); if(perp>t)continue;
-    const z=P[i*3+2]; us.push(u);zs.push(z); if(z<zmin)zmin=z; if(z>zmax)zmax=z;}
-  state.coupe={us,zs,L,zmin,zmax,A,B,t};
+  const us=[],zs=[];let zmin=1e9,zmax=-1e9;
+  for(let i=0;i<N;i++){const px=P[i*3]-A[0],py=P[i*3+1]-A[1];const u=px*ux+py*uy;if(u<-0.2||u>L+0.2)continue;
+    const perp=Math.abs(-uy*px+ux*py);if(perp>t)continue;const z=P[i*3+2];us.push(u);zs.push(z);if(z<zmin)zmin=z;if(z>zmax)zmax=z;}
+  if(!us.length){state.coupe=null;document.getElementById('coupehint').textContent='— coupe vide (zone non scannée) — déplacez la ligne';
+    panes.coupe.gl.setData(new Float32Array(0),0,1);panes.coupe.gl.draw({mppx:1,cx:0,cy:0},1,state.colorMode);clearOV(panes.coupe.ov);return;}
+  const uz=new Float32Array(us.length*2);for(let k=0;k<us.length;k++){uz[k*2]=us[k];uz[k*2+1]=zs[k];}
+  // snap hash for coupe
+  const cell=0.2,map=new Map();for(let k=0;k<us.length;k++){const key=Math.floor(us[k]/cell)+'_'+Math.floor(zs[k]/cell);
+    let a=map.get(key);if(!a){a=[];map.set(key,a);}if(a.length<8)a.push(k);}
+  state.coupe={us,zs,uz,L,zmin,zmax,A,B,t,snap:{cell,map}};
   document.getElementById('coupehint').textContent='— '+us.length.toLocaleString('fr')+' pts · longueur '+L.toFixed(2)+' m';
-  const c=views.coupe.c;
-  views.coupe.vp=fitView(c, 0,L, zmin,zmax);
-  const xy=new Float32Array(us.length*2), col=new Float32Array(us.length), span=(zmax-zmin)||1;
-  for(let k=0;k<us.length;k++){xy[k*2]=us[k];xy[k*2+1]=zs[k];col[k]=(zs[k]-zmin)/span;}
-  views.coupe.data={xy,col};
-  views.coupe.gl.draw(xy,col,views.coupe.vp,1.8);
-  overlayCoupe();
+  panes.coupe.gl.setData(uz,zmin,zmax);
+  // pane adopts the section's true proportions (equal 1 m = 1 m scale, no distortion)
+  document.getElementById('coupestack').style.aspectRatio=Math.min(3.6,Math.max(1.0,L/((zmax-zmin)||1))).toFixed(2);
+  panes.coupe.vp=fitView(panes.coupe.gl.gl.canvas,0,L,zmin,zmax);panes.coupe.refMppx=panes.coupe.vp.mppx;
+  drawCoupe();
 }
-function overlayCoupe(){
-  const c=views.coupe.ov, ctx=c.getContext('2d'); if(!state.coupe){c.getContext('2d').clearRect(0,0,c.width,c.height);return;}
-  const dpr=Math.min(window.devicePixelRatio||1,2); c.width=c.clientWidth*dpr;c.height=c.clientHeight*dpr;ctx.scale(dpr,dpr);
-  ctx.clearRect(0,0,c.clientWidth,c.clientHeight);
-  const vp=views.coupe.vp, toS=(p)=>worldToScreen(vp,c,p[0],p[1]);
-  // storey guide lines from manifest (dedupe levels sharing the ground datum)
+function drawCoupe(){if(!state.coupe){clearOV(panes.coupe.ov);return;}
+  panes.coupe.gl.draw(panes.coupe.vp,pointSize(panes.coupe.vp,panes.coupe.refMppx),state.colorMode);
+  overlayCoupe();}
+function overlayCoupe(){const c=panes.coupe.ov,ctx=clearOV(c);if(!state.coupe)return;const vp=panes.coupe.vp;
+  if(state.grid)drawGrid(ctx,vp,c,'u (m)','z (m)');
+  // storey datum lines + optional height annotations
   ctx.font='10px "IBM Plex Mono"';ctx.textAlign='left';
-  const guides=[]; const seen=new Set();
-  if(M.levels){for(const k in M.levels){const z=M.levels[k][0]; const key=z.toFixed(2);
-    const lab=(Math.abs(z-M.ground_z)<0.1?'sol · niv '+k:'niv '+k);
-    if(!seen.has(key)){seen.add(key);guides.push([lab,z]);}}}
-  guides.forEach(([lab,z])=>{const s=toS([0,z]);ctx.strokeStyle='rgba(46,86,124,.4)';ctx.setLineDash([3,3]);
-    ctx.beginPath();ctx.moveTo(0,s[1]);ctx.lineTo(c.clientWidth,s[1]);ctx.stroke();ctx.setLineDash([]);
-    ctx.fillStyle='#2e567c';ctx.fillText(lab+' ('+z.toFixed(2)+')',4,s[1]-3);});
+  if(state.heights&&M.levels){const seen=new Set();const bounds=[];
+    for(const k in M.levels){const z=M.levels[k][0];const key=z.toFixed(2);
+      const lab=Math.abs(z-M.ground_z)<0.1?'sol · niv '+k:'niv '+k;if(!seen.has(key)){seen.add(key);bounds.push([lab,z]);}}
+    bounds.forEach(([lab,z])=>{const s=worldToScreen(vp,c,0,z);ctx.strokeStyle='rgba(46,86,124,.4)';ctx.setLineDash([3,3]);
+      ctx.beginPath();ctx.moveTo(0,s[1]);ctx.lineTo(c.clientWidth,s[1]);ctx.stroke();ctx.setLineDash([]);
+      ctx.fillStyle='#2e567c';ctx.fillText(lab+' ('+z.toFixed(2)+')',4,s[1]-3);});}
   drawScaleBar(ctx,vp,c,M.building+' · coupe A–B');
-  if(state.measC.length){const d=state.measC.length===2?Math.hypot(state.measC[0][0]-state.measC[1][0],state.measC[0][1]-state.measC[1][1]):0;
-    drawMeasure(ctx,state.measC,toS,d);}
+  drawMeasures(ctx,state.measC,state.activeC,vp,c,true);
 }
 
-// ---------- interactions ----------
-function evpos(c,e){const r=c.getBoundingClientRect();return[e.clientX-r.left,e.clientY-r.top];}
+/* ============================ orthogonal auto-cuts ============================ */
+function orthoCut(kind){state.ocKind=kind;
+  const ang=(+document.getElementById('oc-angle').value)*Math.PI/180;
+  const d=[Math.cos(ang),Math.sin(ang)],n=[-Math.sin(ang),Math.cos(ang)];
+  // direction the cut LINE runs along; sweep axis is the other
+  const lineDir=kind==='transv'?n:d, sweep=kind==='transv'?d:n;
+  const cx=(M.min[0]+M.max[0])/2,cy=(M.min[1]+M.max[1])/2;
+  const corners=[[M.min[0],M.min[1]],[M.max[0],M.min[1]],[M.min[0],M.max[1]],[M.max[0],M.max[1]]];
+  let lmin=1e9,lmax=-1e9,smin=1e9,smax=-1e9;
+  corners.forEach(([x,y])=>{const lx=(x-cx)*lineDir[0]+(y-cy)*lineDir[1],sx=(x-cx)*sweep[0]+(y-cy)*sweep[1];
+    lmin=Math.min(lmin,lx);lmax=Math.max(lmax,lx);smin=Math.min(smin,sx);smax=Math.max(smax,sx);});
+  const off=+document.getElementById('oc-off').value;const sPos=smin+(smax-smin)*off;
+  const base=[cx+sweep[0]*sPos,cy+sweep[1]*sPos];
+  state.section=[[base[0]+lineDir[0]*lmin,base[1]+lineDir[1]*lmin],[base[0]+lineDir[0]*lmax,base[1]+lineDir[1]*lmax]];
+  document.getElementById('planRead').textContent='coupe '+(kind==='transv'?'transversale':'longitudinale')+' · '+(M.axis_deg!=null?M.axis_deg+'°':'');
+  overlayPlan();buildCoupe();}
+
+/* ============================ pan / zoom controller ============================ */
+function attachNav(pane){const c=pane.ov,stack=c.parentElement;
+  let down=false,moved=false,sx=0,sy=0,panned=false;const pts=new Map();let pinchD=0,pinchC=null;
+  c.addEventListener('wheel',e=>{e.preventDefault();if(!pane.vp)return;
+    const r=c.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
+    const w0=screenToWorld(pane.vp,c,mx,my);
+    pane.vp.mppx*=Math.exp(e.deltaY*0.0014);pane.vp.mppx=Math.max(0.0015,Math.min(pane.vp.mppx,(pane.refMppx||1)*6));
+    const w1=screenToWorld(pane.vp,c,mx,my);pane.vp.cx+=w0[0]-w1[0];pane.vp.cy+=w0[1]-w1[1];pane.redraw();},{passive:false});
+  c.addEventListener('pointerdown',e=>{c.setPointerCapture(e.pointerId);pts.set(e.pointerId,[e.clientX,e.clientY]);
+    if(pts.size===1){down=true;moved=false;panned=false;sx=e.clientX;sy=e.clientY;}
+    else if(pts.size===2){const a=[...pts.values()];pinchD=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]);
+      const r=c.getBoundingClientRect();pinchC=[(a[0][0]+a[1][0])/2-r.left,(a[0][1]+a[1][1])/2-r.top];}});
+  c.addEventListener('pointermove',e=>{if(!pts.has(e.pointerId))return;const prev=pts.get(e.pointerId);
+    pts.set(e.pointerId,[e.clientX,e.clientY]);if(!pane.vp)return;
+    if(pts.size>=2){const a=[...pts.values()];const nd=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]);
+      const r=c.getBoundingClientRect(),cc=[(a[0][0]+a[1][0])/2-r.left,(a[0][1]+a[1][1])/2-r.top];
+      if(pinchD){const w0=screenToWorld(pane.vp,c,cc[0],cc[1]);pane.vp.mppx*=pinchD/nd;
+        pane.vp.mppx=Math.max(0.0015,Math.min(pane.vp.mppx,(pane.refMppx||1)*6));
+        const w1=screenToWorld(pane.vp,c,cc[0],cc[1]);pane.vp.cx+=w0[0]-w1[0];pane.vp.cy+=w0[1]-w1[1];}
+      pinchD=nd;pane.redraw();panned=true;moved=true;return;}
+    if(down){const dx=e.clientX-prev[0],dy=e.clientY-prev[1];
+      if(Math.abs(e.clientX-sx)+Math.abs(e.clientY-sy)>4){moved=true;panned=true;stack.classList.add('panning');}
+      if(panned){pane.vp.cx-=dx*pane.vp.mppx;pane.vp.cy+=dy*pane.vp.mppx;pane.redraw();}}});
+  function up(e){c.releasePointerCapture&&c.releasePointerCapture(e.pointerId);const was=pts.get(e.pointerId);
+    pts.delete(e.pointerId);stack.classList.remove('panning');
+    if(down&&!moved&&was){const r=c.getBoundingClientRect();pane.onClick(was[0]-r.left,was[1]-r.top,e);}
+    if(pts.size<2)pinchD=0;if(pts.size===0)down=false;}
+  c.addEventListener('pointerup',up);c.addEventListener('pointercancel',up);
+}
+
+/* ============================ click handlers ============================ */
+function planClick(sx,sy){const vp=panes.plan.vp,c=panes.plan.ov;let w=screenToWorld(vp,c,sx,sy);
+  if(state.planMode==='section'){w=snapPlan(w[0],w[1],14*vp.mppx);
+    if(state.section.length>=2)state.section=[];state.section.push(w);state.ocKind=null;
+    if(state.section.length<2)document.getElementById('planRead').textContent='A–B : point A posé';
+    else document.getElementById('planRead').textContent='A–B : longueur '+Math.hypot(state.section[0][0]-state.section[1][0],state.section[0][1]-state.section[1][1]).toFixed(2)+' m';
+    overlayPlan();if(state.section.length===2)buildCoupe();}
+  else if(state.planMode==='measure'){w=snapPlan(w[0],w[1],14*vp.mppx);addMeasurePoint('P',w);overlayPlan();}}
+function coupeClick(sx,sy){if(!state.coupe||state.coupeMode!=='measure')return;const vp=panes.coupe.vp,c=panes.coupe.ov;
+  let w=screenToWorld(vp,c,sx,sy);w=snapCoupe(w[0],w[1],14*vp.mppx);addMeasurePoint('C',w);overlayCoupe();}
+function snapCoupe(u,z,rad){const cp=state.coupe;if(!cp||!cp.snap)return [u,z];const c=cp.snap.cell;let best=null,bd=rad*rad;
+  const gu=Math.floor(u/c),gz=Math.floor(z/c);
+  for(let du=-1;du<=1;du++)for(let dz=-1;dz<=1;dz++){const a=cp.snap.map.get((gu+du)+'_'+(gz+dz));if(!a)continue;
+    for(const k of a){const ddu=cp.us[k]-u,ddz=cp.zs[k]-z,d=ddu*ddu+ddz*ddz;if(d<bd){bd=d;best=[cp.us[k],cp.zs[k]];}}}
+  return best||[u,z];}
+function addMeasurePoint(pane,w){const list=pane==='P'?state.measP:state.measC;const ak=pane==='P'?'activeP':'activeC';
+  if(!state[ak]){state[ak]={pts:[w]};}else{state[ak].pts.push(w);}
+  const m=state[ak];if(m.pts.length>=2){const last=m.pts[m.pts.length-1],prev=m.pts[m.pts.length-2];
+    const d=Math.hypot(last[0]-prev[0],last[1]-prev[1]);let tot=0;for(let i=1;i<m.pts.length;i++)tot+=Math.hypot(m.pts[i][0]-m.pts[i-1][0],m.pts[i][1]-m.pts[i-1][1]);
+    const rd=pane==='P'?'planRead':'coupeRead';let txt='segment <b>'+d.toFixed(2)+' m</b>';
+    if(pane==='C'){const ang=Math.atan2(Math.abs(last[1]-prev[1]),Math.abs(last[0]-prev[0]))*180/Math.PI;
+      txt+=' · '+ang.toFixed(0)+'° ('+(100*Math.tan(ang*Math.PI/180)).toFixed(0)+'%) · Δz '+Math.abs(last[1]-prev[1]).toFixed(2);}
+    if(m.pts.length>2)txt+=' · Σ '+tot.toFixed(2)+' m';
+    document.getElementById(rd).innerHTML=txt+' <span style="color:var(--ink-soft)">±2–3 cm</span>';}}
+function finalizeMeasure(pane){const ak=pane==='P'?'activeP':'activeC';const list=pane==='P'?state.measP:state.measC;
+  if(state[ak]&&state[ak].pts.length>=2)list.push(state[ak]);state[ak]=null;
+  pane==='P'?overlayPlan():overlayCoupe();}
+
+/* ============================ exports ============================ */
+function exportPNG(){if(!state.coupe){alert('Tracez d’abord une ligne de coupe sur le plan.');return;}
+  const gl=panes.coupe.gl.gl.canvas,ov=panes.coupe.ov;
+  const out=document.createElement('canvas');out.width=gl.width;out.height=gl.height;
+  const x=out.getContext('2d');x.fillStyle='#fbfaf6';x.fillRect(0,0,out.width,out.height);
+  x.drawImage(gl,0,0);x.drawImage(ov,0,0);
+  const dpr=gl.width/gl.clientWidth,vp=panes.coupe.vp;
+  const scale=Math.round(vp.mppx/0.0002645833);
+  const lines=['Ferme du Temple — '+(M.label||M.building),
+    'Coupe A–B · long '+state.coupe.L.toFixed(2)+' m · ép. ±'+state.coupe.t.toFixed(1)+' m',
+    '≈ 1:'+scale+' (écran) · NavVis 04/06/2026','indicatif — non contractuel'];
+  x.font=(11*dpr)+'px "IBM Plex Mono",monospace';
+  let w=0;lines.forEach(l=>w=Math.max(w,x.measureText(l).width));w+=18*dpr;const lh=15*dpr,bh=lines.length*lh+10*dpr;
+  const bx=out.width-w-10*dpr,by=out.height-bh-10*dpr;
+  x.fillStyle='rgba(244,240,230,.9)';x.fillRect(bx,by,w,bh);x.strokeStyle='#211d16';x.lineWidth=dpr;x.strokeRect(bx,by,w,bh);
+  x.fillStyle='#211d16';x.textAlign='left';lines.forEach((l,i)=>{x.fillStyle=i===3?'#b3271e':'#211d16';x.fillText(l,bx+9*dpr,by+(i+1)*lh);});
+  out.toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='coupe_'+M.building.replace(/\s/g,'')+'.png';a.click();});}
+
+function exportDXF(){if(!state.coupe){alert('Tracez d’abord une ligne de coupe.');return;}
+  const {us,zs,L,t}=state.coupe;
+  // profile: bin along u, keep zmin(sol)/zmax(haut)
+  const bin=0.05,nb=Math.max(1,Math.ceil(L/bin));const lo=new Array(nb).fill(null),hi=new Array(nb).fill(null);
+  for(let k=0;k<us.length;k++){let b=Math.floor(us[k]/bin);if(b<0)b=0;if(b>=nb)b=nb-1;
+    if(lo[b]===null||zs[k]<lo[b])lo[b]=zs[k];if(hi[b]===null||zs[k]>hi[b])hi[b]=zs[k];}
+  function poly(layer,pick){const pts=[];for(let b=0;b<nb;b++){if(pick[b]===null)continue;pts.push([(b+0.5)*bin,pick[b]]);}
+    if(pts.length<2)return '';let s=`0\nPOLYLINE\n8\n${layer}\n66\n1\n70\n0\n`;
+    pts.forEach(p=>{s+=`0\nVERTEX\n8\n${layer}\n10\n${p[0].toFixed(3)}\n20\n${p[1].toFixed(3)}\n30\n0\n`;});
+    return s+`0\nSEQEND\n8\n${layer}\n`;}
+  let s='999\nFerme du Temple — coupe as-built (NavVis) — repere local m\n0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1009\n9\n$INSUNITS\n70\n6\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n';
+  s+=poly('PROFIL_BAS',lo);s+=poly('PROFIL_HAUT',hi);
+  // level datum lines
+  if(M.levels){const seen=new Set();for(const k in M.levels){const z=M.levels[k][0];if(seen.has(z.toFixed(2)))continue;seen.add(z.toFixed(2));
+    s+=`0\nLINE\n8\nNIVEAUX\n10\n0\n20\n${z.toFixed(3)}\n30\n0\n11\n${L.toFixed(3)}\n21\n${z.toFixed(3)}\n31\n0\n`;
+    s+=`0\nTEXT\n8\nNIVEAUX\n10\n0.1\n20\n${(z+0.05).toFixed(3)}\n30\n0\n40\n0.18\n1\nniv ${k} ${z.toFixed(2)}\n`;}}
+  // measures
+  state.measC.concat(state.activeC?[state.activeC]:[]).forEach(m=>{if(!m||m.pts.length<2)return;
+    for(let i=1;i<m.pts.length;i++){const a=m.pts[i-1],b=m.pts[i];
+      s+=`0\nLINE\n8\nMESURES\n10\n${a[0].toFixed(3)}\n20\n${a[1].toFixed(3)}\n30\n0\n11\n${b[0].toFixed(3)}\n21\n${b[1].toFixed(3)}\n31\n0\n`;
+      const d=Math.hypot(a[0]-b[0],a[1]-b[1]);
+      s+=`0\nTEXT\n8\nMESURES\n10\n${((a[0]+b[0])/2).toFixed(3)}\n20\n${((a[1]+b[1])/2).toFixed(3)}\n30\n0\n40\n0.2\n1\n${d.toFixed(2)} m\n`;}});
+  // raw points (decimated QA scatter — profiles carry the shape)
+  const step=Math.max(1,Math.ceil(us.length/8000));for(let k=0;k<us.length;k+=step){
+    s+=`0\nPOINT\n8\nNUAGE\n10\n${us[k].toFixed(3)}\n20\n${zs[k].toFixed(3)}\n30\n0\n`;}
+  // meta
+  s+=`0\nTEXT\n8\nMETA\n10\n0\n20\n${(state.coupe.zmax+0.6).toFixed(3)}\n30\n0\n40\n0.3\n1\nFerme du Temple — ${(M.label||M.building)} — coupe A-B — NavVis 04/06/2026 — indicatif\n`;
+  s+='0\nENDSEC\n0\nEOF\n';
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([s],{type:'application/dxf'}));
+  a.download='coupe_'+M.building.replace(/\s/g,'')+'.dxf';a.click();}
+
+/* ============================ UI wiring ============================ */
 function setBtn(id,on){document.getElementById(id).classList.toggle('on',on);}
-
 function initUI(){
-  // plan canvases
-  views.plan={c:document.getElementById('planstack'),gl:makeGL(document.getElementById('planGL')),
-    ov:document.getElementById('planOV'),get vp(){return this._vp},set vp(v){this._vp=v}};
-  views.plan.c=document.getElementById('planGL'); // client size source
-  views.coupe={c:document.getElementById('coupeGL'),gl:makeGL(document.getElementById('coupeGL')),
-    ov:document.getElementById('coupeOV'),_vp:null,get vp(){return this._vp},set vp(v){this._vp=v}};
+  const planGL=makePlanGL(document.getElementById('planGL')),coupeGL=makeCoupeGL(document.getElementById('coupeGL'));
+  if(!planGL||!coupeGL){document.getElementById('planLoad').innerHTML='<div class="glwarn">WebGL indisponible sur ce navigateur — l’outil interactif nécessite WebGL.</div>';return;}
+  panes.plan={gl:planGL,ov:document.getElementById('planOV'),vp:null,refMppx:1,
+    redraw:drawPlan,onClick:planClick};
+  panes.coupe={gl:coupeGL,ov:document.getElementById('coupeOV'),vp:null,refMppx:1,
+    redraw:drawCoupe,onClick:coupeClick};
+  attachNav(panes.plan);attachNav(panes.coupe);
 
-  const planOV=document.getElementById('planOV'), coupeOV=document.getElementById('coupeOV');
-  planOV.addEventListener('click',e=>{
-    const sp=evpos(planOV,e); const w=screenToWorld(views.plan.vp,views.plan.c,sp[0],sp[1]);
-    if(state.planMode==='section'){ if(state.section.length>=2)state.section=[]; state.section.push(w);
-      document.getElementById('planRead').textContent='A–B : '+(state.section.length<2?'point A posé':('longueur '+Math.hypot(state.section[0][0]-state.section[1][0],state.section[0][1]-state.section[1][1]).toFixed(2)+' m'));
-      overlayPlan(); if(state.section.length===2)buildCoupe();
-    } else if(state.planMode==='measure'){ if(state.measP.length>=2)state.measP=[]; state.measP.push(w);
-      if(state.measP.length===2){const d=Math.hypot(state.measP[0][0]-state.measP[1][0],state.measP[0][1]-state.measP[1][1]);
-        document.getElementById('planRead').innerHTML='distance : <b>'+d.toFixed(2)+' m</b>';}
-      overlayPlan();}
-  });
-  coupeOV.addEventListener('click',e=>{ if(!state.coupe)return;
-    const sp=evpos(coupeOV,e); const w=screenToWorld(views.coupe.vp,views.coupe.c,sp[0],sp[1]);
-    if(state.coupeMode==='measure'){ if(state.measC.length>=2)state.measC=[]; state.measC.push(w);
-      if(state.measC.length===2){const d=Math.hypot(state.measC[0][0]-state.measC[1][0],state.measC[0][1]-state.measC[1][1]);
-        document.getElementById('coupeRead').innerHTML='distance : <b>'+d.toFixed(2)+' m</b> (Δu '+Math.abs(state.measC[0][0]-state.measC[1][0]).toFixed(2)+' · Δz '+Math.abs(state.measC[0][1]-state.measC[1][1]).toFixed(2)+')';}
-      overlayCoupe();}
-  });
+  // colour mode
+  document.querySelectorAll('#colormode button').forEach(b=>b.onclick=()=>{
+    document.querySelectorAll('#colormode button').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+    state.colorMode=+b.dataset.cm;drawPlan();drawCoupe();});
+  document.getElementById('t-grid').onclick=function(){state.grid=!state.grid;this.classList.toggle('on',state.grid);overlayPlan();overlayCoupe();};
+  document.getElementById('psize').oninput=()=>{drawPlan();drawCoupe();};
+  document.getElementById('t-heights').onclick=function(){state.heights=!state.heights;this.classList.toggle('on',state.heights);overlayCoupe();};
 
-  // tool buttons
-  document.getElementById('t-section').classList.add('on');
-  document.getElementById('t-section').onclick=()=>{state.planMode='section';setBtn('t-section',true);setBtn('t-measure-p',false);document.getElementById('planmode').textContent='tracez une ligne de coupe ✎';};
-  document.getElementById('t-measure-p').onclick=()=>{state.planMode='measure';setBtn('t-section',false);setBtn('t-measure-p',true);document.getElementById('planmode').textContent='mesure : deux clics ↔';};
-  document.getElementById('t-clear-p').onclick=()=>{state.section=[];state.measP=[];document.getElementById('planRead').textContent='—';overlayPlan();};
-  document.getElementById('t-measure-c').onclick=()=>{state.coupeMode=state.coupeMode==='measure'?null:'measure';setBtn('t-measure-c',state.coupeMode==='measure');};
-  document.getElementById('t-clear-c').onclick=()=>{state.measC=[];document.getElementById('coupeRead').textContent='—';overlayCoupe();};
+  // tool modes
+  document.getElementById('t-section').onclick=()=>{state.planMode='section';setBtn('t-section',true);setBtn('t-measure-p',false);
+    document.getElementById('planmode').textContent='tracez une ligne de coupe ✎ · glisser = déplacer';};
+  document.getElementById('t-measure-p').onclick=()=>{state.planMode='measure';setBtn('t-section',false);setBtn('t-measure-p',true);
+    document.getElementById('planmode').textContent='mesure : clics = polyligne · double-clic = terminer';};
+  document.getElementById('t-measure-c').onclick=function(){state.coupeMode=state.coupeMode==='measure'?null:'measure';this.classList.toggle('on',state.coupeMode==='measure');};
+  document.getElementById('t-clear-p').onclick=()=>{state.section=[];state.measP=[];state.activeP=null;state.ocKind=null;document.getElementById('planRead').textContent='—';overlayPlan();};
+  document.getElementById('t-clear-c').onclick=()=>{state.measC=[];state.activeC=null;document.getElementById('coupeRead').textContent='—';overlayCoupe();};
+  document.getElementById('t-fit-p').onclick=()=>{if(M){panes.plan.vp=fitView(panes.plan.gl.gl.canvas,M.min[0],M.max[0],M.min[1],M.max[1]);panes.plan.refMppx=panes.plan.vp.mppx;drawPlan();}};
+  document.getElementById('t-fit-c').onclick=()=>{if(state.coupe){panes.coupe.vp=fitView(panes.coupe.gl.gl.canvas,0,state.coupe.L,state.coupe.zmin,state.coupe.zmax);panes.coupe.refMppx=panes.coupe.vp.mppx;drawCoupe();}};
   document.getElementById('t-png').onclick=exportPNG;
   document.getElementById('t-dxf').onclick=exportDXF;
 
-  // plan slab mode
-  document.getElementById('m-full').onclick=()=>{state.slab=false;setBtn('m-full',true);setBtn('m-slab',false);document.getElementById('slabwrap').style.display='none';renderPlan();};
-  document.getElementById('m-slab').onclick=()=>{state.slab=true;setBtn('m-slab',true);setBtn('m-full',false);document.getElementById('slabwrap').style.display='inline';renderPlan();};
-  document.getElementById('height').oninput=e=>{document.getElementById('hval').textContent=(+e.target.value).toFixed(2);if(state.slab)renderPlan();};
-  document.getElementById('thick').oninput=e=>{document.getElementById('tval').textContent=(+e.target.value).toFixed(2);if(state.slab)renderPlan();};
+  // plan slab
+  document.getElementById('m-full').onclick=()=>{state.slab=false;setBtn('m-full',true);setBtn('m-slab',false);document.getElementById('slabwrap').style.display='none';drawPlan();};
+  document.getElementById('m-slab').onclick=()=>{state.slab=true;setBtn('m-slab',true);setBtn('m-full',false);document.getElementById('slabwrap').style.display='inline';drawPlan();};
+  document.getElementById('height').oninput=e=>{document.getElementById('hval').textContent=(+e.target.value).toFixed(2);if(state.slab)drawPlan();};
+  document.getElementById('thick').oninput=e=>{document.getElementById('tval').textContent=(+e.target.value).toFixed(2);if(state.slab)drawPlan();};
   document.getElementById('cthick').oninput=e=>{document.getElementById('ctval').textContent=(+e.target.value).toFixed(1);overlayPlan();if(state.section.length===2)buildCoupe();};
 
+  // ortho cuts
+  document.getElementById('oc-transv').onclick=()=>orthoCut('transv');
+  document.getElementById('oc-longit').onclick=()=>orthoCut('longit');
+  document.getElementById('oc-off').oninput=()=>{if(state.ocKind)orthoCut(state.ocKind);};
+  document.getElementById('oc-angle').onchange=()=>{if(state.ocKind)orthoCut(state.ocKind);};
+
   // building switch
-  document.getElementById('building').onchange=e=>{
-    state.section=[];state.measP=[];state.measC=[];state.coupe=null;
+  document.getElementById('building').onchange=e=>{state.section=[];state.measP=[];state.measC=[];state.activeP=null;state.activeC=null;state.coupe=null;state.ocKind=null;
     document.getElementById('planRead').textContent='—';document.getElementById('coupeRead').textContent='—';
-    document.getElementById('coupehint').textContent='— tracez d’abord une ligne sur le plan';
-    overlayCoupe(); load(e.target.value);
-  };
+    document.getElementById('coupehint').textContent='— tracez d’abord une ligne sur le plan';clearOV(panes.coupe.ov);load(e.target.value);};
 
-  window.addEventListener('resize',()=>{ if(!P)return;
-    views.plan.vp=fitView(views.plan.c,M.min[0],M.max[0],M.min[1],M.max[1]);renderPlan();
-    if(state.coupe)buildCoupe();});
-}
+  // double-click finalize measures
+  panes.plan.ov.addEventListener('dblclick',()=>{if(state.planMode==='measure')finalizeMeasure('P');});
+  panes.coupe.ov.addEventListener('dblclick',()=>{if(state.coupeMode==='measure')finalizeMeasure('C');});
 
-function exportPNG(){
-  if(!state.coupe){alert('Tracez d’abord une ligne de coupe sur le plan.');return;}
-  const gl=document.getElementById('coupeGL'), ov=document.getElementById('coupeOV');
-  const out=document.createElement('canvas'); out.width=gl.width;out.height=gl.height;
-  const x=out.getContext('2d'); x.fillStyle='#fbfaf6';x.fillRect(0,0,out.width,out.height);
-  x.drawImage(gl,0,0); x.drawImage(ov,0,0);
-  out.toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);
-    a.download='coupe_'+M.building.replace(/\s/g,'')+'.png';a.click();});
-}
-function exportDXF(){
-  if(!state.coupe){alert('Tracez d’abord une ligne de coupe.');return;}
-  // export the coupe points + measurements as a simple DXF (POINT entities + measure LINE/TEXT)
-  let s='0\nSECTION\n2\nENTITIES\n';
-  const {us,zs}=state.coupe; const step=Math.ceil(us.length/120000); // cap entities
-  for(let i=0;i<us.length;i+=step){s+=`0\nPOINT\n8\nCOUPE\n10\n${us[i].toFixed(3)}\n20\n${zs[i].toFixed(3)}\n30\n0\n`;}
-  if(state.measC.length===2){const[a,b]=state.measC;
-    s+=`0\nLINE\n8\nMESURE\n10\n${a[0].toFixed(3)}\n20\n${a[1].toFixed(3)}\n30\n0\n11\n${b[0].toFixed(3)}\n21\n${b[1].toFixed(3)}\n31\n0\n`;
-    const d=Math.hypot(a[0]-b[0],a[1]-b[1]);
-    s+=`0\nTEXT\n8\nMESURE\n10\n${((a[0]+b[0])/2).toFixed(3)}\n20\n${((a[1]+b[1])/2).toFixed(3)}\n30\n0\n40\n0.2\n1\n${d.toFixed(2)} m\n`;}
-  s+='0\nENDSEC\n0\nEOF\n';
-  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([s],{type:'application/dxf'}));
-  a.download='coupe_'+M.building.replace(/\s/g,'')+'.dxf';a.click();
+  // keyboard
+  window.addEventListener('keydown',e=>{const tag=(e.target.tagName||'').toLowerCase();if(tag==='input'||tag==='select')return;
+    const k=e.key.toLowerCase();
+    if(k==='c'){document.getElementById('t-section').click();}
+    else if(k==='m'){document.getElementById('t-measure-p').click();}
+    else if(k==='r'){document.getElementById('t-fit-p').click();document.getElementById('t-fit-c').click();}
+    else if(k==='g'){document.getElementById('t-grid').click();}
+    else if(k==='z'){ // undo last point of active measure, else last measure
+      ['P','C'].forEach(pn=>{const ak=pn==='P'?'activeP':'activeC',lst=pn==='P'?state.measP:state.measC;
+        if(state[ak]&&state[ak].pts.length){state[ak].pts.pop();if(!state[ak].pts.length)state[ak]=null;}
+        else if(lst.length)lst.pop();});overlayPlan();overlayCoupe();}
+    else if(k==='escape'){state.activeP=state.activeC=null;state.measP=[];state.measC=[];state.section=[];overlayPlan();overlayCoupe();}
+    else if(k==='enter'){finalizeMeasure('P');finalizeMeasure('C');}});
+
+  window.addEventListener('resize',()=>{if(!P)return;
+    panes.plan.vp=fitView(panes.plan.gl.gl.canvas,M.min[0],M.max[0],M.min[1],M.max[1]);panes.plan.refMppx=panes.plan.vp.mppx;drawPlan();
+    if(state.coupe){panes.coupe.vp=fitView(panes.coupe.gl.gl.canvas,0,state.coupe.L,state.coupe.zmin,state.coupe.zmax);panes.coupe.refMppx=panes.coupe.vp.mppx;drawCoupe();}});
 }
 
 initUI();
