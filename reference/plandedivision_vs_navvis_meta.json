@@ -1,0 +1,52 @@
+{
+  "method": "translation-only registration (rot 0, scale 1); single shared translation fixed from ground floor; NO fitting; divergence preserved",
+  "transform": "nav_xy_m = xy_architect_cm/100 + T",
+  "shared_translation_m": [
+    -117090.84288874643,
+    -120972.70262031435
+  ],
+  "results": [
+    {
+      "level": "0",
+      "divergence": {
+        "median_m": 0.10819393128261293,
+        "p90_m": 0.3399083024136578,
+        "max_m": 1.061067704783182,
+        "frac_gt_0.3m": 0.15297884187082406
+      },
+      "lots": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ]
+    },
+    {
+      "level": "1",
+      "divergence": {
+        "median_m": 0.1268186398630191,
+        "p90_m": 0.25485232413398756,
+        "max_m": 0.7244171728506669,
+        "frac_gt_0.3m": 0.0764828303850156
+      },
+      "lots": [
+        1,
+        2,
+        3,
+        5,
+        6,
+        7,
+        8,
+        10,
+        11,
+        12,
+        13
+      ]
+    }
+  ]
+}
