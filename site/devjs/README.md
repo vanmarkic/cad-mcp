@@ -57,11 +57,18 @@ et adapté au **système métrique** (mm + €/m²).
 
 - `index.html` — UI React (faces Atelier / Client + modales Réglages, Mes
   devis, Calepinage).
+- `index.html` — chaque devis porte un `id` stable (jamais édité) qui sert de
+  clé à « Mes devis ». C'est l'identité du devis, **pas** son `numero` (champ
+  métier libre, qui part du même défaut pour chaque nouveau devis).
 - `lib/etabli-core.js` — **noyau de calcul sans DOM**, partagé par l'UI
   (`window.EtabliCore`) et les tests (`module.exports`) : `num`, `computeLine`,
   `tvaBreakdown`, `calculateCutlist`, `panelMetrics`, `cutListText`. Source
   unique de vérité pour la logique métier (`tvaBreakdown` ventile la TVA par
-  taux : remise au prorata, déplacement à son taux).
+  taux : remise au prorata, déplacement à son taux). Le **stockage des devis**
+  y vit aussi : `newQuoteId` (identité stable), `upsertQuote`/`removeQuote`
+  (insertion/suppression sans perdre les autres devis — dédoublonnage par `id`,
+  retombée sur `numero` pour les devis hérités) et `nextQuoteNumero`
+  (numéro "DEV-<année>-NNN" auto-incrémenté).
 
 ## Tests
 
@@ -77,12 +84,15 @@ npm test                          # tout
   **ventilation TVA** : taux unique, taux mixtes 6 %/21 %, remise au prorata,
   déplacement, cocontractant, devis vide ; calepinage : panneaux entiers, trait
   de scie, rotation/sens du fil, pièces trop grandes, coût €/m², liste de débit,
-  **chiffrage multi-matériaux**).
+  **chiffrage multi-matériaux** ; **stockage des devis** : deux devis au même
+  numéro sont tous deux conservés, mise à jour sur place par `id`, suppression
+  par `id`, rétro-compat sans `id`, numéro auto-incrémenté).
 - `test/ui.test.js` — tests UI : non-régression de l'input « % marge » (le champ
   garde la valeur tapée), **TVA fournitures distincte → ventilation 6 %/21 %**,
-  **override de TVA sur une seule fourniture** (l'autre suit le défaut), parcours
-  complet du calepinage, et **deux matériaux distincts → deux lignes de devis**
-  (« Ajouter tout au devis »).
+  **override de TVA sur une seule fourniture** (l'autre suit le défaut),
+  **enregistrer deux devis les garde tous les deux** (régression « seul le
+  dernier devis était enregistré »), parcours complet du calepinage, et **deux
+  matériaux distincts → deux lignes de devis** (« Ajouter tout au devis »).
 
 Les tests UI chargent React/Babel depuis un CDN → connexion réseau requise
 (et `ignoreHTTPSErrors` pour les bacs à sable qui interceptent le TLS). La

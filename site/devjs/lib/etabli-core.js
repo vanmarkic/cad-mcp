@@ -98,6 +98,72 @@
   }
 
   /* =========================================================================
+     STOCKAGE DES DEVIS (« Mes devis »).
+     Régression corrigée : l'app dédoublonnait par `numero`, mais chaque nouveau
+     devis part du même numéro par défaut ("DEV-YYYY-001"). Enregistrer un 2ᵉ
+     devis écrasait donc le 1ᵉʳ — « il n'enregistre que le dernier devis ».
+     L'identité stable d'un devis est son `id` (jamais édité), pas le `numero`
+     (champ métier libre, sujet à collision). On retombe sur `numero` seulement
+     pour les devis hérités, persistés avant l'existence des ids.
+     ========================================================================= */
+
+  // Identifiant unique et stable d'un devis (indépendant du numéro affiché).
+  var _idSeq = 0;
+  function newQuoteId() {
+    _idSeq += 1;
+    var rand = Math.floor(Math.random() * 1e9).toString(36);
+    return "q_" + Date.now().toString(36) + "_" + _idSeq.toString(36) + rand;
+  }
+
+  // Clé d'identité : l'id s'il existe, sinon le numéro (rétro-compat).
+  function quoteKey(q) {
+    if (q && q.id != null && q.id !== "") return "id:" + q.id;
+    return "num:" + (q ? q.numero : undefined);
+  }
+
+  // Insère ou met à jour un devis dans la liste, sans jamais perdre les autres.
+  // Le devis (ré)enregistré passe en tête ; une mise à jour reste à sa place.
+  function upsertQuote(list, quote) {
+    list = Array.isArray(list) ? list.slice() : [];
+    var key = quoteKey(quote);
+    var idx = -1;
+    for (var i = 0; i < list.length; i++) {
+      if (quoteKey(list[i]) === key) { idx = i; break; }
+    }
+    if (idx >= 0) {
+      list[idx] = quote;
+      return list;
+    }
+    return [quote].concat(list);
+  }
+
+  // Supprime un devis par son id (retombe sur le numéro pour les devis hérités).
+  function removeQuote(list, id) {
+    list = Array.isArray(list) ? list : [];
+    return list.filter(function (q) {
+      var qid = q && q.id != null && q.id !== "" ? q.id : q && q.numero;
+      return qid !== id;
+    });
+  }
+
+  // Prochain numéro libre "DEV-<année>-NNN" à partir du plus haut déjà utilisé.
+  function nextQuoteNumero(list, year) {
+    var prefix = "DEV-" + year + "-";
+    var max = 0;
+    list = Array.isArray(list) ? list : [];
+    for (var i = 0; i < list.length; i++) {
+      var n = list[i] && list[i].numero;
+      if (typeof n === "string" && n.indexOf(prefix) === 0) {
+        var v = parseInt(n.slice(prefix.length), 10);
+        if (isFinite(v) && v > max) max = v;
+      }
+    }
+    var next = String(max + 1);
+    while (next.length < 3) next = "0" + next;
+    return prefix + next;
+  }
+
+  /* =========================================================================
      CALEPINAGE — bin packing « guillotine » tenant compte du trait de scie.
      Toutes les longueurs partagent la même unité (l'UI utilise le mm).
      On essaie plusieurs heuristiques (tri × score × découpe) et on garde le
@@ -343,5 +409,9 @@
     panelMetrics: panelMetrics,
     cutListText: cutListText,
     expandPieces: expandPieces,
+    newQuoteId: newQuoteId,
+    upsertQuote: upsertQuote,
+    removeQuote: removeQuote,
+    nextQuoteNumero: nextQuoteNumero,
   };
 });

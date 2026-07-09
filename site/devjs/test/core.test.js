@@ -233,6 +233,67 @@ test("multi-matériaux: chaque panneau est chiffré à son propre €/m²", () =
   assert.ok(Math.abs(grandCost - expected) < 1e-9);
 });
 
+/* -------------------------------------------------- quote store (Mes devis) */
+/* Régression : « établi n'enregistre que le dernier devis, les précédents ont
+   disparu ». saveQuote dédoublonnait par `numero`, or chaque nouveau devis
+   part du même numéro par défaut ("DEV-YYYY-001") → le 2ᵉ écrasait le 1ᵉʳ.
+   La source de vérité de l'identité doit être un `id` stable, pas le numéro
+   (que l'utilisateur édite librement et qui peut collisionner). */
+test("upsertQuote: deux devis au même numéro par défaut sont TOUS les deux gardés", () => {
+  const q1 = { id: "q1", numero: "DEV-2026-001", client: { nom: "Alice" } };
+  const q2 = { id: "q2", numero: "DEV-2026-001", client: { nom: "Bob" } };
+  let list = C.upsertQuote([], q1);
+  list = C.upsertQuote(list, q2);
+  assert.equal(list.length, 2, "aucun devis ne doit disparaître");
+  assert.deepEqual(list.map((x) => x.id).sort(), ["q1", "q2"]);
+});
+
+test("upsertQuote: ré-enregistrer le même devis (même id) met à jour sur place", () => {
+  const q = { id: "q1", numero: "DEV-2026-001", client: { nom: "Alice" } };
+  let list = C.upsertQuote([], q);
+  list = C.upsertQuote(list, { ...q, client: { nom: "Alice B." } });
+  assert.equal(list.length, 1);
+  assert.equal(list[0].client.nom, "Alice B.");
+});
+
+test("upsertQuote: le dernier enregistré passe en tête", () => {
+  let list = C.upsertQuote([], { id: "q1", numero: "A" });
+  list = C.upsertQuote(list, { id: "q2", numero: "B" });
+  assert.equal(list[0].id, "q2");
+});
+
+test("upsertQuote: devis hérités sans id → dédoublonnage par numéro (rétro-compat)", () => {
+  // liste persistée avant l'introduction des ids.
+  let list = [{ numero: "DEV-2026-005", client: { nom: "X" } }];
+  list = C.upsertQuote(list, { numero: "DEV-2026-005", client: { nom: "X2" } });
+  assert.equal(list.length, 1);
+  assert.equal(list[0].client.nom, "X2");
+});
+
+test("removeQuote: supprime par id, garde les autres (même numéro)", () => {
+  let list = [{ id: "q1", numero: "A" }, { id: "q2", numero: "A" }];
+  list = C.removeQuote(list, "q1");
+  assert.equal(list.length, 1);
+  assert.equal(list[0].id, "q2");
+});
+
+test("newQuoteId: identifiants uniques", () => {
+  const seen = new Set();
+  for (let i = 0; i < 200; i++) seen.add(C.newQuoteId());
+  assert.equal(seen.size, 200, "aucune collision d'id");
+});
+
+test("nextQuoteNumero: incrémente le compteur du plus haut numéro de l'année", () => {
+  const list = [
+    { numero: "DEV-2026-001" },
+    { numero: "DEV-2026-004" },
+    { numero: "DEV-2025-009" }, // autre année, ignoré
+    { numero: "PROJ-X" },       // hors schéma, ignoré
+  ];
+  assert.equal(C.nextQuoteNumero(list, 2026), "DEV-2026-005");
+  assert.equal(C.nextQuoteNumero([], 2026), "DEV-2026-001");
+});
+
 /* -------------------------------------------------- cutListText() */
 test("cutListText: groups identical pieces and counts totals", () => {
   const out = C.cutListText([

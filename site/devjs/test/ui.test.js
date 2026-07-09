@@ -34,7 +34,11 @@ function startServer() {
 test("UI", { skip: chromium ? false : "playwright not installed" }, async (t) => {
   const server = await startServer();
   const base = `http://127.0.0.1:${server.address().port}/index.html`;
-  const browser = await chromium.launch();
+  // Some sandboxes/CI ship a pre-installed Chromium whose build differs from the
+  // pinned Playwright version. Let them point at it via PW_EXECUTABLE_PATH
+  // instead of forcing `npx playwright install`.
+  const execPath = process.env.PW_EXECUTABLE_PATH;
+  const browser = await chromium.launch(execPath ? { executablePath: execPath } : {});
   const ctx = await browser.newContext({ ignoreHTTPSErrors: true });
 
   t.after(async () => { await browser.close(); server.close(); });
@@ -135,6 +139,32 @@ test("UI", { skip: chromium ? false : "playwright not installed" }, async (t) =>
     assert.match(totals, /TVA 6 %/, "ligne 2 au défaut 6 %");
     assert.match(totals, /21,00/, "100 € × 21 % = 21,00 €");
     assert.match(totals, /12,00/, "200 € × 6 % = 12,00 €");
+    assert.deepEqual(p._errors, []);
+    await p.close();
+  });
+
+  await t.test("Mes devis: enregistrer deux devis les garde tous les deux (régression perte de devis)", async () => {
+    const p = await newPage();
+
+    // Devis 1 : client Alice, on enregistre.
+    await p.locator('label.fld:has(span.fld-lab:text-is("Client")) input').fill("Alice");
+    await p.click('button:has-text("Enregistrer")');
+    await p.waitForTimeout(150);
+
+    // Nouveau devis (numéro auto-incrémenté), client Bob, on enregistre.
+    await p.click('button:has-text("Nouveau")');
+    await p.waitForTimeout(150);
+    await p.locator('label.fld:has(span.fld-lab:text-is("Client")) input').fill("Bob");
+    await p.click('button:has-text("Enregistrer")');
+    await p.waitForTimeout(150);
+
+    // « Mes devis » doit lister DEUX devis, pas seulement le dernier.
+    await p.click('button:has-text("Mes devis")');
+    await p.waitForSelector(".qrow");
+    assert.equal(await p.locator(".qrow").count(), 2, "les deux devis doivent être conservés");
+    const metas = await p.locator(".qrow-meta").allInnerTexts();
+    assert.ok(metas.some((m) => /Alice/.test(m)), "le 1ᵉʳ devis (Alice) ne doit pas avoir disparu");
+    assert.ok(metas.some((m) => /Bob/.test(m)), "le 2ᵉ devis (Bob) est présent");
     assert.deepEqual(p._errors, []);
     await p.close();
   });

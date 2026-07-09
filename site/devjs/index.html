@@ -32,7 +32,7 @@ window.storage = {
 
 <script type="text/babel" data-presets="react">
 const { useState, useEffect, useMemo, useRef } = React;
-const { num, computeLine, tvaBreakdown, calculateCutlist, panelMetrics, cutListText } = window.EtabliCore;
+const { num, computeLine, tvaBreakdown, calculateCutlist, panelMetrics, cutListText, newQuoteId, upsertQuote, removeQuote, nextQuoteNumero } = window.EtabliCore;
 
 /* =========================================================================
    ÉTABLI — Générateur de devis pour menuisier
@@ -150,8 +150,11 @@ const newLine = (type, p) => ({
   tauxVente: type === "main" ? p.tauxVente : "",
   coutHoraire: type === "main" ? p.coutHoraire : "",
 });
-const newDevis = (company, p) => ({
-  numero: "DEV-" + new Date().getFullYear() + "-001",
+const newDevis = (company, p, saved) => ({
+  // `id` = identité stable du devis (jamais éditée). C'est la clé de « Mes
+  // devis » : deux devis distincts au même numéro ne s'écrasent plus.
+  id: newQuoteId(),
+  numero: nextQuoteNumero(saved, new Date().getFullYear()),
   dateISO: todayISO(),
   client: { nom: "", adresse: "", email: "", tel: "" },
   chantier: "",
@@ -306,7 +309,19 @@ function App() {
             if (parsed.params) setParams((p) => ({ ...p, ...parsed.params }));
           }
           const q = await window.storage.get("etabli:quotes").catch(() => null);
-          if (q && q.value) setSaved(JSON.parse(q.value) || []);
+          if (q && q.value) {
+            // Devis hérités : garantir un id stable à chacun (sinon la
+            // suppression et le dédoublonnage retombent sur le numéro, qui peut
+            // collisionner). On re-persiste si une migration a eu lieu.
+            const raw = JSON.parse(q.value) || [];
+            let migrated = false;
+            const withIds = raw.map((x) => {
+              if (x && (x.id == null || x.id === "")) { migrated = true; return { ...x, id: newQuoteId() }; }
+              return x;
+            });
+            setSaved(withIds);
+            if (migrated) persistQuotes(withIds);
+          }
           const cp = await window.storage.get("etabli:calepinage").catch(() => null);
           if (cp && cp.value) setCalep(migrateCalep(JSON.parse(cp.value)));
         }
@@ -459,13 +474,13 @@ function App() {
     });
 
   const saveQuote = () => {
+    // Un devis sans id est un devis hérité (chargé avant cette version) : on lui
+    // en attribue un à l'enregistrement pour qu'il ait une identité stable.
+    const withId = devis.id ? devis : { ...devis, id: newQuoteId() };
+    if (!devis.id) setDevis(withId);
+    const stamped = { ...withId, _savedAt: new Date().toISOString() };
     setSaved((list) => {
-      const idx = list.findIndex((x) => x.numero === devis.numero);
-      const stamped = { ...devis, _savedAt: new Date().toISOString() };
-      const next =
-        idx >= 0
-          ? list.map((x, i) => (i === idx ? stamped : x))
-          : [stamped, ...list];
+      const next = upsertQuote(list, stamped);
       persistQuotes(next);
       return next;
     });
@@ -477,14 +492,14 @@ function App() {
     setView("atelier");
     flash("Devis chargé : " + q.numero);
   };
-  const deleteQuote = (numero) =>
+  const deleteQuote = (id) =>
     setSaved((list) => {
-      const next = list.filter((x) => x.numero !== numero);
+      const next = removeQuote(list, id);
       persistQuotes(next);
       return next;
     });
   const resetQuote = () => {
-    setDevis(newDevis(company, params));
+    setDevis(newDevis(company, params, saved));
     setModal(null);
     flash("Nouveau devis");
   };
@@ -613,7 +628,7 @@ function App() {
           ) : (
             <ul className="qlist">
               {saved.map((q) => (
-                <li key={q.numero} className="qrow">
+                <li key={q.id || q.numero} className="qrow">
                   <div>
                     <div className="qrow-num">{q.numero}</div>
                     <div className="qrow-meta">
@@ -627,7 +642,7 @@ function App() {
                     </button>
                     <button
                       className="btn sm danger"
-                      onClick={() => deleteQuote(q.numero)}
+                      onClick={() => deleteQuote(q.id || q.numero)}
                     >
                       Suppr.
                     </button>
