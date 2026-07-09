@@ -233,6 +233,209 @@ test("multi-matériaux: chaque panneau est chiffré à son propre €/m²", () =
   assert.ok(Math.abs(grandCost - expected) < 1e-9);
 });
 
+/* -------------------------------------------------- quote store (Mes devis) */
+/* Régression : « établi n'enregistre que le dernier devis, les précédents ont
+   disparu ». saveQuote dédoublonnait par `numero`, or chaque nouveau devis
+   part du même numéro par défaut ("DEV-YYYY-001") → le 2ᵉ écrasait le 1ᵉʳ.
+   La source de vérité de l'identité doit être un `id` stable, pas le numéro
+   (que l'utilisateur édite librement et qui peut collisionner). */
+test("upsertQuote: deux devis au même numéro par défaut sont TOUS les deux gardés", () => {
+  const q1 = { id: "q1", numero: "DEV-2026-001", client: { nom: "Alice" } };
+  const q2 = { id: "q2", numero: "DEV-2026-001", client: { nom: "Bob" } };
+  let list = C.upsertQuote([], q1);
+  list = C.upsertQuote(list, q2);
+  assert.equal(list.length, 2, "aucun devis ne doit disparaître");
+  assert.deepEqual(list.map((x) => x.id).sort(), ["q1", "q2"]);
+});
+
+test("upsertQuote: ré-enregistrer le même devis (même id) met à jour sur place", () => {
+  const q = { id: "q1", numero: "DEV-2026-001", client: { nom: "Alice" } };
+  let list = C.upsertQuote([], q);
+  list = C.upsertQuote(list, { ...q, client: { nom: "Alice B." } });
+  assert.equal(list.length, 1);
+  assert.equal(list[0].client.nom, "Alice B.");
+});
+
+test("upsertQuote: le dernier enregistré passe en tête", () => {
+  let list = C.upsertQuote([], { id: "q1", numero: "A" });
+  list = C.upsertQuote(list, { id: "q2", numero: "B" });
+  assert.equal(list[0].id, "q2");
+});
+
+test("upsertQuote: devis hérités sans id → dédoublonnage par numéro (rétro-compat)", () => {
+  // liste persistée avant l'introduction des ids.
+  let list = [{ numero: "DEV-2026-005", client: { nom: "X" } }];
+  list = C.upsertQuote(list, { numero: "DEV-2026-005", client: { nom: "X2" } });
+  assert.equal(list.length, 1);
+  assert.equal(list[0].client.nom, "X2");
+});
+
+test("removeQuote: supprime par id, garde les autres (même numéro)", () => {
+  let list = [{ id: "q1", numero: "A" }, { id: "q2", numero: "A" }];
+  list = C.removeQuote(list, "q1");
+  assert.equal(list.length, 1);
+  assert.equal(list[0].id, "q2");
+});
+
+test("newQuoteId: identifiants uniques", () => {
+  const seen = new Set();
+  for (let i = 0; i < 200; i++) seen.add(C.newQuoteId());
+  assert.equal(seen.size, 200, "aucune collision d'id");
+});
+
+test("nextQuoteNumero: incrémente le compteur du plus haut numéro de l'année", () => {
+  const list = [
+    { numero: "DEV-2026-001" },
+    { numero: "DEV-2026-004" },
+    { numero: "DEV-2025-009" }, // autre année, ignoré
+    { numero: "PROJ-X" },       // hors schéma, ignoré
+  ];
+  assert.equal(C.nextQuoteNumero(list, 2026), "DEV-2026-005");
+  assert.equal(C.nextQuoteNumero([], 2026), "DEV-2026-001");
+});
+
+/* -------------------------------------------------- catalogue de fournitures */
+/* Un catalogue de fournitures réutilisables : on encode une fourniture une fois
+   (désignation, prix d'achat, unité, marge, TVA), on la retrouve ensuite par
+   auto-complétion ou via la modale « Catalogue ». Logique pure et testée ici. */
+test("catalogItemFromLine: extrait les champs réutilisables + id ; null si désignation vide", () => {
+  const line = { id: "L1", type: "fourniture", designation: "  Vis 4×40  ", pa: "0,08", unite: "pce", marge: "25", tvaRate: 21, qte: "200", detail: "x" };
+  const it = C.catalogItemFromLine(line);
+  assert.equal(it.designation, "Vis 4×40"); // trimmé
+  assert.equal(it.pa, "0,08");
+  assert.equal(it.unite, "pce");
+  assert.equal(it.marge, "25");
+  assert.equal(it.tvaRate, 21);
+  assert.ok(it.id, "un id est attribué");
+  assert.equal(C.catalogItemFromLine({ designation: "   " }), null, "désignation vide → null");
+});
+
+test("upsertCatalogItem: ajoute, met à jour par désignation (insensible casse/espaces), ignore le vide", () => {
+  let cat = C.upsertCatalogItem([], { id: "c1", designation: "MDF 18mm", pa: "30", unite: "m²", marge: "20" });
+  assert.equal(cat.length, 1);
+  cat = C.upsertCatalogItem(cat, { id: "c2", designation: "  mdf  18MM ", pa: "32", unite: "m²", marge: "18" });
+  assert.equal(cat.length, 1, "même article → mise à jour, pas de doublon");
+  assert.equal(cat[0].pa, "32");
+  const same = C.upsertCatalogItem(cat, { id: "c3", designation: "   " });
+  assert.equal(same.length, 1, "désignation vide ignorée");
+});
+
+test("removeCatalogItem: supprime par id", () => {
+  const out = C.removeCatalogItem([{ id: "c1", designation: "A" }, { id: "c2", designation: "B" }], "c1");
+  assert.equal(out.length, 1);
+  assert.equal(out[0].id, "c2");
+});
+
+test("searchCatalog: sous-chaîne insensible à la casse, priorité au préfixe, limite", () => {
+  const cat = [
+    { id: "1", designation: "Charnière invisible" },
+    { id: "2", designation: "Vis à bois 4×40" },
+    { id: "3", designation: "Visserie inox" },
+    { id: "4", designation: "Colle vinylique" },
+  ];
+  const r = C.searchCatalog(cat, "vis", 10);
+  assert.deepEqual(r.map((x) => x.id), ["2", "3", "1"], "préfixe 'Vis…' avant 'Charnière in-vis-ible'");
+  assert.equal(C.searchCatalog(cat, "", 2).length, 2, "requête vide → tout, limité");
+});
+
+test("applyCatalogItemToLine: remplit les champs réutilisables, préserve id/type/qté/détail", () => {
+  const line = { id: "L1", type: "fourniture", qte: "5", designation: "", pa: "", unite: "u", marge: "", detail: "garde-moi" };
+  const item = { id: "c1", designation: "Poignée alu", pa: "6,5", unite: "pce", marge: "30", tvaRate: 21 };
+  const out = C.applyCatalogItemToLine(line, item);
+  assert.equal(out.id, "L1");
+  assert.equal(out.type, "fourniture");
+  assert.equal(out.qte, "5");
+  assert.equal(out.detail, "garde-moi");
+  assert.equal(out.designation, "Poignée alu");
+  assert.equal(out.pa, "6,5");
+  assert.equal(out.unite, "pce");
+  assert.equal(out.marge, "30");
+  assert.equal(out.tvaRate, 21);
+});
+
+test("mergeCatalog: union par désignation, sans perte", () => {
+  const cur = [{ id: "c1", designation: "MDF 18mm", pa: "30" }];
+  const inc = [{ id: "c9", designation: "mdf 18MM", pa: "31" }, { id: "c2", designation: "Chêne", pa: "90" }];
+  const m = C.mergeCatalog(cur, inc);
+  assert.equal(m.length, 2);
+  const byd = Object.fromEntries(m.map((x) => [x.designation.toLowerCase(), x.pa]));
+  assert.equal(byd["mdf 18mm"], "31"); // l'entrant écrase
+  assert.equal(byd["chêne"], "90");
+});
+
+test("buildBackup/readBackup: le catalogue est inclus et relu (rétro-compat : absent → [])", () => {
+  const b = C.buildBackup({ catalogue: [{ id: "c1", designation: "MDF" }] }, {});
+  assert.deepEqual(b.data.catalogue, [{ id: "c1", designation: "MDF" }]);
+  assert.deepEqual(C.readBackup(b).catalogue, [{ id: "c1", designation: "MDF" }]);
+  assert.deepEqual(C.readBackup({ app: "etabli", data: { quotes: [] } }).catalogue, [], "vieux fichier sans catalogue");
+});
+
+/* -------------------------------------------------- sauvegarde / restauration */
+/* Un seul fichier .json regroupe TOUTES les données utilisateur (réglages +
+   devis + calepinage), pour sauver et restaurer d'un navigateur/poste à l'autre.
+   Les fonctions du noyau sont pures : elles ne touchent ni au DOM ni au disque
+   (l'UI s'occupe du téléchargement / FileReader). */
+test("buildBackup: emballe les données avec app + version + normalise les sections", () => {
+  const b = C.buildBackup(
+    { settings: { company: { nom: "Atelier" }, params: { tvaRate: 6 } }, quotes: [{ id: "q1" }], calepinage: { materials: [] } },
+    { exportedAt: "2026-07-09T10:00:00.000Z" }
+  );
+  assert.equal(b.app, "etabli");
+  assert.ok(typeof b.version === "number");
+  assert.equal(b.exportedAt, "2026-07-09T10:00:00.000Z");
+  assert.deepEqual(b.data.quotes, [{ id: "q1" }]);
+  assert.equal(b.data.settings.company.nom, "Atelier");
+  assert.deepEqual(b.data.calepinage, { materials: [] });
+});
+
+test("buildBackup: sections manquantes → quotes [] et null ailleurs", () => {
+  const b = C.buildBackup({}, {});
+  assert.deepEqual(b.data.quotes, []);
+  assert.equal(b.data.settings, null);
+  assert.equal(b.data.calepinage, null);
+});
+
+test("readBackup: relit une chaîne JSON et rend les trois sections", () => {
+  const text = JSON.stringify(C.buildBackup({ quotes: [{ id: "q1", numero: "A" }] }, {}));
+  const r = C.readBackup(text);
+  assert.deepEqual(r.quotes, [{ id: "q1", numero: "A" }]);
+  assert.equal(r.settings, null);
+  assert.equal(r.calepinage, null);
+});
+
+test("readBackup: aller-retour avec buildBackup (accepte aussi un objet)", () => {
+  const data = { settings: { company: { nom: "X" }, params: { acompte: 30 } }, quotes: [{ id: "q1" }], calepinage: { activeId: null } };
+  const r = C.readBackup(C.buildBackup(data, {}));
+  assert.deepEqual(r.quotes, data.quotes);
+  assert.equal(r.settings.company.nom, "X");
+  assert.deepEqual(r.calepinage, { activeId: null });
+});
+
+test("readBackup: JSON invalide → erreur explicite", () => {
+  assert.throws(() => C.readBackup("{pas du json"), /illisible|JSON/i);
+});
+
+test("readBackup: fichier étranger (mauvaise app) → refus", () => {
+  assert.throws(() => C.readBackup(JSON.stringify({ app: "autre", data: {} })), /sauvegarde/i);
+});
+
+test("mergeQuotes: union par id, l'entrant prime, rien n'est perdu", () => {
+  const current = [{ id: "q1", client: { nom: "Alice" } }, { id: "q2", client: { nom: "Bob" } }];
+  const incoming = [{ id: "q1", client: { nom: "Alice (sauvegarde)" } }, { id: "q3", client: { nom: "Carol" } }];
+  const merged = C.mergeQuotes(current, incoming);
+  assert.equal(merged.length, 3, "q1 fusionné, q2 gardé, q3 ajouté");
+  const byId = Object.fromEntries(merged.map((q) => [q.id, q.client.nom]));
+  assert.equal(byId.q1, "Alice (sauvegarde)"); // l'entrant écrase
+  assert.equal(byId.q2, "Bob");                 // l'existant survit
+  assert.equal(byId.q3, "Carol");               // l'entrant s'ajoute
+});
+
+test("mergeQuotes: devis hérités sans id fusionnés par numéro", () => {
+  const merged = C.mergeQuotes([{ numero: "DEV-2026-001", client: { nom: "X" } }], [{ numero: "DEV-2026-001", client: { nom: "X2" } }]);
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].client.nom, "X2");
+});
+
 /* -------------------------------------------------- cutListText() */
 test("cutListText: groups identical pieces and counts totals", () => {
   const out = C.cutListText([

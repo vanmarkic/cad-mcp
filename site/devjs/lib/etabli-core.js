@@ -98,6 +98,230 @@
   }
 
   /* =========================================================================
+     STOCKAGE DES DEVIS (« Mes devis »).
+     Régression corrigée : l'app dédoublonnait par `numero`, mais chaque nouveau
+     devis part du même numéro par défaut ("DEV-YYYY-001"). Enregistrer un 2ᵉ
+     devis écrasait donc le 1ᵉʳ — « il n'enregistre que le dernier devis ».
+     L'identité stable d'un devis est son `id` (jamais édité), pas le `numero`
+     (champ métier libre, sujet à collision). On retombe sur `numero` seulement
+     pour les devis hérités, persistés avant l'existence des ids.
+     ========================================================================= */
+
+  // Identifiant unique et stable d'un devis (indépendant du numéro affiché).
+  var _idSeq = 0;
+  function newQuoteId() {
+    _idSeq += 1;
+    var rand = Math.floor(Math.random() * 1e9).toString(36);
+    return "q_" + Date.now().toString(36) + "_" + _idSeq.toString(36) + rand;
+  }
+
+  // Clé d'identité : l'id s'il existe, sinon le numéro (rétro-compat).
+  function quoteKey(q) {
+    if (q && q.id != null && q.id !== "") return "id:" + q.id;
+    return "num:" + (q ? q.numero : undefined);
+  }
+
+  // Insère ou met à jour un devis dans la liste, sans jamais perdre les autres.
+  // Le devis (ré)enregistré passe en tête ; une mise à jour reste à sa place.
+  function upsertQuote(list, quote) {
+    list = Array.isArray(list) ? list.slice() : [];
+    var key = quoteKey(quote);
+    var idx = -1;
+    for (var i = 0; i < list.length; i++) {
+      if (quoteKey(list[i]) === key) { idx = i; break; }
+    }
+    if (idx >= 0) {
+      list[idx] = quote;
+      return list;
+    }
+    return [quote].concat(list);
+  }
+
+  // Supprime un devis par son id (retombe sur le numéro pour les devis hérités).
+  function removeQuote(list, id) {
+    list = Array.isArray(list) ? list : [];
+    return list.filter(function (q) {
+      var qid = q && q.id != null && q.id !== "" ? q.id : q && q.numero;
+      return qid !== id;
+    });
+  }
+
+  // Prochain numéro libre "DEV-<année>-NNN" à partir du plus haut déjà utilisé.
+  function nextQuoteNumero(list, year) {
+    var prefix = "DEV-" + year + "-";
+    var max = 0;
+    list = Array.isArray(list) ? list : [];
+    for (var i = 0; i < list.length; i++) {
+      var n = list[i] && list[i].numero;
+      if (typeof n === "string" && n.indexOf(prefix) === 0) {
+        var v = parseInt(n.slice(prefix.length), 10);
+        if (isFinite(v) && v > max) max = v;
+      }
+    }
+    var next = String(max + 1);
+    while (next.length < 3) next = "0" + next;
+    return prefix + next;
+  }
+
+  /* =========================================================================
+     CATALOGUE DE FOURNITURES réutilisables.
+     On encode une fourniture une fois (désignation, prix d'achat, unité, marge,
+     TVA) puis on la retrouve par auto-complétion ou via la modale « Catalogue ».
+     L'identité d'un article est sa désignation normalisée (pas de doublon
+     "MDF 18mm" / "mdf  18MM"). Fonctions pures — l'UI ne fait que du câblage.
+     ========================================================================= */
+  var _catSeq = 0;
+  function newCatalogItemId() {
+    _catSeq += 1;
+    var rand = Math.floor(Math.random() * 1e9).toString(36);
+    return "c_" + Date.now().toString(36) + "_" + _catSeq.toString(36) + rand;
+  }
+
+  // Clé d'identité d'un article : désignation sans casse ni espaces superflus.
+  function normDesignation(s) {
+    return String(s == null ? "" : s).trim().toLowerCase().replace(/\s+/g, " ");
+  }
+
+  // Construit un article de catalogue à partir d'une ligne de devis (fourniture).
+  // Ne garde que les champs réutilisables ; null si la désignation est vide.
+  function catalogItemFromLine(line) {
+    line = line || {};
+    var desig = String(line.designation == null ? "" : line.designation).trim();
+    if (!desig) return null;
+    return {
+      id: newCatalogItemId(),
+      designation: desig,
+      pa: line.pa != null ? line.pa : "",
+      unite: line.unite || "u",
+      marge: line.marge != null ? line.marge : "",
+      tvaRate: line.tvaRate != null ? line.tvaRate : "",
+    };
+  }
+
+  // Insère ou met à jour un article (dédoublonnage par désignation normalisée).
+  // Un article sans désignation est ignoré. La mise à jour garde la position et
+  // l'id existant ; le nouvel article passe en tête.
+  function upsertCatalogItem(list, item) {
+    list = Array.isArray(list) ? list.slice() : [];
+    if (!item || !normDesignation(item.designation)) return list;
+    var key = normDesignation(item.designation);
+    for (var i = 0; i < list.length; i++) {
+      if (normDesignation(list[i].designation) === key) {
+        list[i] = { id: list[i].id, designation: item.designation, pa: item.pa, unite: item.unite, marge: item.marge, tvaRate: item.tvaRate };
+        return list;
+      }
+    }
+    return [item].concat(list);
+  }
+
+  function removeCatalogItem(list, id) {
+    list = Array.isArray(list) ? list : [];
+    return list.filter(function (it) { return it && it.id !== id; });
+  }
+
+  // Recherche pour l'auto-complétion : sous-chaîne insensible à la casse, les
+  // correspondances par préfixe d'abord, limitée à `limit` résultats. Requête
+  // vide → tout le catalogue (jusqu'à la limite).
+  function searchCatalog(list, query, limit) {
+    list = Array.isArray(list) ? list : [];
+    var q = normDesignation(query);
+    limit = limit == null ? 8 : limit;
+    var matches = [];
+    for (var i = 0; i < list.length; i++) {
+      var pos = normDesignation(list[i].designation).indexOf(q);
+      if (pos >= 0) matches.push({ it: list[i], pref: pos === 0 ? 0 : 1, ord: i });
+    }
+    matches.sort(function (a, b) { return a.pref - b.pref || a.ord - b.ord; });
+    return matches.slice(0, limit).map(function (m) { return m.it; });
+  }
+
+  // Applique un article à une ligne : remplit les champs réutilisables, préserve
+  // tout le reste (id, type, quantité, métré, cases à cocher…).
+  function applyCatalogItemToLine(line, item) {
+    var out = {};
+    for (var k in line) if (Object.prototype.hasOwnProperty.call(line, k)) out[k] = line[k];
+    out.designation = item.designation;
+    out.pa = item.pa;
+    out.unite = item.unite;
+    out.marge = item.marge;
+    out.tvaRate = item.tvaRate != null ? item.tvaRate : "";
+    return out;
+  }
+
+  // Fusionne deux catalogues par désignation, sans perte (pour la restauration).
+  function mergeCatalog(current, incoming) {
+    var list = Array.isArray(current) ? current.slice() : [];
+    incoming = Array.isArray(incoming) ? incoming : [];
+    for (var i = incoming.length - 1; i >= 0; i--) list = upsertCatalogItem(list, incoming[i]);
+    return list;
+  }
+
+  /* =========================================================================
+     SAUVEGARDE / RESTAURATION de TOUTES les données utilisateur.
+     Un seul fichier .json (réglages + devis + calepinage) qu'on télécharge pour
+     mettre à l'abri, et qu'on réimporte sur un autre navigateur / poste. Ces
+     fonctions sont pures : le téléchargement et la lecture de fichier (FileReader)
+     restent côté UI.
+     ========================================================================= */
+  var BACKUP_APP = "etabli";
+  var BACKUP_VERSION = 1;
+
+  // Emballe les données (déjà désérialisées) dans un paquet de sauvegarde.
+  // meta.exportedAt est fourni par l'appelant (le noyau ne lit pas l'horloge).
+  function buildBackup(data, meta) {
+    data = data || {};
+    meta = meta || {};
+    return {
+      app: BACKUP_APP,
+      version: BACKUP_VERSION,
+      exportedAt: meta.exportedAt != null ? meta.exportedAt : null,
+      data: {
+        settings: data.settings != null ? data.settings : null,
+        quotes: Array.isArray(data.quotes) ? data.quotes : [],
+        calepinage: data.calepinage != null ? data.calepinage : null,
+        catalogue: Array.isArray(data.catalogue) ? data.catalogue : [],
+      },
+    };
+  }
+
+  // Lit et valide un paquet (chaîne JSON ou objet déjà parsé). Lève une erreur
+  // explicite si ce n'est pas une sauvegarde Établi. Rend { settings, quotes,
+  // calepinage } normalisés (sections absentes → null / []).
+  function readBackup(input) {
+    var obj;
+    if (typeof input === "string") {
+      try { obj = JSON.parse(input); }
+      catch (e) { throw new Error("Fichier illisible (JSON invalide)."); }
+    } else {
+      obj = input;
+    }
+    if (!obj || typeof obj !== "object" || obj.app !== BACKUP_APP || !obj.data || typeof obj.data !== "object") {
+      throw new Error("Ce fichier n'est pas une sauvegarde Établi.");
+    }
+    var d = obj.data;
+    return {
+      settings: d.settings != null ? d.settings : null,
+      quotes: Array.isArray(d.quotes) ? d.quotes : [],
+      calepinage: d.calepinage != null ? d.calepinage : null,
+      catalogue: Array.isArray(d.catalogue) ? d.catalogue : [],
+    };
+  }
+
+  // Fusionne deux listes de devis par identité (id, sinon numéro). Les devis
+  // entrants priment sur les existants de même identité et rien n'est supprimé —
+  // une restauration ne peut donc pas faire perdre les devis en cours.
+  function mergeQuotes(current, incoming) {
+    var list = Array.isArray(current) ? current.slice() : [];
+    incoming = Array.isArray(incoming) ? incoming : [];
+    // On applique en ordre inverse : upsertQuote empile en tête, l'ordre
+    // d'origine de `incoming` se retrouve donc préservé au-dessus des existants.
+    for (var i = incoming.length - 1; i >= 0; i--) {
+      list = upsertQuote(list, incoming[i]);
+    }
+    return list;
+  }
+
+  /* =========================================================================
      CALEPINAGE — bin packing « guillotine » tenant compte du trait de scie.
      Toutes les longueurs partagent la même unité (l'UI utilise le mm).
      On essaie plusieurs heuristiques (tri × score × découpe) et on garde le
@@ -343,5 +567,19 @@
     panelMetrics: panelMetrics,
     cutListText: cutListText,
     expandPieces: expandPieces,
+    newQuoteId: newQuoteId,
+    upsertQuote: upsertQuote,
+    removeQuote: removeQuote,
+    nextQuoteNumero: nextQuoteNumero,
+    buildBackup: buildBackup,
+    readBackup: readBackup,
+    mergeQuotes: mergeQuotes,
+    newCatalogItemId: newCatalogItemId,
+    catalogItemFromLine: catalogItemFromLine,
+    upsertCatalogItem: upsertCatalogItem,
+    removeCatalogItem: removeCatalogItem,
+    searchCatalog: searchCatalog,
+    applyCatalogItemToLine: applyCatalogItemToLine,
+    mergeCatalog: mergeCatalog,
   };
 });

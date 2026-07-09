@@ -9,6 +9,7 @@ const assert = require("node:assert/strict");
 const http = require("node:http");
 const fs = require("node:fs");
 const path = require("node:path");
+const os = require("node:os");
 
 let chromium;
 try { ({ chromium } = require("playwright")); } catch (_) { chromium = null; }
@@ -34,8 +35,30 @@ function startServer() {
 test("UI", { skip: chromium ? false : "playwright not installed" }, async (t) => {
   const server = await startServer();
   const base = `http://127.0.0.1:${server.address().port}/index.html`;
-  const browser = await chromium.launch();
+  // Some sandboxes/CI ship a pre-installed Chromium whose build differs from the
+  // pinned Playwright version. Let them point at it via PW_EXECUTABLE_PATH
+  // instead of forcing `npx playwright install`.
+  const execPath = process.env.PW_EXECUTABLE_PATH;
+  const browser = await chromium.launch(execPath ? { executablePath: execPath } : {});
   const ctx = await browser.newContext({ ignoreHTTPSErrors: true });
+
+  // Offline mode: when PW_VENDOR_DIR points at a folder holding react.js /
+  // react-dom.js / babel.js, serve the CDN scripts from disk so the suite runs
+  // without network. Online (CI/dev) it's unset and the real CDN is used.
+  const vendorDir = process.env.PW_VENDOR_DIR;
+  if (vendorDir) {
+    await ctx.route(/unpkg\.com|jsdelivr\.net/, (route) => {
+      const u = route.request().url();
+      const file = /react-dom/.test(u) ? "react-dom.js" : /react/.test(u) ? "react.js" : /babel/.test(u) ? "babel.js" : null;
+      if (file) return route.fulfill({ status: 200, contentType: "text/javascript", body: fs.readFileSync(path.join(vendorDir, file)) });
+      return route.continue();
+    });
+  }
+
+  // Isolation : les tests partagent le même contexte (donc le même localStorage).
+  // On repart d'un stockage vide à chaque chargement de page pour qu'un test
+  // n'hérite pas des devis / du catalogue / du calepinage d'un autre.
+  await ctx.addInitScript(() => { try { localStorage.clear(); } catch (e) {} });
 
   t.after(async () => { await browser.close(); server.close(); });
 
@@ -135,6 +158,164 @@ test("UI", { skip: chromium ? false : "playwright not installed" }, async (t) =>
     assert.match(totals, /TVA 6 %/, "ligne 2 au défaut 6 %");
     assert.match(totals, /21,00/, "100 € × 21 % = 21,00 €");
     assert.match(totals, /12,00/, "200 € × 6 % = 12,00 €");
+    assert.deepEqual(p._errors, []);
+    await p.close();
+  });
+
+  await t.test("Mes devis: enregistrer deux devis les garde tous les deux (régression perte de devis)", async () => {
+    const p = await newPage();
+
+    // Devis 1 : client Alice, on enregistre.
+    await p.locator('label.fld:has(span.fld-lab:text-is("Client")) input').fill("Alice");
+    await p.click('button:has-text("Enregistrer")');
+    await p.waitForTimeout(150);
+
+    // Nouveau devis (numéro auto-incrémenté), client Bob, on enregistre.
+    await p.click('button:has-text("Nouveau")');
+    await p.waitForTimeout(150);
+    await p.locator('label.fld:has(span.fld-lab:text-is("Client")) input').fill("Bob");
+    await p.click('button:has-text("Enregistrer")');
+    await p.waitForTimeout(150);
+
+    // « Mes devis » doit lister DEUX devis, pas seulement le dernier.
+    await p.click('button:has-text("Mes devis")');
+    await p.waitForSelector(".qrow");
+    assert.equal(await p.locator(".qrow").count(), 2, "les deux devis doivent être conservés");
+    const metas = await p.locator(".qrow-meta").allInnerTexts();
+    assert.ok(metas.some((m) => /Alice/.test(m)), "le 1ᵉʳ devis (Alice) ne doit pas avoir disparu");
+    assert.ok(metas.some((m) => /Bob/.test(m)), "le 2ᵉ devis (Bob) est présent");
+    assert.deepEqual(p._errors, []);
+    await p.close();
+  });
+
+  await t.test("Sauvegarde: exporter puis restaurer récupère un devis supprimé", async () => {
+    const p = await newPage();
+
+    // Enregistre un devis "Alice".
+    await p.locator('label.fld:has(span.fld-lab:text-is("Client")) input').fill("Alice");
+    await p.click('button:has-text("Enregistrer")');
+    await p.waitForTimeout(150);
+
+    // Réglages → exporte, capture le fichier téléchargé.
+    await p.click('button:has-text("Réglages")');
+    await p.waitForSelector("text=Sauvegarde des données");
+    const [download] = await Promise.all([
+      p.waitForEvent("download"),
+      p.click('button:has-text("Sauvegarder")'),
+    ]);
+    const file = path.join(os.tmpdir(), "etabli-backup-test.json");
+    await download.saveAs(file);
+    const bundle = JSON.parse(fs.readFileSync(file, "utf8"));
+    assert.equal(bundle.app, "etabli", "fichier de sauvegarde Établi");
+    assert.equal(bundle.data.quotes.length, 1, "le devis Alice est dans la sauvegarde");
+
+    // Simule la perte : supprime le devis Alice.
+    await p.keyboard.press("Escape");
+    await p.click('button:has-text("Mes devis")');
+    await p.waitForSelector(".qrow");
+    await p.click(".qrow .btn.danger");
+    await p.waitForTimeout(120);
+    assert.equal(await p.locator(".qrow").count(), 0, "devis supprimé");
+    await p.keyboard.press("Escape");
+
+    // Restaure depuis le fichier (input caché → setInputFiles direct).
+    await p.click('button:has-text("Réglages")');
+    await p.waitForSelector("text=Sauvegarde des données");
+    await p.locator(".reglages-file").setInputFiles(file);
+    await p.waitForTimeout(200);
+
+    // Le devis Alice est de retour.
+    await p.click('button:has-text("Mes devis")');
+    await p.waitForSelector(".qrow");
+    assert.equal(await p.locator(".qrow").count(), 1, "le devis restauré est revenu");
+    assert.match(await p.locator(".qrow-meta").first().innerText(), /Alice/);
+    assert.deepEqual(p._errors, []);
+    await p.close();
+  });
+
+  await t.test("Catalogue: cataloguer une fourniture, puis l'insérer et l'auto-compléter", async () => {
+    const p = await newPage();
+    const desig = (line) => line.locator(".line-title");
+    const fld = (line, label) => line.getByText(label, { exact: true }).locator("..").locator("input");
+
+    // Encode une fourniture puis clique ☆ pour la mémoriser.
+    await p.click('button.add:has-text("Fourniture")');
+    await p.waitForSelector(".line");
+    const line = p.locator(".line").first();
+    await desig(line).fill("MDF 18mm");
+    await fld(line, "Prix d'achat / u").fill("30");
+    await fld(line, "Unité").fill("m²");
+    await fld(line, "Marge").fill("20");
+    await line.locator(".ico-cat").click();
+    await p.waitForTimeout(150);
+    assert.match(await p.locator('button:has-text("Catalogue")').first().innerText(), /\(1\)/, "le catalogue compte 1 article");
+
+    // Modale Catalogue → l'article est là → « Insérer » ajoute une ligne pré-remplie.
+    await p.click('button:has-text("Catalogue")');
+    await p.waitForSelector(".cat-list .qrow");
+    assert.equal(await p.locator(".cat-list .qrow").count(), 1);
+    assert.match(await p.locator(".cat-list .qrow-num").first().innerText(), /MDF 18mm/);
+    await p.click('.cat-list .qrow .btn:has-text("Insérer")');
+    await p.waitForTimeout(150);
+    assert.equal(await p.locator(".line").count(), 2, "une nouvelle fourniture est insérée");
+    const line2 = p.locator(".line").nth(1);
+    assert.equal(await desig(line2).inputValue(), "MDF 18mm");
+    assert.equal(await fld(line2, "Prix d'achat / u").inputValue(), "30");
+
+    // Auto-complétion : sur une ligne neuve, taper « mdf » propose l'article et le remplit.
+    await p.click('button.add:has-text("Fourniture")');
+    await p.waitForTimeout(100);
+    const line3 = p.locator(".line").nth(2);
+    await desig(line3).click();
+    await desig(line3).fill("mdf");
+    await line3.locator(".ac .ac-item").first().waitFor({ timeout: 4000 });
+    await line3.locator(".ac .ac-item").first().click();
+    await p.waitForTimeout(120);
+    assert.equal(await desig(line3).inputValue(), "MDF 18mm", "l'auto-complétion remplit la désignation");
+    assert.equal(await fld(line3, "Prix d'achat / u").inputValue(), "30", "et le prix d'achat");
+    assert.deepEqual(p._errors, []);
+    await p.close();
+  });
+
+  await t.test("Sauvegarde: le catalogue est inclus dans l'export/restore", async () => {
+    const p = await newPage();
+    const line = p.locator(".line").first();
+    // Catalogue un article.
+    await p.click('button.add:has-text("Fourniture")');
+    await p.waitForSelector(".line");
+    await line.locator(".line-title").fill("Charnière invisible");
+    await line.getByText("Prix d'achat / u", { exact: true }).locator("..").locator("input").fill("4,2");
+    await line.locator(".ico-cat").click();
+    await p.waitForTimeout(120);
+
+    // Exporte → le catalogue est dans le fichier.
+    await p.click('button:has-text("Réglages")');
+    await p.waitForSelector("text=Sauvegarde des données");
+    const [download] = await Promise.all([
+      p.waitForEvent("download"),
+      p.click('button:has-text("Sauvegarder")'),
+    ]);
+    const file = path.join(os.tmpdir(), "etabli-backup-cat.json");
+    await download.saveAs(file);
+    const bundle = JSON.parse(fs.readFileSync(file, "utf8"));
+    assert.equal(bundle.data.catalogue.length, 1, "le catalogue est dans la sauvegarde");
+    assert.match(bundle.data.catalogue[0].designation, /Charnière invisible/);
+
+    // Supprime l'article puis restaure → il revient.
+    await p.keyboard.press("Escape");
+    await p.click('button:has-text("Catalogue")');
+    await p.waitForSelector(".cat-list .qrow");
+    await p.click(".cat-list .qrow .btn.danger");
+    await p.waitForTimeout(120);
+    assert.equal(await p.locator(".cat-list .qrow").count(), 0, "article supprimé");
+    await p.keyboard.press("Escape");
+    await p.click('button:has-text("Réglages")');
+    await p.waitForSelector("text=Sauvegarde des données");
+    await p.locator(".reglages-file").setInputFiles(file);
+    await p.waitForTimeout(200);
+    await p.click('button:has-text("Catalogue")');
+    await p.waitForSelector(".cat-list .qrow");
+    assert.equal(await p.locator(".cat-list .qrow").count(), 1, "article restauré");
     assert.deepEqual(p._errors, []);
     await p.close();
   });
