@@ -32,7 +32,7 @@ window.storage = {
 
 <script type="text/babel" data-presets="react">
 const { useState, useEffect, useMemo, useRef } = React;
-const { num, computeLine, tvaBreakdown, calculateCutlist, panelMetrics, cutListText, newQuoteId, upsertQuote, removeQuote, nextQuoteNumero, buildBackup, readBackup, mergeQuotes } = window.EtabliCore;
+const { num, computeLine, tvaBreakdown, calculateCutlist, panelMetrics, cutListText, newQuoteId, upsertQuote, removeQuote, nextQuoteNumero, buildBackup, readBackup, mergeQuotes, catalogItemFromLine, upsertCatalogItem, removeCatalogItem, searchCatalog, applyCatalogItemToLine, mergeCatalog } = window.EtabliCore;
 
 /* =========================================================================
    ÉTABLI — Générateur de devis pour menuisier
@@ -292,7 +292,8 @@ function App() {
   const [params, setParams] = useState(DEFAULT_PARAMS);
   const [devis, setDevis] = useState(() => newDevis(DEFAULT_COMPANY, DEFAULT_PARAMS));
   const [saved, setSaved] = useState([]);
-  const [modal, setModal] = useState(null); // 'reglages' | 'mesdevis' | 'calepinage' | null
+  const [catalog, setCatalog] = useState([]); // fournitures réutilisables
+  const [modal, setModal] = useState(null); // 'reglages' | 'mesdevis' | 'catalogue' | 'calepinage' | null
   const [toast, setToast] = useState("");
   const [calep, setCalep] = useState(DEFAULT_CALEP);
   const loaded = useRef(false);
@@ -324,6 +325,8 @@ function App() {
           }
           const cp = await window.storage.get("etabli:calepinage").catch(() => null);
           if (cp && cp.value) setCalep(migrateCalep(JSON.parse(cp.value)));
+          const cat = await window.storage.get("etabli:catalogue").catch(() => null);
+          if (cat && cat.value) setCatalog(JSON.parse(cat.value) || []);
         }
       } catch (e) {
         /* ignore — first run */
@@ -360,6 +363,12 @@ function App() {
     try {
       if (window.storage)
         await window.storage.set("etabli:quotes", JSON.stringify(list));
+    } catch (e) {}
+  };
+  const persistCatalog = async (list) => {
+    try {
+      if (window.storage)
+        await window.storage.set("etabli:catalogue", JSON.stringify(list));
     } catch (e) {}
   };
 
@@ -504,11 +513,46 @@ function App() {
     flash("Nouveau devis");
   };
 
+  /* ---------- catalogue de fournitures réutilisables ---------- */
+  // Enregistre une ligne fourniture dans le catalogue (dédoublonné par désignation).
+  const addLineToCatalog = (line) => {
+    const item = catalogItemFromLine(line);
+    if (!item) { flash("Donne d'abord une désignation à la fourniture"); return; }
+    setCatalog((list) => {
+      const next = upsertCatalogItem(list, item);
+      persistCatalog(next);
+      return next;
+    });
+    flash("Ajouté au catalogue : " + item.designation);
+  };
+  // Remplit une ligne existante depuis un article du catalogue (auto-complétion).
+  const applyCatalogToLine = (lineId, item) =>
+    setDevis((d) => ({
+      ...d,
+      lines: d.lines.map((l) => (l.id === lineId ? applyCatalogItemToLine(l, item) : l)),
+    }));
+  // Insère une NOUVELLE ligne fourniture pré-remplie depuis le catalogue.
+  const insertCatalogItem = (item) => {
+    setDevis((d) => ({
+      ...d,
+      lines: [...d.lines, applyCatalogItemToLine(newLine("fourniture", params), item)],
+    }));
+    setModal(null);
+    setView("atelier");
+    flash("Fourniture ajoutée : " + item.designation);
+  };
+  const deleteCatalogItem = (id) =>
+    setCatalog((list) => {
+      const next = removeCatalogItem(list, id);
+      persistCatalog(next);
+      return next;
+    });
+
   /* ---------- sauvegarde / restauration de TOUTES les données ---------- */
-  // Télécharge un .json regroupant réglages + devis + calepinage.
+  // Télécharge un .json regroupant réglages + devis + calepinage + catalogue.
   const exportAll = () => {
     const bundle = buildBackup(
-      { settings: { company, params }, quotes: saved, calepinage: calep },
+      { settings: { company, params }, quotes: saved, calepinage: calep, catalogue: catalog },
       { exportedAt: new Date().toISOString() }
     );
     const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" });
@@ -547,6 +591,13 @@ function App() {
         persistQuotes(next);
         return next;
       });
+      if (restored.catalogue && restored.catalogue.length) {
+        setCatalog((list) => {
+          const next = mergeCatalog(list, restored.catalogue);
+          persistCatalog(next);
+          return next;
+        });
+      }
       if (restored.calepinage) setCalep(migrateCalep(restored.calepinage));
       setModal(null);
       flash("Sauvegarde restaurée (" + restored.quotes.length + " devis dans le fichier)");
@@ -603,6 +654,9 @@ function App() {
         </div>
 
         <div className="bar-actions">
+          <button className="btn ghost" onClick={() => setModal("catalogue")}>
+            Catalogue {catalog.length ? `(${catalog.length})` : ""}
+          </button>
           <button className="btn ghost" onClick={() => setModal("calepinage")}>
             Calepinage
           </button>
@@ -632,6 +686,10 @@ function App() {
           delLine={delLine}
           moveLine={moveLine}
           margeColor={margeColor}
+          catalog={catalog}
+          onApplyCatalogItem={applyCatalogToLine}
+          onAddToCatalog={addLineToCatalog}
+          onOpenCatalogue={() => setModal("catalogue")}
         />
       ) : (
         <ClientSheet
@@ -651,6 +709,15 @@ function App() {
             params={params}
             onAddToDevis={addCalepToDevis}
             flash={flash}
+          />
+        </Modal>
+      )}
+      {modal === "catalogue" && (
+        <Modal title="Catalogue de fournitures" onClose={() => setModal(null)} wide>
+          <Catalogue
+            catalog={catalog}
+            onInsert={insertCatalogItem}
+            onDelete={deleteCatalogItem}
           />
         </Modal>
       )}
@@ -726,6 +793,10 @@ function Atelier({
   delLine,
   moveLine,
   margeColor,
+  catalog,
+  onApplyCatalogItem,
+  onAddToCatalog,
+  onOpenCatalogue,
 }) {
   const set = (patch) => setDevis((d) => ({ ...d, ...patch }));
   const setClient = (patch) =>
@@ -812,6 +883,9 @@ function Atelier({
               margeColor={margeColor}
               tvaApplies={tvaApplies}
               fournDefaultRate={fournDefaultRate}
+              catalog={catalog}
+              onApplyCatalogItem={onApplyCatalogItem}
+              onAddToCatalog={onAddToCatalog}
             />
           ))}
         </div>
@@ -825,6 +899,9 @@ function Atelier({
           </button>
           <button className="btn add" onClick={() => addLine("forfait")}>
             + Forfait / sous-traitance
+          </button>
+          <button className="btn add add-cat" onClick={onOpenCatalogue} title="Piocher une fourniture déjà encodée">
+            ↳ depuis le catalogue{catalog && catalog.length ? ` (${catalog.length})` : ""}
           </button>
         </div>
       </section>
@@ -978,22 +1055,63 @@ function Row({ k, v, strong }) {
 }
 
 /* ---------- single line card ---------- */
-function LineCard({ line, index, last, setLine, delLine, moveLine, margeColor, tvaApplies, fournDefaultRate }) {
+function LineCard({ line, index, last, setLine, delLine, moveLine, margeColor, tvaApplies, fournDefaultRate, catalog, onApplyCatalogItem, onAddToCatalog }) {
   const l = line;
+  const [acOpen, setAcOpen] = useState(false);
   const typeLabel =
     l.type === "main" ? "Main-d'œuvre" : l.type === "forfait" ? "Forfait" : "Fourniture";
+  const isFourn = l.type === "fourniture";
+  // Auto-complétion depuis le catalogue (fournitures uniquement).
+  const suggestions = isFourn && acOpen ? searchCatalog(catalog || [], l.designation, 6) : [];
   return (
     <div className="line">
       <div className="line-head">
         <span className={"chip chip-" + l.type}>{typeLabel}</span>
-        <input
-          className="in line-title"
-          type="text"
-          placeholder="Désignation (ex. plateau chêne massif 40 mm)"
-          value={l.designation}
-          onChange={(e) => setLine(l.id, { designation: e.target.value })}
-        />
+        <div className="line-title-wrap">
+          <input
+            className="in line-title"
+            type="text"
+            placeholder="Désignation (ex. plateau chêne massif 40 mm)"
+            value={l.designation}
+            onChange={(e) => setLine(l.id, { designation: e.target.value })}
+            onFocus={() => setAcOpen(true)}
+            onBlur={() => setAcOpen(false)}
+            autoComplete="off"
+          />
+          {suggestions.length > 0 && (
+            <ul className="ac">
+              {suggestions.map((it) => (
+                <li key={it.id}>
+                  <button
+                    type="button"
+                    className="ac-item"
+                    // onMouseDown (avant le blur) pour appliquer sans fermer trop tôt.
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      onApplyCatalogItem(l.id, it);
+                      setAcOpen(false);
+                    }}
+                  >
+                    <span className="ac-desig">{it.designation}</span>
+                    <span className="ac-meta">
+                      {eur(num(it.pa))}/{it.unite || "u"} · marge {num(it.marge)} %
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
         <div className="line-ord">
+          {isFourn && (
+            <button
+              className="ico ico-cat"
+              title="Ajouter cette fourniture au catalogue"
+              onClick={() => onAddToCatalog(l)}
+            >
+              ☆
+            </button>
+          )}
           <button className="ico" title="Monter" disabled={index === 0} onClick={() => moveLine(l.id, -1)}>
             ↑
           </button>
@@ -1292,6 +1410,60 @@ function ClientSheet({ devis, company, calc, onPrint }) {
 /* =========================================================================
    REGLAGES
    ========================================================================= */
+/* =========================================================================
+   MODAL Catalogue — piocher / gérer les fournitures réutilisables
+   ========================================================================= */
+function Catalogue({ catalog, onInsert, onDelete }) {
+  const [q, setQ] = useState("");
+  const items = searchCatalog(catalog || [], q, 200);
+  const empty = !catalog || catalog.length === 0;
+  return (
+    <div>
+      <p className="muted reglages-backup-note">
+        Tes fournitures déjà encodées. « Insérer » ajoute une ligne fourniture
+        pré-remplie au devis en cours. Pour mémoriser un article, clique sur
+        l'étoile <b>☆</b> d'une ligne fourniture dans l'atelier — ou tape sa
+        désignation dans une ligne pour la retrouver en auto-complétion.
+      </p>
+      {!empty && (
+        <Field label="Rechercher" wide>
+          <TextIn value={q} onChange={setQ} placeholder="désignation…" />
+        </Field>
+      )}
+      {empty ? (
+        <p className="muted">
+          Catalogue vide. Encode une fourniture dans l'atelier puis clique sur
+          <b> ☆</b> pour la mémoriser ici.
+        </p>
+      ) : items.length === 0 ? (
+        <p className="muted">Aucune fourniture ne correspond à « {q} ».</p>
+      ) : (
+        <ul className="qlist cat-list">
+          {items.map((it) => (
+            <li key={it.id} className="qrow">
+              <div>
+                <div className="qrow-num">{it.designation}</div>
+                <div className="qrow-meta">
+                  {eur(num(it.pa))} / {it.unite || "u"} · marge {num(it.marge)} %
+                  {it.tvaRate !== "" && it.tvaRate != null ? ` · TVA ${num(it.tvaRate)} %` : ""}
+                </div>
+              </div>
+              <div className="qrow-act">
+                <button className="btn sm" onClick={() => onInsert(it)}>
+                  Insérer
+                </button>
+                <button className="btn sm danger" onClick={() => onDelete(it.id)}>
+                  Suppr.
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function Reglages({ company, params, onSave, onExport, onImport, quoteCount }) {
   const [c, setC] = useState(company);
   const [p, setP] = useState(params);
@@ -1397,6 +1569,12 @@ function Reglages({ company, params, onSave, onExport, onImport, quoteCount }) {
    MODAL shell
    ========================================================================= */
 function Modal({ title, children, onClose, wide }) {
+  // Échap ferme la modale (en plus du clic hors-cadre et du bouton ✕).
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
   return (
     <div className="overlay no-print" onClick={onClose}>
       <div
@@ -1813,9 +1991,27 @@ const CSS = `
 .chip-fourniture{background:#e8dcc6; color:#7a5a1c}
 .chip-main{background:#d9e3da; color:#39593f}
 .chip-forfait{background:#e2dae6; color:#5b4769}
-.line-title{flex:1; border-color:transparent; background:transparent; font-weight:600; font-size:14px}
+.line-title-wrap{flex:1; position:relative}
+.line-title{width:100%; border-color:transparent; background:transparent; font-weight:600; font-size:14px}
 .line-title:focus{background:#fff}
+/* auto-complétion catalogue */
+.ac{
+  list-style:none; margin:4px 0 0; padding:4px; position:absolute; z-index:30;
+  left:0; right:0; top:100%; background:#fff; border:1px solid var(--line);
+  border-radius:8px; box-shadow:0 8px 22px rgba(44,39,31,.16); max-height:230px; overflow:auto;
+}
+.ac-item{
+  display:flex; flex-direction:column; align-items:flex-start; gap:1px; width:100%;
+  text-align:left; background:transparent; border:0; border-radius:6px; padding:6px 8px; cursor:pointer;
+}
+.ac-item:hover{background:var(--oak-soft)}
+.ac-desig{font-weight:600; font-size:13px; color:var(--ink)}
+.ac-meta{font-size:11px; color:var(--ink-3)}
 .line-ord{display:flex; gap:4px}
+.ico-cat{color:var(--oak-2)}
+.ico-cat:hover{border-color:var(--oak); color:var(--oak); background:var(--oak-soft)}
+.add-cat{margin-left:auto}
+.cat-list .qrow-num{font-weight:600}
 .ico{
   width:28px; height:28px; border:1px solid var(--line); background:#fff; border-radius:6px;
   cursor:pointer; color:var(--ink-2); font-size:13px; line-height:1; transition:.12s;

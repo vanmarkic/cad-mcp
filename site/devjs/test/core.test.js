@@ -294,6 +294,82 @@ test("nextQuoteNumero: incrémente le compteur du plus haut numéro de l'année"
   assert.equal(C.nextQuoteNumero([], 2026), "DEV-2026-001");
 });
 
+/* -------------------------------------------------- catalogue de fournitures */
+/* Un catalogue de fournitures réutilisables : on encode une fourniture une fois
+   (désignation, prix d'achat, unité, marge, TVA), on la retrouve ensuite par
+   auto-complétion ou via la modale « Catalogue ». Logique pure et testée ici. */
+test("catalogItemFromLine: extrait les champs réutilisables + id ; null si désignation vide", () => {
+  const line = { id: "L1", type: "fourniture", designation: "  Vis 4×40  ", pa: "0,08", unite: "pce", marge: "25", tvaRate: 21, qte: "200", detail: "x" };
+  const it = C.catalogItemFromLine(line);
+  assert.equal(it.designation, "Vis 4×40"); // trimmé
+  assert.equal(it.pa, "0,08");
+  assert.equal(it.unite, "pce");
+  assert.equal(it.marge, "25");
+  assert.equal(it.tvaRate, 21);
+  assert.ok(it.id, "un id est attribué");
+  assert.equal(C.catalogItemFromLine({ designation: "   " }), null, "désignation vide → null");
+});
+
+test("upsertCatalogItem: ajoute, met à jour par désignation (insensible casse/espaces), ignore le vide", () => {
+  let cat = C.upsertCatalogItem([], { id: "c1", designation: "MDF 18mm", pa: "30", unite: "m²", marge: "20" });
+  assert.equal(cat.length, 1);
+  cat = C.upsertCatalogItem(cat, { id: "c2", designation: "  mdf  18MM ", pa: "32", unite: "m²", marge: "18" });
+  assert.equal(cat.length, 1, "même article → mise à jour, pas de doublon");
+  assert.equal(cat[0].pa, "32");
+  const same = C.upsertCatalogItem(cat, { id: "c3", designation: "   " });
+  assert.equal(same.length, 1, "désignation vide ignorée");
+});
+
+test("removeCatalogItem: supprime par id", () => {
+  const out = C.removeCatalogItem([{ id: "c1", designation: "A" }, { id: "c2", designation: "B" }], "c1");
+  assert.equal(out.length, 1);
+  assert.equal(out[0].id, "c2");
+});
+
+test("searchCatalog: sous-chaîne insensible à la casse, priorité au préfixe, limite", () => {
+  const cat = [
+    { id: "1", designation: "Charnière invisible" },
+    { id: "2", designation: "Vis à bois 4×40" },
+    { id: "3", designation: "Visserie inox" },
+    { id: "4", designation: "Colle vinylique" },
+  ];
+  const r = C.searchCatalog(cat, "vis", 10);
+  assert.deepEqual(r.map((x) => x.id), ["2", "3", "1"], "préfixe 'Vis…' avant 'Charnière in-vis-ible'");
+  assert.equal(C.searchCatalog(cat, "", 2).length, 2, "requête vide → tout, limité");
+});
+
+test("applyCatalogItemToLine: remplit les champs réutilisables, préserve id/type/qté/détail", () => {
+  const line = { id: "L1", type: "fourniture", qte: "5", designation: "", pa: "", unite: "u", marge: "", detail: "garde-moi" };
+  const item = { id: "c1", designation: "Poignée alu", pa: "6,5", unite: "pce", marge: "30", tvaRate: 21 };
+  const out = C.applyCatalogItemToLine(line, item);
+  assert.equal(out.id, "L1");
+  assert.equal(out.type, "fourniture");
+  assert.equal(out.qte, "5");
+  assert.equal(out.detail, "garde-moi");
+  assert.equal(out.designation, "Poignée alu");
+  assert.equal(out.pa, "6,5");
+  assert.equal(out.unite, "pce");
+  assert.equal(out.marge, "30");
+  assert.equal(out.tvaRate, 21);
+});
+
+test("mergeCatalog: union par désignation, sans perte", () => {
+  const cur = [{ id: "c1", designation: "MDF 18mm", pa: "30" }];
+  const inc = [{ id: "c9", designation: "mdf 18MM", pa: "31" }, { id: "c2", designation: "Chêne", pa: "90" }];
+  const m = C.mergeCatalog(cur, inc);
+  assert.equal(m.length, 2);
+  const byd = Object.fromEntries(m.map((x) => [x.designation.toLowerCase(), x.pa]));
+  assert.equal(byd["mdf 18mm"], "31"); // l'entrant écrase
+  assert.equal(byd["chêne"], "90");
+});
+
+test("buildBackup/readBackup: le catalogue est inclus et relu (rétro-compat : absent → [])", () => {
+  const b = C.buildBackup({ catalogue: [{ id: "c1", designation: "MDF" }] }, {});
+  assert.deepEqual(b.data.catalogue, [{ id: "c1", designation: "MDF" }]);
+  assert.deepEqual(C.readBackup(b).catalogue, [{ id: "c1", designation: "MDF" }]);
+  assert.deepEqual(C.readBackup({ app: "etabli", data: { quotes: [] } }).catalogue, [], "vieux fichier sans catalogue");
+});
+
 /* -------------------------------------------------- sauvegarde / restauration */
 /* Un seul fichier .json regroupe TOUTES les données utilisateur (réglages +
    devis + calepinage), pour sauver et restaurer d'un navigateur/poste à l'autre.

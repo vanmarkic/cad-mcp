@@ -164,6 +164,99 @@
   }
 
   /* =========================================================================
+     CATALOGUE DE FOURNITURES réutilisables.
+     On encode une fourniture une fois (désignation, prix d'achat, unité, marge,
+     TVA) puis on la retrouve par auto-complétion ou via la modale « Catalogue ».
+     L'identité d'un article est sa désignation normalisée (pas de doublon
+     "MDF 18mm" / "mdf  18MM"). Fonctions pures — l'UI ne fait que du câblage.
+     ========================================================================= */
+  var _catSeq = 0;
+  function newCatalogItemId() {
+    _catSeq += 1;
+    var rand = Math.floor(Math.random() * 1e9).toString(36);
+    return "c_" + Date.now().toString(36) + "_" + _catSeq.toString(36) + rand;
+  }
+
+  // Clé d'identité d'un article : désignation sans casse ni espaces superflus.
+  function normDesignation(s) {
+    return String(s == null ? "" : s).trim().toLowerCase().replace(/\s+/g, " ");
+  }
+
+  // Construit un article de catalogue à partir d'une ligne de devis (fourniture).
+  // Ne garde que les champs réutilisables ; null si la désignation est vide.
+  function catalogItemFromLine(line) {
+    line = line || {};
+    var desig = String(line.designation == null ? "" : line.designation).trim();
+    if (!desig) return null;
+    return {
+      id: newCatalogItemId(),
+      designation: desig,
+      pa: line.pa != null ? line.pa : "",
+      unite: line.unite || "u",
+      marge: line.marge != null ? line.marge : "",
+      tvaRate: line.tvaRate != null ? line.tvaRate : "",
+    };
+  }
+
+  // Insère ou met à jour un article (dédoublonnage par désignation normalisée).
+  // Un article sans désignation est ignoré. La mise à jour garde la position et
+  // l'id existant ; le nouvel article passe en tête.
+  function upsertCatalogItem(list, item) {
+    list = Array.isArray(list) ? list.slice() : [];
+    if (!item || !normDesignation(item.designation)) return list;
+    var key = normDesignation(item.designation);
+    for (var i = 0; i < list.length; i++) {
+      if (normDesignation(list[i].designation) === key) {
+        list[i] = { id: list[i].id, designation: item.designation, pa: item.pa, unite: item.unite, marge: item.marge, tvaRate: item.tvaRate };
+        return list;
+      }
+    }
+    return [item].concat(list);
+  }
+
+  function removeCatalogItem(list, id) {
+    list = Array.isArray(list) ? list : [];
+    return list.filter(function (it) { return it && it.id !== id; });
+  }
+
+  // Recherche pour l'auto-complétion : sous-chaîne insensible à la casse, les
+  // correspondances par préfixe d'abord, limitée à `limit` résultats. Requête
+  // vide → tout le catalogue (jusqu'à la limite).
+  function searchCatalog(list, query, limit) {
+    list = Array.isArray(list) ? list : [];
+    var q = normDesignation(query);
+    limit = limit == null ? 8 : limit;
+    var matches = [];
+    for (var i = 0; i < list.length; i++) {
+      var pos = normDesignation(list[i].designation).indexOf(q);
+      if (pos >= 0) matches.push({ it: list[i], pref: pos === 0 ? 0 : 1, ord: i });
+    }
+    matches.sort(function (a, b) { return a.pref - b.pref || a.ord - b.ord; });
+    return matches.slice(0, limit).map(function (m) { return m.it; });
+  }
+
+  // Applique un article à une ligne : remplit les champs réutilisables, préserve
+  // tout le reste (id, type, quantité, métré, cases à cocher…).
+  function applyCatalogItemToLine(line, item) {
+    var out = {};
+    for (var k in line) if (Object.prototype.hasOwnProperty.call(line, k)) out[k] = line[k];
+    out.designation = item.designation;
+    out.pa = item.pa;
+    out.unite = item.unite;
+    out.marge = item.marge;
+    out.tvaRate = item.tvaRate != null ? item.tvaRate : "";
+    return out;
+  }
+
+  // Fusionne deux catalogues par désignation, sans perte (pour la restauration).
+  function mergeCatalog(current, incoming) {
+    var list = Array.isArray(current) ? current.slice() : [];
+    incoming = Array.isArray(incoming) ? incoming : [];
+    for (var i = incoming.length - 1; i >= 0; i--) list = upsertCatalogItem(list, incoming[i]);
+    return list;
+  }
+
+  /* =========================================================================
      SAUVEGARDE / RESTAURATION de TOUTES les données utilisateur.
      Un seul fichier .json (réglages + devis + calepinage) qu'on télécharge pour
      mettre à l'abri, et qu'on réimporte sur un autre navigateur / poste. Ces
@@ -186,6 +279,7 @@
         settings: data.settings != null ? data.settings : null,
         quotes: Array.isArray(data.quotes) ? data.quotes : [],
         calepinage: data.calepinage != null ? data.calepinage : null,
+        catalogue: Array.isArray(data.catalogue) ? data.catalogue : [],
       },
     };
   }
@@ -209,6 +303,7 @@
       settings: d.settings != null ? d.settings : null,
       quotes: Array.isArray(d.quotes) ? d.quotes : [],
       calepinage: d.calepinage != null ? d.calepinage : null,
+      catalogue: Array.isArray(d.catalogue) ? d.catalogue : [],
     };
   }
 
@@ -479,5 +574,12 @@
     buildBackup: buildBackup,
     readBackup: readBackup,
     mergeQuotes: mergeQuotes,
+    newCatalogItemId: newCatalogItemId,
+    catalogItemFromLine: catalogItemFromLine,
+    upsertCatalogItem: upsertCatalogItem,
+    removeCatalogItem: removeCatalogItem,
+    searchCatalog: searchCatalog,
+    applyCatalogItemToLine: applyCatalogItemToLine,
+    mergeCatalog: mergeCatalog,
   };
 });
