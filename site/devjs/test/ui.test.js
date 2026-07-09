@@ -9,6 +9,7 @@ const assert = require("node:assert/strict");
 const http = require("node:http");
 const fs = require("node:fs");
 const path = require("node:path");
+const os = require("node:os");
 
 let chromium;
 try { ({ chromium } = require("playwright")); } catch (_) { chromium = null; }
@@ -165,6 +166,51 @@ test("UI", { skip: chromium ? false : "playwright not installed" }, async (t) =>
     const metas = await p.locator(".qrow-meta").allInnerTexts();
     assert.ok(metas.some((m) => /Alice/.test(m)), "le 1ᵉʳ devis (Alice) ne doit pas avoir disparu");
     assert.ok(metas.some((m) => /Bob/.test(m)), "le 2ᵉ devis (Bob) est présent");
+    assert.deepEqual(p._errors, []);
+    await p.close();
+  });
+
+  await t.test("Sauvegarde: exporter puis restaurer récupère un devis supprimé", async () => {
+    const p = await newPage();
+
+    // Enregistre un devis "Alice".
+    await p.locator('label.fld:has(span.fld-lab:text-is("Client")) input').fill("Alice");
+    await p.click('button:has-text("Enregistrer")');
+    await p.waitForTimeout(150);
+
+    // Réglages → exporte, capture le fichier téléchargé.
+    await p.click('button:has-text("Réglages")');
+    await p.waitForSelector("text=Sauvegarde des données");
+    const [download] = await Promise.all([
+      p.waitForEvent("download"),
+      p.click('button:has-text("Sauvegarder")'),
+    ]);
+    const file = path.join(os.tmpdir(), "etabli-backup-test.json");
+    await download.saveAs(file);
+    const bundle = JSON.parse(fs.readFileSync(file, "utf8"));
+    assert.equal(bundle.app, "etabli", "fichier de sauvegarde Établi");
+    assert.equal(bundle.data.quotes.length, 1, "le devis Alice est dans la sauvegarde");
+
+    // Simule la perte : supprime le devis Alice.
+    await p.keyboard.press("Escape");
+    await p.click('button:has-text("Mes devis")');
+    await p.waitForSelector(".qrow");
+    await p.click(".qrow .btn.danger");
+    await p.waitForTimeout(120);
+    assert.equal(await p.locator(".qrow").count(), 0, "devis supprimé");
+    await p.keyboard.press("Escape");
+
+    // Restaure depuis le fichier (input caché → setInputFiles direct).
+    await p.click('button:has-text("Réglages")');
+    await p.waitForSelector(".reglages-file");
+    await p.locator(".reglages-file").setInputFiles(file);
+    await p.waitForTimeout(200);
+
+    // Le devis Alice est de retour.
+    await p.click('button:has-text("Mes devis")');
+    await p.waitForSelector(".qrow");
+    assert.equal(await p.locator(".qrow").count(), 1, "le devis restauré est revenu");
+    assert.match(await p.locator(".qrow-meta").first().innerText(), /Alice/);
     assert.deepEqual(p._errors, []);
     await p.close();
   });

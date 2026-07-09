@@ -294,6 +294,72 @@ test("nextQuoteNumero: incrémente le compteur du plus haut numéro de l'année"
   assert.equal(C.nextQuoteNumero([], 2026), "DEV-2026-001");
 });
 
+/* -------------------------------------------------- sauvegarde / restauration */
+/* Un seul fichier .json regroupe TOUTES les données utilisateur (réglages +
+   devis + calepinage), pour sauver et restaurer d'un navigateur/poste à l'autre.
+   Les fonctions du noyau sont pures : elles ne touchent ni au DOM ni au disque
+   (l'UI s'occupe du téléchargement / FileReader). */
+test("buildBackup: emballe les données avec app + version + normalise les sections", () => {
+  const b = C.buildBackup(
+    { settings: { company: { nom: "Atelier" }, params: { tvaRate: 6 } }, quotes: [{ id: "q1" }], calepinage: { materials: [] } },
+    { exportedAt: "2026-07-09T10:00:00.000Z" }
+  );
+  assert.equal(b.app, "etabli");
+  assert.ok(typeof b.version === "number");
+  assert.equal(b.exportedAt, "2026-07-09T10:00:00.000Z");
+  assert.deepEqual(b.data.quotes, [{ id: "q1" }]);
+  assert.equal(b.data.settings.company.nom, "Atelier");
+  assert.deepEqual(b.data.calepinage, { materials: [] });
+});
+
+test("buildBackup: sections manquantes → quotes [] et null ailleurs", () => {
+  const b = C.buildBackup({}, {});
+  assert.deepEqual(b.data.quotes, []);
+  assert.equal(b.data.settings, null);
+  assert.equal(b.data.calepinage, null);
+});
+
+test("readBackup: relit une chaîne JSON et rend les trois sections", () => {
+  const text = JSON.stringify(C.buildBackup({ quotes: [{ id: "q1", numero: "A" }] }, {}));
+  const r = C.readBackup(text);
+  assert.deepEqual(r.quotes, [{ id: "q1", numero: "A" }]);
+  assert.equal(r.settings, null);
+  assert.equal(r.calepinage, null);
+});
+
+test("readBackup: aller-retour avec buildBackup (accepte aussi un objet)", () => {
+  const data = { settings: { company: { nom: "X" }, params: { acompte: 30 } }, quotes: [{ id: "q1" }], calepinage: { activeId: null } };
+  const r = C.readBackup(C.buildBackup(data, {}));
+  assert.deepEqual(r.quotes, data.quotes);
+  assert.equal(r.settings.company.nom, "X");
+  assert.deepEqual(r.calepinage, { activeId: null });
+});
+
+test("readBackup: JSON invalide → erreur explicite", () => {
+  assert.throws(() => C.readBackup("{pas du json"), /illisible|JSON/i);
+});
+
+test("readBackup: fichier étranger (mauvaise app) → refus", () => {
+  assert.throws(() => C.readBackup(JSON.stringify({ app: "autre", data: {} })), /sauvegarde/i);
+});
+
+test("mergeQuotes: union par id, l'entrant prime, rien n'est perdu", () => {
+  const current = [{ id: "q1", client: { nom: "Alice" } }, { id: "q2", client: { nom: "Bob" } }];
+  const incoming = [{ id: "q1", client: { nom: "Alice (sauvegarde)" } }, { id: "q3", client: { nom: "Carol" } }];
+  const merged = C.mergeQuotes(current, incoming);
+  assert.equal(merged.length, 3, "q1 fusionné, q2 gardé, q3 ajouté");
+  const byId = Object.fromEntries(merged.map((q) => [q.id, q.client.nom]));
+  assert.equal(byId.q1, "Alice (sauvegarde)"); // l'entrant écrase
+  assert.equal(byId.q2, "Bob");                 // l'existant survit
+  assert.equal(byId.q3, "Carol");               // l'entrant s'ajoute
+});
+
+test("mergeQuotes: devis hérités sans id fusionnés par numéro", () => {
+  const merged = C.mergeQuotes([{ numero: "DEV-2026-001", client: { nom: "X" } }], [{ numero: "DEV-2026-001", client: { nom: "X2" } }]);
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].client.nom, "X2");
+});
+
 /* -------------------------------------------------- cutListText() */
 test("cutListText: groups identical pieces and counts totals", () => {
   const out = C.cutListText([

@@ -164,6 +164,69 @@
   }
 
   /* =========================================================================
+     SAUVEGARDE / RESTAURATION de TOUTES les données utilisateur.
+     Un seul fichier .json (réglages + devis + calepinage) qu'on télécharge pour
+     mettre à l'abri, et qu'on réimporte sur un autre navigateur / poste. Ces
+     fonctions sont pures : le téléchargement et la lecture de fichier (FileReader)
+     restent côté UI.
+     ========================================================================= */
+  var BACKUP_APP = "etabli";
+  var BACKUP_VERSION = 1;
+
+  // Emballe les données (déjà désérialisées) dans un paquet de sauvegarde.
+  // meta.exportedAt est fourni par l'appelant (le noyau ne lit pas l'horloge).
+  function buildBackup(data, meta) {
+    data = data || {};
+    meta = meta || {};
+    return {
+      app: BACKUP_APP,
+      version: BACKUP_VERSION,
+      exportedAt: meta.exportedAt != null ? meta.exportedAt : null,
+      data: {
+        settings: data.settings != null ? data.settings : null,
+        quotes: Array.isArray(data.quotes) ? data.quotes : [],
+        calepinage: data.calepinage != null ? data.calepinage : null,
+      },
+    };
+  }
+
+  // Lit et valide un paquet (chaîne JSON ou objet déjà parsé). Lève une erreur
+  // explicite si ce n'est pas une sauvegarde Établi. Rend { settings, quotes,
+  // calepinage } normalisés (sections absentes → null / []).
+  function readBackup(input) {
+    var obj;
+    if (typeof input === "string") {
+      try { obj = JSON.parse(input); }
+      catch (e) { throw new Error("Fichier illisible (JSON invalide)."); }
+    } else {
+      obj = input;
+    }
+    if (!obj || typeof obj !== "object" || obj.app !== BACKUP_APP || !obj.data || typeof obj.data !== "object") {
+      throw new Error("Ce fichier n'est pas une sauvegarde Établi.");
+    }
+    var d = obj.data;
+    return {
+      settings: d.settings != null ? d.settings : null,
+      quotes: Array.isArray(d.quotes) ? d.quotes : [],
+      calepinage: d.calepinage != null ? d.calepinage : null,
+    };
+  }
+
+  // Fusionne deux listes de devis par identité (id, sinon numéro). Les devis
+  // entrants priment sur les existants de même identité et rien n'est supprimé —
+  // une restauration ne peut donc pas faire perdre les devis en cours.
+  function mergeQuotes(current, incoming) {
+    var list = Array.isArray(current) ? current.slice() : [];
+    incoming = Array.isArray(incoming) ? incoming : [];
+    // On applique en ordre inverse : upsertQuote empile en tête, l'ordre
+    // d'origine de `incoming` se retrouve donc préservé au-dessus des existants.
+    for (var i = incoming.length - 1; i >= 0; i--) {
+      list = upsertQuote(list, incoming[i]);
+    }
+    return list;
+  }
+
+  /* =========================================================================
      CALEPINAGE — bin packing « guillotine » tenant compte du trait de scie.
      Toutes les longueurs partagent la même unité (l'UI utilise le mm).
      On essaie plusieurs heuristiques (tri × score × découpe) et on garde le
@@ -413,5 +476,8 @@
     upsertQuote: upsertQuote,
     removeQuote: removeQuote,
     nextQuoteNumero: nextQuoteNumero,
+    buildBackup: buildBackup,
+    readBackup: readBackup,
+    mergeQuotes: mergeQuotes,
   };
 });

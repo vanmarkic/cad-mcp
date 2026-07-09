@@ -25,6 +25,21 @@ comme l'exige une facture belge à taux mixtes. Une remise globale est répartie
 au prorata du HT entre les taux. Pour un client **professionnel
 (cocontractant)**, l'autoliquidation (0 %) prime sur tout.
 
+## Sauvegarde / restauration de toutes les données
+
+Les données vivent dans le `localStorage` du navigateur — donc liées à ce poste
+et à ce navigateur. Pour les mettre à l'abri (ou passer d'une machine à l'autre),
+**Réglages → « Sauvegarde des données »** :
+
+- **Sauvegarder (télécharger)** exporte **tout** (réglages entreprise + valeurs
+  par défaut, **tous les devis**, et le calepinage en cours) dans un seul fichier
+  `etabli-sauvegarde-AAAA-MM-JJ.json` à garder au chaud (autre disque, cloud…).
+- **Restaurer…** réimporte un tel fichier : les réglages et le calepinage sont
+  remplacés, et les devis de la sauvegarde sont **fusionnés par `id`** avec les
+  devis actuels — un même devis est mis à jour, les autres sont ajoutés,
+  **rien n'est jamais supprimé**. Un fichier étranger (mauvaise app / JSON
+  cassé) est refusé avec un message clair, sans rien toucher.
+
 ## Calepinage de panneaux (cutlist)
 
 Bouton **« Calepinage »** dans la barre du haut. Les panneaux s'achètent
@@ -68,7 +83,11 @@ et adapté au **système métrique** (mm + €/m²).
   y vit aussi : `newQuoteId` (identité stable), `upsertQuote`/`removeQuote`
   (insertion/suppression sans perdre les autres devis — dédoublonnage par `id`,
   retombée sur `numero` pour les devis hérités) et `nextQuoteNumero`
-  (numéro "DEV-<année>-NNN" auto-incrémenté).
+  (numéro "DEV-<année>-NNN" auto-incrémenté). La **sauvegarde/restauration**
+  y est pure aussi : `buildBackup` (emballe réglages + devis + calepinage),
+  `readBackup` (relit/valide un fichier, refuse les fichiers étrangers) et
+  `mergeQuotes` (fusion des devis par identité, sans perte). L'UI ne garde que
+  le glue navigateur : téléchargement (Blob) et lecture de fichier (FileReader).
 
 ## Tests
 
@@ -86,13 +105,17 @@ npm test                          # tout
   de scie, rotation/sens du fil, pièces trop grandes, coût €/m², liste de débit,
   **chiffrage multi-matériaux** ; **stockage des devis** : deux devis au même
   numéro sont tous deux conservés, mise à jour sur place par `id`, suppression
-  par `id`, rétro-compat sans `id`, numéro auto-incrémenté).
+  par `id`, rétro-compat sans `id`, numéro auto-incrémenté ; **sauvegarde** :
+  aller-retour `buildBackup`/`readBackup`, refus d'un fichier étranger, fusion
+  `mergeQuotes` sans perte).
 - `test/ui.test.js` — tests UI : non-régression de l'input « % marge » (le champ
   garde la valeur tapée), **TVA fournitures distincte → ventilation 6 %/21 %**,
   **override de TVA sur une seule fourniture** (l'autre suit le défaut),
   **enregistrer deux devis les garde tous les deux** (régression « seul le
-  dernier devis était enregistré »), parcours complet du calepinage, et **deux
-  matériaux distincts → deux lignes de devis** (« Ajouter tout au devis »).
+  dernier devis était enregistré »), **exporter puis restaurer récupère un devis
+  supprimé** (sauvegarde .json → suppression → restauration), parcours complet
+  du calepinage, et **deux matériaux distincts → deux lignes de devis**
+  (« Ajouter tout au devis »).
 
 Les tests UI chargent React/Babel depuis un CDN → connexion réseau requise
 (et `ignoreHTTPSErrors` pour les bacs à sable qui interceptent le TLS). La

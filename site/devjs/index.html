@@ -32,7 +32,7 @@ window.storage = {
 
 <script type="text/babel" data-presets="react">
 const { useState, useEffect, useMemo, useRef } = React;
-const { num, computeLine, tvaBreakdown, calculateCutlist, panelMetrics, cutListText, newQuoteId, upsertQuote, removeQuote, nextQuoteNumero } = window.EtabliCore;
+const { num, computeLine, tvaBreakdown, calculateCutlist, panelMetrics, cutListText, newQuoteId, upsertQuote, removeQuote, nextQuoteNumero, buildBackup, readBackup, mergeQuotes } = window.EtabliCore;
 
 /* =========================================================================
    ÉTABLI — Générateur de devis pour menuisier
@@ -504,6 +504,57 @@ function App() {
     flash("Nouveau devis");
   };
 
+  /* ---------- sauvegarde / restauration de TOUTES les données ---------- */
+  // Télécharge un .json regroupant réglages + devis + calepinage.
+  const exportAll = () => {
+    const bundle = buildBackup(
+      { settings: { company, params }, quotes: saved, calepinage: calep },
+      { exportedAt: new Date().toISOString() }
+    );
+    const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "etabli-sauvegarde-" + todayISO() + ".json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+    flash("Sauvegarde téléchargée (" + saved.length + " devis)");
+  };
+  // Réimporte une sauvegarde : réglages/calepinage remplacés, devis FUSIONNÉS
+  // par id (rien n'est supprimé). Tolère les sections absentes.
+  const importAll = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      let restored;
+      try {
+        restored = readBackup(String(reader.result));
+      } catch (e) {
+        flash("Échec : " + (e && e.message ? e.message : "fichier invalide"));
+        return;
+      }
+      if (restored.settings) {
+        const c = { ...company, ...(restored.settings.company || {}) };
+        const p = { ...params, ...(restored.settings.params || {}) };
+        setCompany(c);
+        setParams(p);
+        persistSettings(c, p);
+      }
+      setSaved((list) => {
+        const next = mergeQuotes(list, restored.quotes);
+        persistQuotes(next);
+        return next;
+      });
+      if (restored.calepinage) setCalep(migrateCalep(restored.calepinage));
+      setModal(null);
+      flash("Sauvegarde restaurée (" + restored.quotes.length + " devis dans le fichier)");
+    };
+    reader.onerror = () => flash("Échec de lecture du fichier");
+    reader.readAsText(file);
+  };
+
   const doPrint = () => {
     setView("client");
     setTimeout(() => window.print(), 350);
@@ -608,6 +659,9 @@ function App() {
           <Reglages
             company={company}
             params={params}
+            quoteCount={saved.length}
+            onExport={exportAll}
+            onImport={importAll}
             onSave={(c, p) => {
               setCompany(c);
               setParams(p);
@@ -1238,9 +1292,10 @@ function ClientSheet({ devis, company, calc, onPrint }) {
 /* =========================================================================
    REGLAGES
    ========================================================================= */
-function Reglages({ company, params, onSave }) {
+function Reglages({ company, params, onSave, onExport, onImport, quoteCount }) {
   const [c, setC] = useState(company);
   const [p, setP] = useState(params);
+  const fileRef = useRef(null);
   const sc = (k) => (v) => setC((x) => ({ ...x, [k]: v }));
   const sp = (k) => (v) => setP((x) => ({ ...x, [k]: v }));
   return (
@@ -1299,6 +1354,34 @@ function Reglages({ company, params, onSave }) {
         <Field label="Acompte">
           <NumIn value={p.acompte} onChange={sp("acompte")} suffix="%" />
         </Field>
+      </div>
+
+      <div className="card-eyebrow mt">Sauvegarde des données</div>
+      <p className="muted reglages-backup-note">
+        Exporte tout — réglages, devis{quoteCount ? ` (${quoteCount})` : ""} et
+        calepinages — dans un fichier <code>.json</code> à garder au chaud (autre
+        disque, cloud…). « Restaurer » réimporte un tel fichier : les réglages
+        sont remplacés et les devis de la sauvegarde sont <strong>fusionnés</strong>
+        aux tiens — rien n'est jamais supprimé.
+      </p>
+      <div className="reglages-backup-act">
+        <button className="btn" onClick={onExport}>
+          Sauvegarder (télécharger)
+        </button>
+        <button className="btn ghost" onClick={() => fileRef.current && fileRef.current.click()}>
+          Restaurer…
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="application/json,.json"
+          className="reglages-file"
+          onChange={(e) => {
+            const f = e.target.files && e.target.files[0];
+            e.target.value = "";
+            onImport(f);
+          }}
+        />
       </div>
 
       <div className="modal-foot">
@@ -1830,6 +1913,11 @@ const CSS = `
 .modal-head h2{font-family:var(--display); font-weight:700; font-size:16px; margin:0; letter-spacing:.02em}
 .modal-body{padding:20px}
 .modal-foot{margin-top:18px; display:flex; justify-content:flex-end}
+
+.reglages-backup-note{margin:0 0 12px; max-width:60ch; line-height:1.5}
+.reglages-backup-note code{background:var(--paper-2,#efeae0); padding:1px 5px; border-radius:4px; font-size:.9em}
+.reglages-backup-act{display:flex; gap:8px; flex-wrap:wrap}
+.reglages-file{display:none}
 
 .qlist{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:9px}
 .qrow{display:flex; align-items:center; justify-content:space-between; gap:12px; border:1px solid var(--line); border-radius:9px; padding:11px 13px; background:#fff}
