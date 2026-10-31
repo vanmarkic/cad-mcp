@@ -411,4 +411,319 @@ test("UI", { skip: chromium ? false : "playwright not installed" }, async (t) =>
     assert.deepEqual(p._errors, []);
     await p.close();
   });
+  /* ======================= formatage du texte libre ======================= */
+  await t.test("formatage: gras via la barre d'outils, bascule, puis rendu sur le devis client", async () => {
+    const p = await newPage();
+    await p.click('button.add:has-text("Fourniture")');
+    await p.waitForSelector(".line");
+    const ta = p.locator(".line .line-detail textarea");
+    await ta.fill("Pose incluse");
+    await ta.evaluate((el) => { el.focus(); el.setSelectionRange(5, 12); });
+    const gras = p.locator('.line .line-detail button[aria-label="Gras"]');
+    await gras.click();
+    assert.equal(await ta.inputValue(), "Pose **incluse**");
+    assert.match(await p.locator(".line .rt-preview").innerText(), /incluse/, "aperçu affiché dès qu'il y a du balisage");
+    assert.equal(await p.locator(".line .rt-preview strong").innerText(), "incluse");
+
+    // la sélection est restaurée → un 2ᵉ clic retire le gras
+    await gras.click();
+    assert.equal(await ta.inputValue(), "Pose incluse");
+    assert.equal(await p.locator(".line .rt-preview").count(), 0, "plus d'aperçu sans balisage");
+    await gras.click();
+
+    // liste à puces sur une 2ᵉ ligne
+    await ta.evaluate((el) => { el.focus(); el.value = el.value; });
+    await ta.fill("Pose **incluse**\nDépose\nÉvacuation");
+    await ta.evaluate((el) => { el.focus(); el.setSelectionRange(el.value.indexOf("Dépose"), el.value.length); });
+    await p.locator('.line .line-detail button[aria-label="Liste à puces"]').click();
+    assert.equal(await ta.inputValue(), "Pose **incluse**\n- Dépose\n- Évacuation");
+
+    // côté client : le métré (affiché) est rendu en gras + puces, sans les astérisques
+    await p.locator(".line").getByText("Afficher le métré sur le devis").click();
+    await p.click('button:has-text("Devis client")');
+    await p.waitForSelector(".s-table");
+    assert.equal(await p.locator(".s-detail strong").innerText(), "incluse");
+    assert.equal(await p.locator(".s-detail li").count(), 2);
+    const txt = await p.locator(".s-detail").innerText();
+    assert.doesNotMatch(txt, /\*\*/, "plus de balisage visible chez le client");
+    assert.deepEqual(p._errors, []);
+    await p.close();
+  });
+
+  await t.test("formatage: raccourci Ctrl+B, conditions en liste, description du chantier en italique", async () => {
+    const p = await newPage();
+    const field = (label) => p.locator(`.fld:has(> .fld-lab:text-is("${label}")) textarea`);
+
+    const cond = field("Conditions (bas de devis)");
+    await cond.fill("Modalités :\n- acompte 30 %\n- solde à la fin");
+    await cond.evaluate((el) => { el.focus(); el.setSelectionRange(0, 11); });
+    await cond.press("Control+b");
+    assert.equal(await cond.inputValue(), "**Modalités :**\n- acompte 30 %\n- solde à la fin");
+
+    const ch = field("Description du chantier");
+    await ch.fill("Dressing sur mesure");
+    await ch.evaluate((el) => { el.focus(); el.setSelectionRange(0, el.value.length); });
+    await p.locator('.fld:has(> .fld-lab:text-is("Description du chantier")) button[aria-label="Italique"]').click();
+    assert.equal(await ch.inputValue(), "*Dressing sur mesure*");
+
+    await p.click('button:has-text("Devis client")');
+    await p.waitForSelector(".s-table");
+    assert.equal(await p.locator(".s-cond strong").innerText(), "Modalités :");
+    assert.equal(await p.locator(".s-cond li").count(), 2, "deux puces dans les conditions");
+    assert.equal(await p.locator(".s-parties em").innerText(), "Dressing sur mesure");
+    assert.deepEqual(p._errors, []);
+    await p.close();
+  });
+
+  await t.test("formatage: le HTML saisi n'est jamais interprété (pas d'injection)", async () => {
+    const p = await newPage();
+    const cond = p.locator('.fld:has(> .fld-lab:text-is("Conditions (bas de devis)")) textarea');
+    await cond.fill('<img src=x onerror="window.__pwned=1"> **gras**');
+    await p.click('button:has-text("Devis client")');
+    await p.waitForSelector(".s-cond");
+    assert.equal(await p.locator(".s-cond img").count(), 0, "aucune balise injectée");
+    assert.match(await p.locator(".s-cond").innerText(), /<img src=x/, "affiché comme du texte");
+    assert.equal(await p.evaluate(() => window.__pwned), undefined);
+    assert.deepEqual(p._errors, []);
+    await p.close();
+  });
+
+  /* ======================= mètre linéaire : fournitures ======================= */
+  await t.test("fourniture au mètre linéaire: longueurs + chute → quantité en ml, prix, devis client, détail au métré", async () => {
+    const p = await newPage();
+    await p.click('button.add:has-text("Fourniture")');
+    await p.waitForSelector(".line");
+    const line = p.locator(".line").first();
+    await line.locator(".line-title").fill("Baguette chêne 20×20");
+    await line.locator(".ml-toggle input").check();
+    await p.waitForSelector(".ml-box");
+
+    // 3 × 2,4 m, puis une 2ᵉ longueur 2 × 1,2 m, chute 10 % → 9,6 × 1,1 = 10,56 ml
+    await line.locator('.ml-row input[aria-label="Longueur"]').first().fill("2,4");
+    await line.locator('.ml-row input[aria-label="Quantité de cette longueur"]').first().fill("3");
+    await line.locator("button:has-text('+ Longueur')").click();
+    await line.locator('.ml-row input[aria-label="Longueur"]').nth(1).fill("1,2");
+    await line.locator('.ml-row input[aria-label="Quantité de cette longueur"]').nth(1).fill("2");
+    await line.locator(".ml-perte input").fill("10");
+    await line.getByText("Prix d'achat / ml").locator("..").locator("input").fill("4,2");
+    await line.getByText("Marge", { exact: true }).locator("..").locator("input").fill("0");
+    await p.waitForTimeout(150);
+
+    assert.equal(await line.getByText("Quantité (métré)").locator("..").locator("input").inputValue(), "10,56");
+    assert.equal(await line.getByText("Unité", { exact: true }).locator("..").locator("input").inputValue(), "ml");
+    assert.equal(await line.getByText("Quantité (métré)").locator("..").locator("input").getAttribute("readonly"), "");
+    assert.match(await line.locator(".ml-sum").innerText(), /9,6 ml/);
+    assert.match(await line.locator(".ml-qte").innerText(), /10,56 ml/);
+    assert.match(await line.locator(".line-figs").innerText(), /Vente HTVA\s+44,35/, "10,56 ml × 4,20 € = 44,352 €");
+
+    // le détail au métré se remplit en puces
+    await line.locator("button:has-text('Détail au métré')").click();
+    const detail = await line.locator(".line-detail textarea").inputValue();
+    assert.equal(detail, "Longueurs :\n- 3 × 2,4 m\n- 2 × 1,2 m\nTotal : 9,6 ml + 10 % de chute = 10,56 ml");
+
+    await p.click('button:has-text("Devis client")');
+    await p.waitForSelector(".s-table");
+    const row = await p.locator(".s-table tbody tr").first().innerText();
+    assert.match(row, /10,56 ml/, "quantité en ml sur la feuille client");
+    assert.match(row, /4,20/, "PU HTVA au mètre");
+    assert.match(row, /44,35/, "total HTVA");
+    assert.equal(await p.locator(".s-detail li").count(), 2, "les longueurs s'affichent en puces");
+    assert.deepEqual(p._errors, []);
+    await p.close();
+  });
+
+  await t.test("fourniture au mètre linéaire: décocher garde la quantité calculée, l'unité cm/mm convertit", async () => {
+    const p = await newPage();
+    await p.click('button.add:has-text("Fourniture")');
+    await p.waitForSelector(".line");
+    const line = p.locator(".line").first();
+    await line.locator(".ml-toggle input").check();
+    await line.locator('.ml-row input[aria-label="Longueur"]').first().fill("240");
+    await line.locator('.ml-row input[aria-label="Quantité de cette longueur"]').first().fill("2");
+    await line.locator('select[aria-label="Unité des longueurs"]').selectOption("cm");
+    await p.waitForTimeout(100);
+    const qte = line.getByText("Quantité (métré)").locator("..").locator("input");
+    assert.equal(await qte.inputValue(), "4,8", "2 × 240 cm = 4,8 m");
+    await line.locator('select[aria-label="Unité des longueurs"]').selectOption("mm");
+    await p.waitForTimeout(100);
+    assert.equal(await qte.inputValue(), "0,48", "2 × 240 mm = 0,48 m");
+
+    await line.locator(".ml-toggle input").uncheck();
+    await p.waitForTimeout(100);
+    assert.equal(await qte.inputValue(), "0,48", "la quantité calculée devient la valeur saisie");
+    await qte.fill("5");
+    await p.waitForTimeout(100);
+    assert.match(await line.locator(".line-figs").innerText(), /Coût\s+0,00/, "mode normal : la quantité saisie s'applique à nouveau");
+    assert.deepEqual(p._errors, []);
+    await p.close();
+  });
+
+  /* ======================= mètre linéaire : calepinage ======================= */
+  await t.test("calepinage barres: découpe 1D, nombre de barres, coût au ml, ligne de devis en barres", async () => {
+    const p = await newPage();
+    await p.click('button:has-text("Calepinage")');
+    await p.waitForSelector(".cl");
+    await p.click("button.cl-lin-add");
+    await p.waitForSelector('.cl .grid:has-text("Longueur de la barre")');
+    const g = p.locator(".cl .grid");
+    await g.getByText("Matière / désignation").locator("..").locator("input").fill("Baguette chêne");
+    await g.getByText("Prix matière").locator("..").locator("input").fill("4,2");
+    assert.equal(await g.getByText("Longueur de la barre").locator("..").locator("input").inputValue(), "2400");
+
+    const addRow = async (label, len, qty) => {
+      await p.click('button.add:has-text("Ajouter une pièce")');
+      const rows = p.locator(".cl-prow:not(.cl-prow-head)");
+      const row = rows.nth((await rows.count()) - 1);
+      assert.equal(await row.locator("input").count(), 3, "désignation, longueur, quantité (pas de largeur)");
+      await row.locator("input").nth(0).fill(label);
+      await row.locator("input").nth(1).fill(len);
+      await row.locator("input").nth(2).fill(qty);
+    };
+    await addRow("Plinthe", "900", "3");
+    await addRow("Montant", "600", "4");
+    await p.waitForTimeout(300);
+
+    const stats = await p.locator(".cl-stats").innerText();
+    assert.match(stats, /BARRES À ACHETER[\s\S]*\b3\b/i, "5,1 m à débiter dans des barres de 2,4 m → 3 barres");
+    assert.match(stats, /7,2 ml/, "3 barres × 2,4 m achetés");
+    assert.match(stats, /30,24/, "3 × (2,4 m × 4,20 €) = 30,24 €");
+    assert.equal(await p.locator(".cl-svg-bar").count(), 3, "un schéma par barre");
+    assert.match(await p.locator(".cl-pu-note").innerText(), /4,20.*\/ ml.*10,08.*\/ barre/);
+    const list = await p.locator(".cl-list").inputValue();
+    assert.match(list, /Qté\tDésignation\tLongueur \(mm\)/);
+    assert.match(list, /3\tPlinthe\t900/);
+    assert.match(list, /4\tMontant\t600/);
+
+    await p.click('button:has-text("Ajouter au devis")');
+    await p.waitForSelector(".line");
+    const line = p.locator(".line").first();
+    assert.equal(await line.locator(".line-title").inputValue(), "Baguette chêne — débit calepiné");
+    assert.equal(await line.getByText("Quantité (métré)").locator("..").locator("input").inputValue(), "3");
+    assert.equal(await line.getByText("Unité", { exact: true }).locator("..").locator("input").inputValue(), "barre");
+    assert.equal(await line.getByText("Prix d'achat / u").locator("..").locator("input").inputValue(), "10.08");
+    assert.deepEqual(p._errors, []);
+    await p.close();
+  });
+
+  await t.test("calepinage barres: facturation au mètre débité, prix à la barre, pièce trop longue signalée", async () => {
+    const p = await newPage();
+    await p.click('button:has-text("Calepinage")');
+    await p.waitForSelector(".cl");
+    await p.click("button.cl-lin-add");
+    const g = p.locator(".cl .grid");
+    await g.getByText("Prix matière").locator("..").locator("input").fill("12");
+    await g.getByText("Prix matière").locator("..").locator("select").selectOption("bar");
+    await g.getByText("Facturation").locator("..").locator("select").selectOption("ml");
+
+    for (const [len, qty] of [["900", "3"], ["600", "4"], ["3000", "1"]]) {
+      await p.click('button.add:has-text("Ajouter une pièce")');
+      const rows = p.locator(".cl-prow:not(.cl-prow-head)");
+      const row = rows.nth((await rows.count()) - 1);
+      await row.locator("input").nth(1).fill(len);
+      await row.locator("input").nth(2).fill(qty);
+    }
+    await p.waitForTimeout(300);
+    await p.waitForSelector(".cl-warn");
+    assert.match(await p.locator(".cl-warn").innerText(), /plus longues qu'une barre/);
+
+    const stats = await p.locator(".cl-stats").innerText();
+    assert.match(stats, /MÈTRES FACTURÉS/i);
+    assert.match(stats, /5,1 ml/, "seuls les mètres débités sont facturés");
+    assert.match(stats, /25,50/, "5,1 ml × (12 € / 2,4 m = 5 €/ml)");
+
+    await p.click('button:has-text("Ajouter au devis")');
+    await p.waitForSelector(".line");
+    const line = p.locator(".line").first();
+    assert.equal(await line.getByText("Unité", { exact: true }).locator("..").locator("input").inputValue(), "ml");
+    assert.equal(await line.getByText("Quantité (métré)").locator("..").locator("input").inputValue(), "5.1");
+    assert.equal(await line.getByText("Prix d'achat / u").locator("..").locator("input").inputValue(), "5");
+    assert.deepEqual(p._errors, []);
+    await p.close();
+  });
+
+  await t.test("calepinage: panneau + barre dans le même calepinage → deux lignes en un coup", async () => {
+    const p = await newPage();
+    await p.click('button:has-text("Calepinage")');
+    await p.waitForSelector(".cl");
+    const g = () => p.locator(".cl .grid");
+    // panneau
+    await g().getByText("Matière / désignation").locator("..").locator("input").fill("MDF 18");
+    await g().getByText("Prix matière").locator("..").locator("input").fill("30");
+    await p.click('button.add:has-text("Ajouter une pièce")');
+    let row = p.locator(".cl-prow:not(.cl-prow-head)").first();
+    await row.locator("input").nth(1).fill("600");
+    await row.locator("input").nth(2).fill("400");
+    await row.locator("input").nth(3).fill("4");
+    // barre
+    await p.click("button.cl-lin-add");
+    await g().getByText("Matière / désignation").locator("..").locator("input").fill("Plinthe");
+    await g().getByText("Prix matière").locator("..").locator("input").fill("3");
+    await p.click('button.add:has-text("Ajouter une pièce")');
+    row = p.locator(".cl-prow:not(.cl-prow-head)").first();
+    await row.locator("input").nth(1).fill("1000");
+    await row.locator("input").nth(2).fill("5");
+    await p.waitForTimeout(300);
+
+    await p.waitForSelector(".cl-grand");
+    const grand = await p.locator(".cl-grand").innerText();
+    assert.match(grand, /1 panneau/);
+    assert.match(grand, /3 barre/, "5 × 1 m dans des barres de 2,4 m → 3 barres");
+    assert.match(grand, /2 lignes/);
+    await p.click('button:has-text("Ajouter tout au devis")');
+    await p.waitForSelector(".line");
+    const titles = await p.locator(".line-title").evaluateAll((els) => els.map((e) => e.value));
+    assert.deepEqual(titles.sort(), ["MDF 18 — débit calepiné", "Plinthe — débit calepiné"]);
+    assert.deepEqual(p._errors, []);
+    await p.close();
+  });
+
+  /* ======================= compatibilité : anciennes données ======================= */
+  await t.test("compat: un calepinage et un devis sans les nouveaux champs (kind, mlOn…) se chargent sans erreur", async () => {
+    const p = await newPage();
+    const legacy = {
+      app: "etabli", version: 1, exportedAt: null,
+      data: {
+        settings: null,
+        catalogue: [],
+        calepinage: {
+          materials: [{ id: "m1", material: "Ancien MDF", pricePerM2: "20", panelW: "2500", panelH: "1250", kerf: "3", grainDirection: false,
+            pieces: [{ id: "p1", label: "Côté", w: "600", h: "400", qty: "2", color: "#A8631F" }] }],
+          activeId: "m1",
+        },
+        quotes: [{ id: "q_old", numero: "DEV-2025-007", dateISO: "2025-05-01", client: { nom: "Ancien client", adresse: "", email: "", tel: "" },
+          chantier: "Ancien chantier en texte simple", clientType: "particulier", tvaRate: 6, tvaFournitures: "", remiseType: "eur", remiseVal: "",
+          deplacement: "", deplacementCout: "", acompte: "30", validite: "30", conditions: "Conditions d'avant.",
+          lines: [{ id: "l1", type: "fourniture", designation: "Vieille fourniture", detail: "3 x 2 m", showDetail: true, showQty: true, qte: "4", unite: "u", pa: "10", marge: "20", tvaRate: "" }] }],
+      },
+    };
+    const file = path.join(os.tmpdir(), "etabli-legacy.json");
+    fs.writeFileSync(file, JSON.stringify(legacy));
+    await p.click('button:has-text("Réglages")');
+    await p.waitForSelector("text=Sauvegarde des données");
+    await p.locator(".reglages-file").setInputFiles(file);
+    await p.waitForTimeout(250);
+
+    // le calepinage d'avant est un panneau, avec ses pièces
+    await p.click('button:has-text("Calepinage")');
+    await p.waitForSelector(".cl");
+    assert.equal(await p.locator('.cl .grid:has-text("Longueur panneau")').count(), 1, "matériau hérité = panneau");
+    assert.match(await p.locator(".cl-stats").innerText(), /PANNEAUX À ACHETER[\s\S]*\b1\b/i);
+    await p.keyboard.press("Escape");
+
+    // le devis d'avant se charge et se calcule comme avant (4 × 10 € + 20 % = 48 €)
+    await p.click('button:has-text("Mes devis")');
+    await p.waitForSelector(".qrow");
+    await p.click(".qrow .btn:has-text('Charger')");
+    await p.waitForSelector(".line");
+    assert.equal(await p.locator(".line .ml-toggle input").isChecked(), false);
+    assert.equal(await p.locator(".line").getByText("Quantité (métré)").locator("..").locator("input").inputValue(), "4");
+    assert.match(await p.locator(".line-figs").innerText(), /Vente HTVA\s+48,00/);
+    await p.click('button:has-text("Devis client")');
+    await p.waitForSelector(".s-table");
+    assert.match(await p.locator(".s-parties").innerText(), /Ancien chantier en texte simple/);
+    assert.match(await p.locator(".s-detail").innerText(), /3 x 2 m/);
+    assert.match(await p.locator(".s-cond").innerText(), /Conditions d'avant\./);
+    assert.deepEqual(p._errors, []);
+    await p.close();
+  });
 });

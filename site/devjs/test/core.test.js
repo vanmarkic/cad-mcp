@@ -452,3 +452,386 @@ test("cutListText: groups identical pieces and counts totals", () => {
   assert.match(out.text, /2\tMontant\t1800\t300/);
   assert.doesNotMatch(out.text, /Vide/);
 });
+
+/* =========================================================================
+   TEXTE ENRICHI — gras / italique / souligné / listes (parseRichText)
+   ========================================================================= */
+const runsOf = (text) => C.parseRichText(text)[0].runs.map((r) => [r.text, r.b ? "b" : "", r.i ? "i" : "", r.u ? "u" : ""].join("|"));
+
+test("parseRichText: gras, italique, souligné", () => {
+  assert.deepEqual(runsOf("un **gras** et *ital* et __sou__ fin"), [
+    "un ||||", "gras|b||", " et ||||", "ital||i|", " et ||||", "sou|||u", " fin||||",
+  ].map((x) => x.replace(/\|{4}$/, "|||")));
+});
+
+test("parseRichText: mises en forme combinées et imbriquées", () => {
+  assert.deepEqual(runsOf("***gras italique***"), ["gras italique|b|i|"]);
+  assert.deepEqual(runsOf("*a **b** c*"), ["a ||i|", "b|b|i|", " c||i|"]);
+  assert.deepEqual(runsOf("**a *b* c**"), ["a |b||", "b|b|i|", " c|b||"]);
+});
+
+test("parseRichText: texte courant intact (3*4, 2 * 3, réf_12_B, marque non fermée)", () => {
+  for (const t of ["3*4 et 5*6", "2 * 3 = 6", "réf_12_B et snake__case__x", "**jamais fermé", "un * seul", "étoile * et *autre"]) {
+    const blocks = C.parseRichText(t);
+    assert.equal(blocks.length, 1);
+    assert.equal(blocks[0].runs.length, 1, "un seul segment brut pour : " + t);
+    assert.equal(blocks[0].runs[0].text, t);
+    assert.equal(C.hasRichFormatting(t), false);
+  }
+});
+
+test("parseRichText: \\* et \\_ affichent le caractère tel quel", () => {
+  assert.deepEqual(runsOf("2\\*3\\*4 et \\_x\\_"), ["2*3*4 et _x_|||"]);
+  assert.deepEqual(runsOf("\\*pas italique\\*"), ["*pas italique*|||"]);
+});
+
+test("parseRichText: listes à puces / numérotées, paragraphes conservés", () => {
+  const b = C.parseRichText("Intro\nsuite\n- un\n- **deux**\n• trois\nFin\n3. x\n4) y");
+  assert.deepEqual(b.map((x) => x.type), ["p", "ul", "p", "ol"]);
+  assert.equal(b[0].runs[0].text, "Intro\nsuite", "les retours à la ligne d'un paragraphe sont gardés");
+  assert.equal(b[1].items.length, 3);
+  assert.equal(b[1].items[1][0].b, true);
+  assert.equal(b[3].start, 3, "la numérotation démarre au 1er numéro saisi");
+  assert.equal(b[3].items.length, 2);
+});
+
+test("parseRichText: vide, espaces, CRLF et lignes vides en bord", () => {
+  assert.deepEqual(C.parseRichText(""), []);
+  assert.deepEqual(C.parseRichText(null), []);
+  assert.deepEqual(C.parseRichText("  \n \n"), []);
+  const b = C.parseRichText("\n\nA\r\n\r\nB\n\n");
+  assert.equal(b.length, 1);
+  assert.equal(b[0].runs[0].text, "A\n\nB");
+});
+
+test("parseRichText: les ligne de métré générées (tabulations, ×) ne sont pas prises pour une liste", () => {
+  const detail = "3 panneau(x) 2500×1250 mm — chute 12 %\nQté\tDésignation\tLongueur (mm)\tLargeur (mm)\n10\tÉtagère\t600\t400";
+  const b = C.parseRichText(detail);
+  assert.equal(b.length, 1);
+  assert.equal(b[0].type, "p");
+  assert.equal(b[0].runs[0].text, detail);
+  assert.equal(C.hasRichFormatting(detail), false);
+});
+
+test("hasRichFormatting: vrai dès qu'il y a du gras / une liste", () => {
+  assert.equal(C.hasRichFormatting("texte **gras**"), true);
+  assert.equal(C.hasRichFormatting("- puce"), true);
+  assert.equal(C.hasRichFormatting("1. numéro"), true);
+  assert.equal(C.hasRichFormatting("simple"), false);
+});
+
+test("parseRichText: le HTML saisi reste du texte (pas d'injection)", () => {
+  const b = C.parseRichText("<script>alert(1)</script> **<b>x</b>**");
+  assert.equal(b[0].runs[0].text, "<script>alert(1)</script> ");
+  assert.equal(b[0].runs[1].text, "<b>x</b>");
+  assert.equal(b[0].runs[1].b, true);
+});
+
+/* ---------- barre d'outils : applyTextFormat ---------- */
+const fmt = (text, s, e, kind) => C.applyTextFormat(text, s, e, kind);
+const picked = (r) => r.text.slice(r.start, r.end);
+
+test("applyTextFormat: gras sur une sélection, puis une 2ᵉ fois le retire", () => {
+  const r1 = fmt("bonjour le monde", 8, 10, "bold");
+  assert.equal(r1.text, "bonjour **le** monde");
+  assert.equal(picked(r1), "le", "la sélection est conservée sur le mot");
+  const r2 = fmt(r1.text, r1.start, r1.end, "bold");
+  assert.equal(r2.text, "bonjour le monde");
+  assert.equal(picked(r2), "le");
+});
+
+test("applyTextFormat: retire aussi quand la sélection englobe les marques", () => {
+  const r = fmt("a **gras** b", 2, 10, "bold");
+  assert.equal(r.text, "a gras b");
+  assert.equal(picked(r), "gras");
+});
+
+test("applyTextFormat: italique, souligné et combinaisons bascule indépendamment", () => {
+  let r = fmt("mot", 0, 3, "italic");
+  assert.equal(r.text, "*mot*");
+  r = fmt(r.text, r.start, r.end, "bold");
+  assert.equal(r.text, "***mot***");
+  r = fmt(r.text, r.start, r.end, "italic"); // retire l'italique, garde le gras
+  assert.equal(r.text, "**mot**");
+  r = fmt(r.text, r.start, r.end, "underline");
+  assert.equal(r.text, "**__mot__**");
+  r = fmt(r.text, r.start, r.end, "bold");   // retire le gras à travers le souligné, qui reste
+  assert.equal(r.text, "__mot__");
+  assert.equal(picked(r), "mot");
+  r = fmt(r.text, r.start, r.end, "underline");
+  assert.equal(r.text, "mot");
+});
+
+test("applyTextFormat: les espaces de bord de la sélection restent hors des marques", () => {
+  const r = fmt("  mot  ", 0, 7, "bold");
+  assert.equal(r.text, "  **mot**  ");
+  // résultat rendu comme du gras
+  assert.equal(C.parseRichText(r.text)[0].runs.find((x) => x.b).text, "mot");
+});
+
+test("applyTextFormat: sans sélection, insère une paire (curseur au milieu) puis la retire", () => {
+  const r1 = fmt("ab", 1, 1, "bold");
+  assert.equal(r1.text, "a****b");
+  assert.equal(r1.start, 3);
+  assert.equal(r1.end, 3);
+  const r2 = fmt(r1.text, r1.start, r1.end, "bold");
+  assert.equal(r2.text, "ab");
+  assert.equal(r2.start, 1);
+});
+
+test("applyTextFormat: sélection multi-lignes → chaque ligne est formatée, retirée d'un coup", () => {
+  const r = fmt("l1\nl2\nl3", 0, 8, "bold");
+  assert.equal(r.text, "**l1**\n**l2**\n**l3**");
+  const back = fmt(r.text, r.start, r.end, "bold");
+  assert.equal(back.text, "l1\nl2\nl3");
+  // si une seule ligne était déjà en gras, on met les autres en gras (pas d'inversion)
+  const mixed = fmt("**a**\nb", 0, 8, "bold");
+  assert.equal(mixed.text, "**a**\n**b**");
+});
+
+test("applyTextFormat: listes — ajout, retrait, conversion puces ⇄ numérotée", () => {
+  let r = fmt("a\nb\n\nc", 0, 6, "ul");
+  assert.equal(r.text, "- a\n- b\n\n- c", "les lignes vides sont ignorées");
+  r = fmt(r.text, r.start, r.end, "ul");
+  assert.equal(r.text, "a\nb\n\nc", "2ᵉ clic = retrait");
+  r = fmt("a\nb", 0, 3, "ol");
+  assert.equal(r.text, "1. a\n2. b");
+  r = fmt(r.text, r.start, r.end, "ul");
+  assert.equal(r.text, "- a\n- b", "numérotée → puces");
+  r = fmt(r.text, r.start, r.end, "ol");
+  assert.equal(r.text, "1. a\n2. b", "puces → numérotée");
+});
+
+test("applyTextFormat: liste sans sélection (ligne du curseur) et ligne vide", () => {
+  let r = fmt("un\ndeux\ntrois", 5, 5, "ul");
+  assert.equal(r.text, "un\n- deux\ntrois");
+  assert.equal(r.start, 7, "le curseur suit le décalage du préfixe");
+  r = fmt("", 0, 0, "ul");
+  assert.equal(r.text, "- ");
+  assert.equal(r.start, 2);
+  r = fmt("a\n\nb", 2, 2, "ol");
+  assert.equal(r.text, "a\n1. \nb");
+});
+
+test("applyTextFormat: type inconnu / bornes hors texte → inchangé, sans exception", () => {
+  assert.deepEqual(fmt("abc", 1, 2, "nope"), { text: "abc", start: 1, end: 2 });
+  const r = fmt("abc", -5, 99, "bold");
+  assert.equal(r.text, "**abc**");
+  const sw = fmt("abc", 3, 0, "italic"); // bornes inversées
+  assert.equal(sw.text, "*abc*");
+});
+
+test("applyTextFormat: gras appliqué = vraiment rendu en gras (aller-retour avec le parseur)", () => {
+  const r = fmt("pose incluse", 5, 12, "bold");
+  const runs = C.parseRichText(r.text)[0].runs;
+  assert.deepEqual(runs.map((x) => [x.text, x.b]), [["pose ", false], ["incluse", true]]);
+});
+
+/* =========================================================================
+   MÈTRE LINÉAIRE — fournitures (linearLineQty / computeLine)
+   ========================================================================= */
+test("linearTotal: somme longueur × quantité selon l'unité (m, cm, mm)", () => {
+  const items = [{ len: "2,4", qty: "3" }, { len: "1,2", qty: "2" }];
+  assert.ok(Math.abs(C.linearTotal(items, "m").totalM - 9.6) < 1e-9);
+  assert.ok(Math.abs(C.linearTotal([{ len: "240", qty: "3" }, { len: "120", qty: "2" }], "cm").totalM - 9.6) < 1e-9);
+  assert.ok(Math.abs(C.linearTotal([{ len: "2400", qty: "3" }], "mm").totalM - 7.2) < 1e-9);
+  const t = C.linearTotal(items, "m");
+  assert.equal(t.pieces, 5);
+  assert.equal(t.distinct, 2);
+});
+
+test("linearTotal: lignes vides / quantité nulle ignorées, unité inconnue = mètres", () => {
+  const t = C.linearTotal([{ len: "", qty: "2" }, { len: "3", qty: "0" }, { len: "3", qty: "" }, { len: "1,5", qty: "2" }], "zzz");
+  assert.equal(t.totalM, 3);
+  assert.equal(t.pieces, 2);
+  assert.equal(C.linearTotal(undefined, "m").totalM, 0);
+});
+
+test("linearLineQty: la chute majore la quantité, sans bruit de virgule flottante", () => {
+  const r = C.linearLineQty({ mlItems: [{ len: "2,4", qty: "3" }, { len: "1,2", qty: "2" }], mlUnit: "m", mlPerte: "10" });
+  assert.equal(r.totalM, 9.6);
+  assert.equal(r.qteM, 10.56);
+  assert.equal(r.perte, 10);
+  assert.equal(C.linearLineQty({ mlItems: [{ len: "2,4", qty: "3" }], mlUnit: "m", mlPerte: "" }).qteM, 7.2);
+  assert.equal(C.linearLineQty({ mlItems: [{ len: "1", qty: "1" }], mlPerte: "-50" }).qteM, 1, "une chute négative est ignorée");
+});
+
+test("computeLine fourniture au ml: la quantité découle des longueurs, l'unité est ml", () => {
+  const r = C.computeLine({
+    type: "fourniture", mlOn: true, mlItems: [{ len: "2400", qty: "3" }], mlUnit: "mm", mlPerte: "",
+    pa: "4,2", marge: "30", qte: "99", unite: "u",
+  });
+  assert.equal(r.unite, "ml");
+  assert.equal(r.qte, 7.2, "la qte saisie (99) est ignorée en mode ml");
+  assert.ok(Math.abs(r.cout - 4.2 * 7.2) < 1e-9);
+  assert.ok(Math.abs(r.puv - 4.2 * 1.3) < 1e-9);
+  assert.ok(Math.abs(r.vente - 4.2 * 1.3 * 7.2) < 1e-9);
+});
+
+test("computeLine: mlOn absent/false → comportement inchangé (devis existants)", () => {
+  const base = { type: "fourniture", pa: "10", marge: "50", qte: "3", unite: "m²" };
+  const a = C.computeLine(base);
+  const b = C.computeLine({ ...base, mlOn: false, mlItems: [{ len: "9", qty: "9" }] });
+  assert.deepEqual(a, b);
+  assert.equal(a.qte, 3);
+  assert.equal(a.unite, "m²");
+});
+
+test("linearDetailText: détail de métré prêt pour le texte enrichi (puces + total)", () => {
+  const t = C.linearDetailText({ mlItems: [{ len: "2,4", qty: "3" }, { len: "1,2", qty: "2" }, { len: "", qty: "1" }], mlUnit: "m", mlPerte: "10" });
+  assert.equal(t, "Longueurs :\n- 3 × 2,4 m\n- 2 × 1,2 m\nTotal : 9,6 ml + 10 % de chute = 10,56 ml");
+  assert.equal(C.parseRichText(t)[1].type, "ul", "les longueurs s'affichent en puces sur le devis");
+  assert.equal(C.linearDetailText({ mlItems: [] }), "");
+});
+
+/* =========================================================================
+   MÈTRE LINÉAIRE — calepinage 1D (calculateLinearCutlist / linearMetrics)
+   ========================================================================= */
+const LP = (length, quantity, id) => ({ id: id || "p" + length, label: "p" + length, length, quantity });
+
+test("calculateLinearCutlist: une pièce par barre quand deux ne tiennent pas ensemble", () => {
+  // 4 × 1300 sur barres de 2400 : 2600 > 2400 → une pièce par barre → 4 barres (pas ⌈5200/2400⌉ = 3)
+  const r = C.calculateLinearCutlist([LP(1300, 4)], { barLength: 2400, kerf: 3 });
+  assert.equal(r.totalBars, 4);
+  assert.equal(r.unfitPieces.length, 0);
+  assert.equal(r.usedLength, 5200);
+  assert.ok(Math.abs(r.totalWastePercent - (1 - 5200 / 9600) * 100) < 1e-9);
+});
+
+test("calculateLinearCutlist: le trait de scie compte entre deux pièces", () => {
+  // 2 × 1200 : 1200 + 3 + 1200 = 2403 > 2400 → 2 barres ; sans trait de scie → 1
+  assert.equal(C.calculateLinearCutlist([LP(1200, 2)], { barLength: 2400, kerf: 3 }).totalBars, 2);
+  assert.equal(C.calculateLinearCutlist([LP(1200, 2)], { barLength: 2400, kerf: 0 }).totalBars, 1);
+  // 1200 + 1197 + 3 de trait = 2400 pile → tient
+  const fit = C.calculateLinearCutlist([LP(1200, 1, "a"), LP(1197, 1, "b")], { barLength: 2400, kerf: 3 });
+  assert.equal(fit.totalBars, 1);
+  assert.deepEqual(fit.bars[0].pieces.map((p) => [p.x, p.length]), [[0, 1200], [1203, 1197]]);
+});
+
+test("calculateLinearCutlist: pièce = barre entière → aucun trait de scie nécessaire", () => {
+  const r = C.calculateLinearCutlist([LP(2400, 2)], { barLength: 2400, kerf: 3 });
+  assert.equal(r.totalBars, 2);
+  assert.equal(r.totalWastePercent, 0);
+});
+
+test("calculateLinearCutlist: pièce plus longue que la barre → signalée, pas silencieusement perdue", () => {
+  const r = C.calculateLinearCutlist([LP(3000, 1), LP(500, 2)], { barLength: 2400, kerf: 3 });
+  assert.equal(r.unfitPieces.length, 1);
+  assert.equal(r.unfitPieces[0].id, "p3000");
+  assert.equal(r.totalBars, 1, "les 2 × 500 sont tout de même débitées");
+});
+
+test("calculateLinearCutlist: mélange de longueurs, jamais de dépassement, au plus ⌈borne⌉+1 barres", () => {
+  const pieces = [LP(900, 3), LP(600, 4), LP(450, 5), LP(1100, 2)];
+  const r = C.calculateLinearCutlist(pieces, { barLength: 2400, kerf: 3 });
+  const total = 900 * 3 + 600 * 4 + 450 * 5 + 1100 * 2;
+  assert.equal(r.usedLength, total, "toutes les pièces sont placées");
+  const lower = Math.ceil(total / 2400);
+  assert.ok(r.totalBars >= lower && r.totalBars <= lower + 1, `barres ${r.totalBars} vs borne ${lower}`);
+  for (const bar of r.bars) {
+    const n = bar.pieces.length;
+    const need = bar.pieces.reduce((s, p) => s + p.length, 0) + 3 * (n - 1);
+    assert.ok(need <= 2400, "chaque barre contient ses pièces + traits de scie");
+    let x = 0;
+    for (const p of bar.pieces) { assert.ok(p.x >= x - 1e-9, "pièces ordonnées sans chevauchement"); x = p.x + p.length; }
+  }
+});
+
+test("calculateLinearCutlist: entrées vides / invalides", () => {
+  assert.equal(C.calculateLinearCutlist([], { barLength: 2400, kerf: 3 }).totalBars, 0);
+  const noBar = C.calculateLinearCutlist([LP(500, 2)], { barLength: 0, kerf: 3 });
+  assert.equal(noBar.totalBars, 0);
+  assert.equal(noBar.unfitPieces.length, 1, "longueur de barre nulle → pièces signalées");
+  assert.equal(C.calculateLinearCutlist([{ id: "x", length: 0, quantity: 3 }, { id: "y", length: 500, quantity: 0 }], { barLength: 2400 }).totalBars, 0);
+});
+
+test("linearMetrics: prix au ml → prix de la barre dérivé, barres entières facturées", () => {
+  const r = C.calculateLinearCutlist([LP(900, 3), LP(600, 4)], { barLength: 2400, kerf: 3 });
+  assert.equal(r.totalBars, 3);
+  const m = C.linearMetrics(r, { barLength: 2400 }, "4,2", { priceUnit: "ml", billing: "bar" });
+  assert.ok(Math.abs(m.pricePerBar - 10.08) < 1e-9, "4,20 €/ml × 2,4 m");
+  assert.ok(Math.abs(m.boughtM - 7.2) < 1e-9);
+  assert.ok(Math.abs(m.usedM - 5.1) < 1e-9);
+  assert.ok(Math.abs(m.totalCost - 3 * 10.08) < 1e-9);
+  assert.equal(m.billedM, m.boughtM);
+});
+
+test("linearMetrics: prix à la barre → prix du ml dérivé ; facturation au ml débité", () => {
+  const r = C.calculateLinearCutlist([LP(900, 3), LP(600, 4)], { barLength: 2400, kerf: 3 });
+  const bar = C.linearMetrics(r, { barLength: 2400 }, 12, { priceUnit: "bar", billing: "bar" });
+  assert.equal(bar.pricePerBar, 12);
+  assert.ok(Math.abs(bar.pricePerMl - 5) < 1e-9, "12 € / 2,4 m");
+  assert.equal(bar.totalCost, 36);
+  const ml = C.linearMetrics(r, { barLength: 2400 }, 12, { priceUnit: "bar", billing: "ml" });
+  assert.ok(Math.abs(ml.totalCost - 5.1 * 5) < 1e-9, "5,1 ml débités × 5 €/ml = 25,50 €");
+  assert.ok(ml.totalCost < bar.totalCost, "payer au ml débité coûte moins que les barres entières");
+  assert.equal(ml.billedM, ml.usedM);
+});
+
+test("linearMetrics: sans résultat ni prix → zéros, jamais NaN", () => {
+  const m = C.linearMetrics(null, { barLength: 0 }, "", {});
+  assert.equal(m.totalCost, 0);
+  assert.equal(m.totalBars, 0);
+  assert.equal(m.pricePerMl, 0);
+});
+
+test("linearCutListText: regroupe par désignation + longueur, total en mm", () => {
+  const out = C.linearCutListText([
+    { label: "Plinthe", length: 900, quantity: 3 },
+    { label: "Plinthe", length: 900, quantity: 1 },
+    { label: "Montant", length: 600, quantity: 2 },
+    { label: "Vide", length: 0, quantity: 5 },
+  ]);
+  assert.equal(out.distinct, 2);
+  assert.equal(out.totalPieces, 6);
+  assert.equal(out.totalLength, 900 * 4 + 600 * 2);
+  assert.match(out.text.split("\n")[0], /Qté\tDésignation\tLongueur \(mm\)/);
+  assert.match(out.text, /4\tPlinthe\t900/);
+  assert.match(out.text, /2\tMontant\t600/);
+  assert.doesNotMatch(out.text, /Vide/);
+});
+
+test("applyTextFormat: sélection englobant des marques imbriquées (**__mot__**)", () => {
+  // tout sélectionné, gras → retiré à travers le souligné
+  let r = fmt("**__mot__**", 0, 11, "bold");
+  assert.equal(r.text, "__mot__");
+  // souligné retiré tout en gardant le gras
+  r = fmt("**__mot__**", 0, 11, "underline");
+  assert.equal(r.text, "**mot**");
+  // curseur au centre de **__|__** : retire la paire demandée (gras) et garde le souligné
+  r = fmt("**____**", 4, 4, "bold");
+  assert.equal(r.text, "____");
+  assert.equal(r.start, 2);
+});
+
+test("applyTextFormat: aller-retour — appliquer deux fois rend le texte d'origine (fuzz déterministe)", () => {
+  let seed = 12345;
+  const rnd = (n) => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed % n; };
+  const words = ["pose", "chêne", "2,40", "m", "plinthe", "à", "fournir", "→"];
+  for (let iter = 0; iter < 300; iter++) {
+    const nLines = 1 + rnd(3);
+    const lines = [];
+    for (let l = 0; l < nLines; l++) {
+      const nw = rnd(4);
+      lines.push(Array.from({ length: nw }, () => words[rnd(words.length)]).join(" ".repeat(1 + rnd(2))));
+    }
+    const text = lines.join("\n");
+    const a = rnd(text.length + 1), b = rnd(text.length + 1);
+    const s = Math.min(a, b), e = Math.max(a, b);
+    for (const kind of ["bold", "italic", "underline", "ul", "ol"]) {
+      const r1 = C.applyTextFormat(text, s, e, kind);
+      const r2 = C.applyTextFormat(r1.text, r1.start, r1.end, kind);
+      assert.equal(r2.text, text, `${kind} ×2 sur ${JSON.stringify(text)} [${s},${e}] → ${JSON.stringify(r1.text)} → ${JSON.stringify(r2.text)}`);
+      // le parseur ne plante jamais, même sur un texte à moitié balisé
+      C.parseRichText(r1.text);
+    }
+  }
+});
+
+test("parseRichText: robuste sur des entrées dégénérées (pas de boucle infinie ni d'exception)", () => {
+  for (const t of ["*", "**", "***", "****", "_", "__", "\\", "\\\\*", "* *", "** **", "a**", "**a", "*a**", "__a_", "-", "- ", "1.", "1. ", "•", "\n\n- \n"]) {
+    assert.doesNotThrow(() => C.parseRichText(t), JSON.stringify(t));
+  }
+  const long = "*a ".repeat(2000) + "**b ".repeat(2000);
+  assert.doesNotThrow(() => C.parseRichText(long));
+});
