@@ -353,20 +353,159 @@
     return "l_" + Date.now().toString(36) + "_" + _lineSeq.toString(36) + Math.floor(Math.random() * 1e6).toString(36);
   }
 
-  // Emballe UN devis. `_savedAt` (horodatage local de « Enregistrer ») n'est pas
-  // exporté ; un devis sans id reçoit un identifiant stable.
+  /* ---------- schéma + consignes pour l'IA, embarqués dans chaque export ----------
+     Le fichier exporté s'ouvre sur `_instructions` (consignes en clair) puis
+     `_schema` (JSON Schema 2020-12) : on peut le donner tel quel à ChatGPT, Claude
+     ou toute autre IA, qui s'en sert pour modifier le devis ou en produire un
+     autre. À l'import, ces deux clés sont ignorées ; le MÊME schéma sert de
+     validateur léger (voir checkSchema) — une seule source de vérité.
+     Le schéma reste volontairement simple (type, enum, const, pattern, required,
+     properties, items, minItems/maxItems) : les `description` sont le vrai guide de
+     l'IA, et elles resservent de message d'erreur. Elles ne vont PAS dans
+     `$comment`, que la spec JSON Schema autorise les outils à supprimer. */
+  var NUM_PATTERN = "^\\s*(-?\\d+([.,]\\d+)?)?\\s*$";
+  function numStr(d) {
+    return {
+      type: ["string", "number"],
+      pattern: NUM_PATTERN,
+      description: d + ' Nombre en chaîne, sans symbole ni unité ("12,5"), "" = non renseigné.',
+    };
+  }
+  function strField(d) { return { type: "string", description: d }; }
+  var VAT_DESC = "6 (rénovation de logement de plus de 10 ans), 21 (standard / neuf) ou 12 (cas particuliers).";
+
+  var QUOTE_JSON_SCHEMA = {
+    $schema: "https://json-schema.org/draft/2020-12/schema",
+    title: "Export d'un devis ÉTABLI",
+    description: "Fichier d'export / d'import d'UN devis de menuiserie. Ré-importable tel quel dans ÉTABLI (Mes devis → Importer un devis…).",
+    type: "object",
+    required: ["app", "kind", "data"],
+    properties: {
+      _instructions: { description: "Consignes pour l'IA. Ignoré à l'import : tu peux l'omettre dans ta réponse." },
+      _schema: { description: "Le présent schéma. Ignoré à l'import : tu peux l'omettre dans ta réponse." },
+      app: { const: "etabli", description: 'Toujours "etabli".' },
+      kind: { const: "quote", description: 'Toujours "quote" (un seul devis par fichier).' },
+      version: { type: "integer", description: "Version du format : 1." },
+      exportedAt: { type: ["string", "null"], description: "Date d'export ISO 8601, ou null." },
+      data: {
+        type: "object",
+        description: "Contenu du fichier : la liste `quotes` ne contient qu'UN devis.",
+        required: ["quotes"],
+        properties: {
+          quotes: {
+            type: "array",
+            minItems: 1,
+            maxItems: 1,
+            description: "Exactement UN devis.",
+            items: {
+              type: "object",
+              required: ["numero", "dateISO", "clientType", "tvaRate", "acompte", "validite", "lines"],
+              properties: {
+                id: strField("Identifiant unique et stable du devis (texte). Garde-le pour modifier CE devis ; mets-en un nouveau pour en créer un autre."),
+                numero: strField('Numéro du devis affiché au client, ex. "DEV-2026-001".'),
+                dateISO: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$", description: 'Date du devis au format AAAA-MM-JJ, ex. "2026-10-31".' },
+                client: {
+                  type: "object",
+                  description: "Coordonnées du client.",
+                  properties: {
+                    nom: strField("Nom ou société."),
+                    adresse: strField("Adresse du chantier."),
+                    email: strField("E-mail."),
+                    tel: strField("Téléphone."),
+                  },
+                },
+                chantier: strField("Description du chantier (texte mis en forme possible)."),
+                clientType: { enum: ["particulier", "pro"], description: '"particulier" (TVA appliquée) ou "pro" (professionnel cocontractant : autoliquidation, TVA 0 %).' },
+                tvaRate: { enum: [6, 12, 21], description: "Taux de TVA principal en % (NOMBRE, pas une chaîne) : " + VAT_DESC + " S'applique à la main-d'œuvre, aux forfaits et au déplacement." },
+                tvaFournitures: { enum: ["", 6, 12, 21], description: 'Taux de TVA dédié aux lignes de fourniture (nombre), ou "" pour le même taux que tvaRate.' },
+                remiseType: { enum: ["eur", "pct"], description: 'Unité de la remise : "eur" (€) ou "pct" (%).' },
+                remiseVal: numStr("Valeur de la remise (en € ou en %, selon remiseType)."),
+                deplacement: numStr("Frais de déplacement facturés au client, en € HTVA."),
+                deplacementCout: numStr("Coût réel du déplacement pour l'atelier, en € (jamais montré au client)."),
+                acompte: numStr("Acompte demandé à la commande, en % du total TVAC."),
+                validite: numStr("Validité du devis, en jours."),
+                conditions: strField("Conditions de bas de devis (texte mis en forme possible)."),
+                lines: {
+                  type: "array",
+                  description: "Lignes du devis, dans l'ordre d'affichage.",
+                  items: {
+                    type: "object",
+                    required: ["type"],
+                    properties: {
+                      id: strField('Identifiant unique de la ligne dans le devis, ex. "l1".'),
+                      type: { enum: LINE_TYPES, description: '"fourniture" = matériel (qte × pa, plus marge) ; "main" = main-d\'œuvre (heures × tauxVente) ; "forfait" = montant global (pa, plus marge).' },
+                      designation: strField("Libellé de la ligne, affiché au client."),
+                      detail: strField("Métré / détail de la ligne (texte mis en forme possible) ; montré au client seulement si showDetail vaut true."),
+                      showDetail: { type: "boolean", description: "Afficher le détail sur le devis client." },
+                      showQty: { type: "boolean", description: "Afficher la quantité et le prix unitaire sur le devis client." },
+                      qte: numStr("Quantité (fourniture ; ignorée si mlOn vaut true)."),
+                      unite: strField('Unité de la fourniture : "u", "m²", "pce"… ; "ml" si mlOn vaut true.'),
+                      pa: numStr("Prix d'achat HTVA : par unité (fourniture), par mètre si mlOn vaut true, ou montant du forfait."),
+                      marge: numStr("Marge en % ajoutée au prix d'achat (30 → prix de vente = pa × 1,30). Fourniture et forfait."),
+                      tvaRate: { enum: ["", 6, 12, 21], description: 'Taux de TVA propre à cette fourniture (nombre), ou "" pour le taux fournitures du devis.' },
+                      heures: numStr("Nombre d'heures (main-d'œuvre)."),
+                      tauxVente: numStr("Taux horaire facturé au client, en € HTVA (main-d'œuvre)."),
+                      coutHoraire: numStr("Coût horaire interne, en € (main-d'œuvre, jamais montré au client)."),
+                      mlOn: { type: "boolean", description: "Fourniture calculée au mètre linéaire : ÉTABLI calcule alors la quantité à partir de mlItems, mlUnit et mlPerte (qte est ignorée)." },
+                      mlItems: {
+                        type: "array",
+                        description: "Longueurs à fournir (si mlOn vaut true), sinon [].",
+                        items: {
+                          type: "object",
+                          properties: {
+                            id: strField("Identifiant unique de la longueur."),
+                            len: numStr("Longueur, exprimée dans l'unité mlUnit."),
+                            qty: numStr("Nombre de pièces de cette longueur (entier)."),
+                          },
+                        },
+                      },
+                      mlUnit: { enum: ["m", "cm", "mm"], description: "Unité des longueurs de mlItems." },
+                      mlPerte: numStr("Chute / majoration en %, appliquée à la somme des longueurs."),
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  };
+
+  var QUOTE_AI_INSTRUCTIONS = [
+    "CONSIGNES POUR L'IA (ChatGPT, Claude, ou toute autre IA).",
+    "Ce fichier est l'export d'UN devis de menuiserie de l'application ÉTABLI (Belgique). Il se réimporte tel quel dans ÉTABLI : Mes devis → Importer un devis…",
+    "TA TÂCHE : d'après la demande de l'utilisateur, tu modifies ce devis ou tu en crées un nouveau en prenant celui-ci comme modèle, puis tu renvoies le fichier COMPLET.",
+    "FORMAT DE SORTIE : un SEUL objet JSON valide, dans un seul bloc de code ```json, sans aucun texte avant ni après. JSON strict : guillemets doubles, pas de virgule finale, pas de commentaire. Garde les clés app, kind, version et data telles quelles. Tu peux omettre _instructions et _schema (ignorés à l'import).",
+    "SCHÉMA : respecte _schema (types, valeurs autorisées, champs obligatoires) et lis la description de chaque champ. N'invente aucun champ. Garde pour chaque ligne le même jeu de champs que dans le devis d'exemple ; ceux qui ne concernent pas son type restent vides.",
+    'NOMBRES : montants, quantités et pourcentages sont des chaînes, comme dans l\'exemple, sans symbole ni unité ("12,5", jamais "12,5 €"). "" = non renseigné. Seuls tvaRate, tvaFournitures et tvaRate de ligne sont de vrais nombres JSON (6, 12 ou 21). Les dates s\'écrivent AAAA-MM-JJ.',
+    "RÈGLES MÉTIER : (1) Ne calcule JAMAIS de totaux : ÉTABLI recalcule tout à partir des lignes, il n'existe aucun champ total. (2) N'invente AUCUN prix ni aucune quantité : si une valeur manque, laisse \"\" ou pose la question à l'utilisateur avant de répondre. (3) marge est un pourcentage ajouté au prix d'achat pa : marge 30 donne un prix de vente de pa × 1,30. (4) clientType \"pro\" = professionnel cocontractant : autoliquidation, TVA 0 %.",
+    'LIGNES : type "fourniture" = matériel (qte × pa, plus marge) ; "main" = main-d\'œuvre (heures × tauxVente, coutHoraire = coût interne) ; "forfait" = montant global (pa, plus marge). Chaque ligne a un id unique dans le devis ("l1", "l2"…).',
+    "MÈTRE LINÉAIRE (fournitures : baguettes, profilés…) : si mlOn vaut true, ÉTABLI calcule la quantité à partir de mlItems (liste de { id, len, qty }) exprimés dans mlUnit (\"m\", \"cm\" ou \"mm\"), majorés de mlPerte (% de chute) ; unite vaut alors \"ml\" et pa est le prix d'achat au mètre. Sinon mlOn vaut false et mlItems vaut [].",
+    "TEXTE MIS EN FORME (detail, chantier, conditions) : **gras**, *italique*, __souligné__ ; « - » en début de ligne = puce ; « 1. » = liste numérotée ; retour à la ligne = \\n ; jamais de HTML.",
+    "IDENTIFIANTS : pour modifier ce devis, garde son id et son numero. Pour un autre devis, mets un nouvel id (texte unique) et un nouveau numero. L'import AJOUTE toujours le devis à la liste sans écraser l'existant.",
+    "SI L'IMPORT ÉCHOUE : ÉTABLI affiche la liste des erreurs avec leur chemin (ex. data.quotes[0].lines[2].type). L'utilisateur te la collera : corrige uniquement ces points et renvoie le fichier complet.",
+  ];
+
+  // Emballe UN devis. En-tête (consignes + schéma) d'abord, puis l'enveloppe et le
+  // devis. `_savedAt` (horodatage local de « Enregistrer ») n'est pas exporté ; un
+  // devis sans id reçoit un identifiant stable. meta.aiHeader === false → sans en-tête.
   function buildQuoteExport(quote, meta) {
     meta = meta || {};
     var q = cloneJSON(quote || {});
     delete q._savedAt;
     if (q.id == null || q.id === "") q.id = newQuoteId();
-    return {
-      app: BACKUP_APP,
-      kind: QUOTE_FILE_KIND,
-      version: BACKUP_VERSION,
-      exportedAt: meta.exportedAt != null ? meta.exportedAt : null,
-      data: { quotes: [q] },
-    };
+    var out = {};
+    if (meta.aiHeader !== false) {
+      out._instructions = QUOTE_AI_INSTRUCTIONS.slice();
+      out._schema = cloneJSON(QUOTE_JSON_SCHEMA);
+    }
+    out.app = BACKUP_APP;
+    out.kind = QUOTE_FILE_KIND;
+    out.version = BACKUP_VERSION;
+    out.exportedAt = meta.exportedAt != null ? meta.exportedAt : null;
+    out.data = { quotes: [q] };
+    return out;
   }
 
   // Nom de fichier : etabli-devis-<numéro>-<date>.json (numéro nettoyé : sans accents
@@ -378,10 +517,157 @@
     return "etabli-devis-" + (n || "sans-numero") + (dateISO ? "-" + dateISO : "") + ".json";
   }
 
+  /* ---------- lecteur tolérant (syntaxe) ----------
+     Une IA répond rarement en JSON « nu » : bloc ```json, phrase autour, virgule
+     finale. On lit STRICT d'abord ; en cas d'échec seulement, on extrait le premier
+     objet {…} équilibré (en respectant les chaînes), on retire les virgules finales
+     et on relit. Le lecteur ne devine JAMAIS un champ manquant ni ne convertit un
+     type : le fond est du ressort du schéma. */
+  function stripTrailingCommas(s) {
+    var out = "", inStr = false, esc = false;
+    for (var i = 0; i < s.length; i++) {
+      var c = s.charAt(i);
+      if (inStr) {
+        out += c;
+        if (esc) esc = false; else if (c === "\\") esc = true; else if (c === '"') inStr = false;
+        continue;
+      }
+      if (c === '"') { inStr = true; out += c; continue; }
+      if (c === ",") {
+        var j = i + 1;
+        while (j < s.length && /\s/.test(s.charAt(j))) j++;
+        if (s.charAt(j) === "}" || s.charAt(j) === "]") continue;
+      }
+      out += c;
+    }
+    return out;
+  }
+
+  function extractFirstObject(s) {
+    var start = s.indexOf("{");
+    if (start < 0) return null;
+    var depth = 0, inStr = false, esc = false;
+    for (var i = start; i < s.length; i++) {
+      var c = s.charAt(i);
+      if (inStr) {
+        if (esc) esc = false; else if (c === "\\") esc = true; else if (c === '"') inStr = false;
+        continue;
+      }
+      if (c === '"') inStr = true;
+      else if (c === "{") depth++;
+      else if (c === "}") { depth--; if (depth === 0) return s.slice(start, i + 1); }
+    }
+    return null; // objet jamais refermé (réponse tronquée ?)
+  }
+
+  // → { value, repaired } ; lève « Fichier illisible (JSON invalide)… » sinon.
+  function parseJSONLenient(text) {
+    var s = String(text == null ? "" : text).replace(/^﻿/, "");
+    try { return { value: JSON.parse(s), repaired: false }; } catch (e0) { /* essai tolérant */ }
+    var cand = s;
+    var fence = /```[a-zA-Z]*\s*([\s\S]*?)```/.exec(s);
+    if (fence && fence[1].indexOf("{") >= 0) cand = fence[1];
+    var obj = extractFirstObject(cand);
+    if (obj == null) {
+      throw new Error("Fichier illisible (JSON invalide) : " + (cand.indexOf("{") >= 0
+        ? "l'objet JSON n'est pas refermé (réponse tronquée ?)."
+        : "aucun objet JSON trouvé."));
+    }
+    try { return { value: JSON.parse(stripTrailingCommas(obj)), repaired: true }; }
+    catch (e) { throw new Error("Fichier illisible (JSON invalide) : " + e.message); }
+  }
+
+  /* ---------- validateur léger piloté par le schéma (fond) ----------
+     Sous-ensemble de JSON Schema suffisant pour QUOTE_JSON_SCHEMA : const, type
+     (unique ou liste), enum, pattern, minItems/maxItems, required, properties,
+     items. Il renvoie TOUTES les erreurs d'un coup (chemin + message en français)
+     pour que l'IA corrige en un seul aller-retour ; les champs inconnus ne bloquent
+     pas, ils sont signalés (avertissements). Les clés commençant par « _ » sont
+     réservées aux métadonnées. */
+  var TYPE_FR = { string: "une chaîne de caractères", number: "un nombre", integer: "un entier", boolean: "un booléen (true/false)", object: "un objet", array: "un tableau", "null": "null" };
+  function typeOk(v, t) {
+    if (t === "null") return v === null;
+    if (t === "array") return Array.isArray(v);
+    if (t === "object") return isPlainObject(v);
+    if (t === "integer") return typeof v === "number" && isFinite(v) && Math.floor(v) === v;
+    if (t === "number") return typeof v === "number" && isFinite(v);
+    return typeof v === t;
+  }
+  function describeValue(v) {
+    if (v === null) return "null";
+    if (Array.isArray(v)) return "un tableau";
+    if (typeof v === "object") return "un objet";
+    if (typeof v === "string") return "la chaîne " + JSON.stringify(v.length > 40 ? v.slice(0, 40) + "…" : v);
+    if (typeof v === "number") return "le nombre " + v;
+    return String(v);
+  }
+  function joinPath(p, k) { return p ? p + "." + k : k; }
+
+  function checkSchema(v, sch, path, errs, warns) {
+    var where = path || "(fichier)";
+    if (sch.hasOwnProperty("const") && v !== sch.const) {
+      errs.push({ path: where, message: "doit valoir " + JSON.stringify(sch.const) + " (reçu : " + describeValue(v) + ")" });
+      return;
+    }
+    if (sch.type) {
+      var types = Array.isArray(sch.type) ? sch.type : [sch.type];
+      if (!types.some(function (t) { return typeOk(v, t); })) {
+        errs.push({ path: where, message: "attendu " + types.map(function (t) { return TYPE_FR[t] || t; }).join(" ou ") + ", reçu " + describeValue(v) });
+        return;
+      }
+    }
+    if (sch.enum && !sch.enum.some(function (e) { return e === v; })) {
+      errs.push({ path: where, message: "valeur non autorisée (" + describeValue(v) + ") — valeurs possibles : " + sch.enum.map(function (e) { return JSON.stringify(e); }).join(", ") });
+      return;
+    }
+    if (typeof v === "string" && sch.pattern && !new RegExp(sch.pattern).test(v)) {
+      errs.push({ path: where, message: "format invalide (" + describeValue(v) + ")" + (sch.description ? " — " + sch.description : "") });
+    }
+    if (Array.isArray(v)) {
+      if (sch.minItems != null && v.length < sch.minItems || sch.maxItems != null && v.length > sch.maxItems) {
+        errs.push({ path: where, message: v.length + " élément(s), attendu " + (sch.minItems === sch.maxItems ? "exactement " + sch.minItems : "entre " + sch.minItems + " et " + sch.maxItems) + (sch.description ? " — " + sch.description : "") });
+      }
+      if (sch.items) for (var i = 0; i < v.length; i++) checkSchema(v[i], sch.items, path + "[" + i + "]", errs, warns);
+    }
+    if (isPlainObject(v)) {
+      var props = sch.properties || {};
+      (sch.required || []).forEach(function (k) {
+        if (!Object.prototype.hasOwnProperty.call(v, k)) {
+          errs.push({ path: joinPath(path, k), message: "champ obligatoire manquant" + (props[k] && props[k].description ? " — " + props[k].description : "") });
+        }
+      });
+      Object.keys(v).forEach(function (k) {
+        if (Object.prototype.hasOwnProperty.call(props, k)) checkSchema(v[k], props[k], joinPath(path, k), errs, warns);
+        else if (sch.properties && k.charAt(0) !== "_") warns.push({ path: where, message: "champ inconnu « " + k + " » (conservé tel quel, sans effet dans ÉTABLI)" });
+      });
+    }
+  }
+
+  // Valide un fichier d'export de devis (déjà parsé) contre le schéma embarqué.
+  function validateQuoteFile(obj) {
+    var errors = [], warnings = [];
+    checkSchema(obj, QUOTE_JSON_SCHEMA, "", errors, warnings);
+    return { errors: errors, warnings: warnings };
+  }
+
+  var MAX_SHOWN_ERRORS = 20;
+  function formatIssues(list) {
+    var lines = list.slice(0, MAX_SHOWN_ERRORS).map(function (e) { return "• " + e.path + " : " + e.message; });
+    if (list.length > MAX_SHOWN_ERRORS) lines.push("• … et " + (list.length - MAX_SHOWN_ERRORS) + " autre(s)");
+    return lines.join("\n");
+  }
+
+  // Texte à coller à l'IA quand l'import a échoué (boucle « valider → renvoyer les erreurs »).
+  function quoteFeedbackPrompt(message) {
+    return "Le fichier JSON que tu m'as donné a été refusé par ÉTABLI à l'import. Voici les erreurs :\n" +
+      strOf(message) +
+      "\nCorrige uniquement ces points et renvoie le fichier JSON COMPLET : un seul objet JSON valide, mêmes clés app / kind / version / data.";
+  }
+
   // Valide la STRUCTURE d'un devis venu d'un fichier (pas ses montants) pour qu'il
-  // ne puisse pas faire planter l'appli au chargement : client objet, lignes
-  // objets de type connu, identifiants présents et uniques. Un devis bien formé
-  // (celui que produit l'export) ressort identique.
+  // ne puisse pas faire planter l'appli au chargement : client objet, identifiants
+  // de lignes présents et uniques. Un devis bien formé (celui que produit l'export)
+  // ressort identique. (Les types et valeurs sont déjà contrôlés par le schéma.)
   function normalizeQuote(q) {
     if (!isPlainObject(q)) throw new Error("Devis invalide.");
     if (!Array.isArray(q.lines)) throw new Error("Devis invalide : la liste des lignes est absente.");
@@ -403,28 +689,36 @@
     return out;
   }
 
-  // Lit un fichier d'export d'UN devis (chaîne JSON ou objet) → le devis normalisé.
-  // Erreurs explicites : JSON invalide, autre appli, sauvegarde complète, devis abîmé.
-  function readQuoteExport(input) {
-    var obj;
+  // Lit un fichier d'export d'UN devis (chaîne JSON — éventuellement collée depuis
+  // une conversation IA — ou objet) → { quote, warnings }. Erreurs explicites :
+  // JSON illisible, autre appli, sauvegarde complète, puis la liste COMPLÈTE des
+  // écarts au schéma (error.details = [{ path, message }]).
+  function readQuoteExportDetailed(input) {
+    var obj, warnings = [];
     if (typeof input === "string") {
-      try { obj = JSON.parse(input); }
-      catch (e) { throw new Error("Fichier illisible (JSON invalide)."); }
+      var parsed = parseJSONLenient(input);
+      obj = parsed.value;
+      if (parsed.repaired) warnings.push("JSON nettoyé automatiquement (bloc de code, texte autour ou virgule finale retirés).");
     } else {
       obj = input;
     }
-    if (!isPlainObject(obj) || obj.app !== BACKUP_APP || !isPlainObject(obj.data)) {
-      throw new Error("Ce fichier n'est pas un devis Établi.");
+    if (!isPlainObject(obj)) throw new Error("Ce fichier n'est pas un devis Établi.");
+    if (obj.app !== BACKUP_APP) {
+      throw new Error("Ce fichier n'est pas un devis Établi (app doit valoir \"etabli\", reçu : " + describeValue(obj.app) + ").");
     }
-    if (obj.kind !== QUOTE_FILE_KIND) {
-      throw new Error("C'est une sauvegarde complète, pas un devis seul : utilise Réglages → « Restaurer… ».");
+    if (obj.kind === undefined) {
+      throw new Error("C'est une sauvegarde complète, pas un devis seul : utilise Réglages → « Restaurer… ». (Si ce fichier est un devis produit par une IA, il manque \"kind\": \"quote\".)");
     }
-    var list = obj.data.quotes;
-    if (!Array.isArray(list) || list.length !== 1) {
-      throw new Error("Fichier de devis invalide (un seul devis attendu).");
+    var res = validateQuoteFile(obj);
+    if (res.errors.length) {
+      var err = new Error("Le devis du fichier n'est pas valide (" + res.errors.length + " erreur" + (res.errors.length > 1 ? "s" : "") + ") :\n" + formatIssues(res.errors));
+      err.details = res.errors;
+      throw err;
     }
-    return normalizeQuote(list[0]);
+    res.warnings.forEach(function (w) { warnings.push(w.path + " : " + w.message); });
+    return { quote: normalizeQuote(obj.data.quotes[0]), warnings: warnings };
   }
+  function readQuoteExport(input) { return readQuoteExportDetailed(input).quote; }
 
   // Sérialisation JSON à clés triées : deux devis de même contenu donnent la même chaîne.
   function stableStringify(v) {
@@ -1252,6 +1546,12 @@
     mergeQuotes: mergeQuotes,
     buildQuoteExport: buildQuoteExport,
     readQuoteExport: readQuoteExport,
+    readQuoteExportDetailed: readQuoteExportDetailed,
+    validateQuoteFile: validateQuoteFile,
+    parseJSONLenient: parseJSONLenient,
+    quoteFeedbackPrompt: quoteFeedbackPrompt,
+    quoteJsonSchema: QUOTE_JSON_SCHEMA,
+    quoteAiInstructions: QUOTE_AI_INSTRUCTIONS,
     quoteFileName: quoteFileName,
     addImportedQuote: addImportedQuote,
     newCatalogItemId: newCatalogItemId,

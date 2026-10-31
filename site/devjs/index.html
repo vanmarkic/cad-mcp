@@ -32,7 +32,7 @@ window.storage = {
 
 <script type="text/babel" data-presets="react">
 const { useState, useEffect, useMemo, useRef } = React;
-const { num, computeLine, tvaBreakdown, calculateCutlist, panelMetrics, cutListText, newQuoteId, upsertQuote, removeQuote, nextQuoteNumero, buildBackup, readBackup, mergeQuotes, catalogItemFromLine, upsertCatalogItem, removeCatalogItem, searchCatalog, applyCatalogItemToLine, mergeCatalog, linearLineQty, linearDetailText, calculateLinearCutlist, linearMetrics, linearCutListText, parseRichText, hasRichFormatting, applyTextFormat, buildQuoteExport, readQuoteExport, quoteFileName, addImportedQuote } = window.EtabliCore;
+const { num, computeLine, tvaBreakdown, calculateCutlist, panelMetrics, cutListText, newQuoteId, upsertQuote, removeQuote, nextQuoteNumero, buildBackup, readBackup, mergeQuotes, catalogItemFromLine, upsertCatalogItem, removeCatalogItem, searchCatalog, applyCatalogItemToLine, mergeCatalog, linearLineQty, linearDetailText, calculateLinearCutlist, linearMetrics, linearCutListText, parseRichText, hasRichFormatting, applyTextFormat, buildQuoteExport, readQuoteExportDetailed, quoteFeedbackPrompt, quoteFileName, addImportedQuote } = window.EtabliCore;
 
 /* =========================================================================
    ÉTABLI — Générateur de devis pour menuisier
@@ -476,6 +476,7 @@ function App() {
   const [params, setParams] = useState(DEFAULT_PARAMS);
   const [devis, setDevis] = useState(() => newDevis(DEFAULT_COMPANY, DEFAULT_PARAMS));
   const [saved, setSaved] = useState([]);
+  const [importNotice, setImportNotice] = useState(null); // { level, title, body, feedback } — résultat de l'import d'un devis
   const savedRef = useRef([]); // dernier `saved` — lu par les callbacks asynchrones (FileReader)
   savedRef.current = saved;
   const [catalog, setCatalog] = useState([]); // fournitures réutilisables
@@ -766,15 +767,23 @@ function App() {
   // en cours, ni aux réglages, ni au catalogue (voir addImportedQuote dans le noyau).
   const importQuote = (file) => {
     if (!file) return;
+    setImportNotice(null);
     const reader = new FileReader();
     reader.onload = () => {
-      let incoming;
+      let read;
       try {
-        incoming = readQuoteExport(String(reader.result));
+        read = readQuoteExportDetailed(String(reader.result));
       } catch (e) {
-        flash("Échec : " + (e && e.message ? e.message : "fichier invalide"), 5000);
+        const msg = e && e.message ? e.message : "fichier invalide";
+        // Avis persistant (les erreurs sont longues) + texte prêt à coller à l'IA.
+        setImportNotice({ level: "error", title: "Import refusé", body: msg, feedback: quoteFeedbackPrompt(msg) });
+        flash("Import refusé — voir le détail dans « Mes devis »", 3500);
         return;
       }
+      const incoming = read.quote;
+      const notice = read.warnings.length
+        ? { level: "info", title: "Devis importé — remarques", body: read.warnings.map((w) => "• " + w).join("\n") }
+        : null;
       const res = addImportedQuote(savedRef.current, { ...incoming, _savedAt: new Date().toISOString() });
       const label = incoming.numero || "sans numéro";
       if (res.status === "duplicate") {
@@ -784,6 +793,7 @@ function App() {
       savedRef.current = res.list;
       setSaved(res.list);
       persistQuotes(res.list);
+      setImportNotice(notice);
       if (res.status === "copy") {
         flash("Importé comme copie : un devis de même identifiant mais de contenu différent existe déjà (" + label + ")", 6000);
       } else if (res.numeroClash) {
@@ -794,6 +804,15 @@ function App() {
     };
     reader.onerror = () => flash("Échec de lecture du fichier");
     reader.readAsText(file);
+  };
+  // Copie le message d'erreur prêt à coller à l'IA (boucle « valider → renvoyer les erreurs »).
+  const copyFeedback = async (text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      flash("Copié — colle-le dans la conversation avec l'IA");
+    } catch (e) {
+      flash("Copie impossible : sélectionne le texte du cadre puis Ctrl+C", 4000);
+    }
   };
   // Réimporte une sauvegarde : réglages/calepinage remplacés, devis FUSIONNÉS
   // par id (rien n'est supprimé). Tolère les sections absentes.
@@ -892,7 +911,7 @@ function App() {
           <button className="btn ghost" onClick={() => setModal("reglages")}>
             Réglages
           </button>
-          <button className="btn ghost" onClick={() => setModal("mesdevis")}>
+          <button className="btn ghost" onClick={() => { setImportNotice(null); setModal("mesdevis"); }}>
             Mes devis {saved.length ? `(${saved.length})` : ""}
           </button>
           <button className="btn ghost" onClick={resetQuote}>
@@ -977,6 +996,9 @@ function App() {
             onExport={exportQuote}
             onExportCurrent={() => exportQuote(devis)}
             onImport={importQuote}
+            notice={importNotice}
+            onDismissNotice={() => setImportNotice(null)}
+            onCopyFeedback={copyFeedback}
           />
         </Modal>
       )}
@@ -1299,7 +1321,7 @@ function LineCard({ line, index, last, setLine, delLine, moveLine, margeColor, t
             className="in line-title"
             type="text"
             placeholder="Désignation (ex. plateau chêne massif 40 mm)"
-            value={l.designation}
+            value={l.designation ?? ""}
             onChange={(e) => setLine(l.id, { designation: e.target.value })}
             onFocus={() => setAcOpen(true)}
             onBlur={() => setAcOpen(false)}
@@ -1720,7 +1742,7 @@ function ClientSheet({ devis, company, calc, onPrint }) {
 /* =========================================================================
    MODAL Mes devis — liste + export / import d'un seul devis
    ========================================================================= */
-function MesDevis({ saved, onLoad, onDelete, onExport, onExportCurrent, onImport }) {
+function MesDevis({ saved, onLoad, onDelete, onExport, onExportCurrent, onImport, notice, onDismissNotice, onCopyFeedback }) {
   const fileRef = useRef(null);
   return (
     <div>
@@ -1734,7 +1756,7 @@ function MesDevis({ saved, onLoad, onDelete, onExport, onExportCurrent, onImport
         <input
           ref={fileRef}
           type="file"
-          accept="application/json,.json"
+          accept="application/json,.json,.txt,text/plain"
           className="devis-file"
           onChange={(e) => {
             const f = e.target.files && e.target.files[0];
@@ -1748,6 +1770,27 @@ function MesDevis({ saved, onLoad, onDelete, onExport, onExportCurrent, onImport
         devis existant et ne touche pas au devis en cours. Pour tout transférer d'un coup,
         utilise <em>Réglages → Sauvegarde des données</em>.
       </p>
+      <p className="muted qtools-note">
+        <strong>Avec une IA :</strong> le fichier exporté s'ouvre sur des consignes et un schéma.
+        Joins-le à une conversation (ChatGPT, Claude…) pour faire modifier le devis ou en créer un
+        nouveau, puis enregistre la réponse en <code>.json</code> (ou <code>.txt</code>) et importe-la.
+        Si elle est refusée, copie les erreurs pour l'IA depuis le cadre ci-dessous.
+      </p>
+      {notice && (
+        <div className={"qnotice qnotice-" + notice.level} role="alert">
+          <div className="qnotice-head">
+            <strong>{notice.title}</strong>
+            <button className="ico" aria-label="Fermer ce message" onClick={onDismissNotice}>✕</button>
+          </div>
+          <pre className="qnotice-body">{notice.body}</pre>
+          {notice.feedback ? (
+            <div className="qnotice-act">
+              <button className="btn sm" onClick={() => onCopyFeedback(notice.feedback)}>Copier pour l'IA</button>
+              <span className="muted">Colle-le dans la conversation : l'IA corrigera le fichier.</span>
+            </div>
+          ) : null}
+        </div>
+      )}
       {saved.length === 0 ? (
         <p className="muted">
           Aucun devis enregistré pour l'instant. Clique sur « Enregistrer »
@@ -2628,6 +2671,12 @@ const CSS = `
 .qtools{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px}
 .qtools-note{margin:0 0 14px; font-size:12px; line-height:1.5}
 .devis-file{display:none}
+.qtools-note code{background:var(--paper-2,#efeae0); padding:1px 5px; border-radius:4px; font-size:.9em}
+.qnotice{border:1px solid var(--brick); background:#f6e9e2; border-radius:9px; padding:10px 12px; margin:0 0 14px}
+.qnotice-info{border-color:var(--amber); background:#f7efdc}
+.qnotice-head{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px; font-size:13px}
+.qnotice-body{margin:0 0 8px; font-family:var(--mono); font-size:11.5px; line-height:1.5; white-space:pre-wrap; word-break:break-word; max-height:220px; overflow:auto; user-select:text}
+.qnotice-act{display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-size:11.5px}
 
 /* calepinage */
 .cl .grid{margin-bottom:4px}

@@ -866,23 +866,22 @@ test("UI", { skip: chromium ? false : "playwright not installed" }, async (t) =>
     await p.click('button:has-text("Mes devis")');
     await p.waitForSelector(".qrow");
 
-    const bad = path.join(os.tmpdir(), "etabli-un-devis-bad.json");
-    fs.writeFileSync(bad, "{pas du json");
-    await p.locator(".devis-file").setInputFiles(bad);
-    await p.waitForTimeout(200);
-    assert.match(await p.locator(".toast").innerText(), /Échec.*(illisible|JSON)/i);
-
-    const full = path.join(os.tmpdir(), "etabli-un-devis-full.json");
-    fs.writeFileSync(full, JSON.stringify({ app: "etabli", version: 1, data: { quotes: [{ id: "x", numero: "X", lines: [] }] } }));
-    await p.locator(".devis-file").setInputFiles(full);
-    await p.waitForTimeout(200);
-    assert.match(await p.locator(".toast").innerText(), /sauvegarde complète/i);
-
-    const broken = path.join(os.tmpdir(), "etabli-un-devis-broken.json");
-    fs.writeFileSync(broken, JSON.stringify({ app: "etabli", kind: "quote", version: 1, data: { quotes: [{ id: "x", numero: "X", lines: [{ type: "bizarre" }] }] } }));
-    await p.locator(".devis-file").setInputFiles(broken);
-    await p.waitForTimeout(200);
-    assert.match(await p.locator(".toast").innerText(), /type inconnu/i);
+    const refuse = async (name, content, re) => {
+      const f = path.join(os.tmpdir(), name);
+      fs.writeFileSync(f, typeof content === "string" ? content : JSON.stringify(content));
+      await p.locator(".devis-file").setInputFiles(f);
+      await p.waitForSelector(".qnotice-error");
+      const txt = await p.locator(".qnotice-error").innerText();
+      assert.match(txt, /Import refusé/);
+      assert.match(txt, re);
+      await p.locator('.qnotice button[aria-label="Fermer ce message"]').click();
+      assert.equal(await p.locator(".qnotice").count(), 0, "le cadre se ferme");
+    };
+    await refuse("etabli-un-devis-bad.json", "{pas du json", /illisible|JSON/i);
+    await refuse("etabli-un-devis-full.json", { app: "etabli", version: 1, data: { quotes: [{ id: "x", numero: "X", lines: [] }] } }, /sauvegarde complète/i);
+    await refuse("etabli-un-devis-broken.json",
+      { app: "etabli", kind: "quote", version: 1, data: { quotes: [{ id: "x", numero: "X", lines: [{ type: "bizarre" }] }] } },
+      /lines\[0\]\.type : valeur non autorisée/);
 
     assert.equal(await p.locator(".qrow").count(), 1, "la liste n'a pas bougé");
     assert.deepEqual(p._errors, []);
@@ -914,6 +913,179 @@ test("UI", { skip: chromium ? false : "playwright not installed" }, async (t) =>
     assert.equal(await clientField(p).inputValue(), "Carla");
     assert.match(await p.locator(".line-figs").innerText(), /Vente HTVA\s+72,00/, "2 × 30 € + 20 % = 72 €");
     assert.equal(await p.locator(".line .line-detail textarea").inputValue(), "Pose **soignée**");
+    assert.deepEqual(p._errors, []);
+    await p.close();
+  });
+  /* ======================= export pour l'IA : consignes + schéma ======================= */
+  const CoreForTests = require("../lib/etabli-core.js");
+
+  await t.test("export IA: le fichier s'ouvre sur les consignes et le schéma, et se réimporte (en-tête ignoré)", async () => {
+    const p = await newPage();
+    await clientField(p).fill("Alice");
+    await p.click('button.add:has-text("Fourniture")');
+    await p.waitForSelector(".line");
+    await p.locator(".line .line-title").fill("MDF 18");
+    await p.click('button:has-text("Enregistrer")');
+    await p.waitForTimeout(150);
+    await p.click('button:has-text("Mes devis")');
+    await p.waitForSelector(".qrow");
+    const ex = await exportRow(p, 0, "etabli-ia-1.json");
+
+    // en-tête d'abord : l'ordre des clés est celui du fichier
+    const raw = fs.readFileSync(ex.file, "utf8");
+    assert.ok(raw.indexOf('"_instructions"') < raw.indexOf('"_schema"') && raw.indexOf('"_schema"') < raw.indexOf('"app"') && raw.indexOf('"app"') < raw.indexOf('"data"'),
+      "_instructions, puis _schema, puis l'enveloppe et les données");
+    assert.match(ex.json._instructions.join("\n"), /CONSIGNES POUR L'IA/);
+    assert.match(ex.json._instructions.join("\n"), /N'invente AUCUN prix/);
+    assert.equal(ex.json._schema.$schema, "https://json-schema.org/draft/2020-12/schema");
+    assert.ok(ex.json._schema.properties.data.properties.quotes.items.properties.lines, "le schéma décrit les lignes");
+    assert.deepEqual(CoreForTests.validateQuoteFile(ex.json).errors, [], "l'export est valide contre son propre schéma");
+
+    // l'en-tête ne gêne pas la réimportation (supprimer, puis importer)
+    await p.click(".qrow .btn.danger");
+    await p.locator(".devis-file").setInputFiles(ex.file);
+    await p.waitForSelector(".qrow");
+    assert.equal(await p.locator(".qrow").count(), 1);
+    assert.equal(await p.locator(".qnotice").count(), 0, "aucune remarque pour un fichier de l'appli");
+    assert.match(await p.locator(".qrow-meta").first().innerText(), /Alice/);
+    assert.deepEqual(p._errors, []);
+    await p.close();
+  });
+
+  await t.test("export IA: une réponse d'IA collée telle quelle (bloc de code, phrase autour, virgule finale) est acceptée", async () => {
+    const p = await newPage();
+    await clientField(p).fill("Alice");
+    await p.click('button:has-text("Enregistrer")');
+    await p.waitForTimeout(150);
+    await p.click('button:has-text("Mes devis")');
+    await p.waitForSelector(".qrow");
+    const ex = await exportRow(p, 0, "etabli-ia-2.json");
+
+    // ce que ferait une IA : sans en-tête, nouvel id/client, entouré de texte, avec une virgule finale
+    const reply = JSON.parse(JSON.stringify(ex.json));
+    delete reply._instructions; delete reply._schema;
+    reply.data.quotes[0].id = "q_ia_1";
+    reply.data.quotes[0].client.nom = "Client créé par l'IA";
+    const body = JSON.stringify(reply, null, 2).replace(/\}\s*$/, ",\n}");
+    const file = path.join(os.tmpdir(), "etabli-ia-reponse.txt");
+    fs.writeFileSync(file, "Voici le devis demandé :\n\n```json\n" + body + "\n```\n\nDis-moi si tu veux un autre ajustement.");
+
+    await p.locator(".devis-file").setInputFiles(file);
+    await p.waitForSelector(".qnotice-info");
+    assert.equal(await p.locator(".qrow").count(), 2, "ajouté à côté de l'existant");
+    assert.match((await rowsMeta(p)).join("\n"), /Client créé par l'IA/);
+    assert.match(await p.locator(".qnotice-info").innerText(), /nettoyé automatiquement/);
+    assert.deepEqual(p._errors, []);
+    await p.close();
+  });
+
+  await t.test("export IA: un JSON de l'IA invalide → toutes les erreurs listées, « Copier pour l'IA », puis le fichier corrigé passe", async () => {
+    await ctx.grantPermissions(["clipboard-read", "clipboard-write"]);
+    const p = await newPage();
+    await clientField(p).fill("Alice");
+    await p.click('button.add:has-text("Fourniture")');
+    await p.waitForSelector(".line");
+    await p.locator(".line .line-title").fill("MDF 18");
+    await p.click('button:has-text("Enregistrer")');
+    await p.waitForTimeout(150);
+    await p.click('button:has-text("Mes devis")');
+    await p.waitForSelector(".qrow");
+    const ex = await exportRow(p, 0, "etabli-ia-3.json");
+
+    const bad = JSON.parse(JSON.stringify(ex.json));
+    delete bad._instructions; delete bad._schema;
+    const q = bad.data.quotes[0];
+    q.id = "q_ia_2";
+    q.tvaRate = "6 %";
+    q.lines[0].pa = "12 €";
+    q.lines[0].type = "bizarre";
+    const badFile = path.join(os.tmpdir(), "etabli-ia-invalide.json");
+    fs.writeFileSync(badFile, JSON.stringify(bad));
+    await p.locator(".devis-file").setInputFiles(badFile);
+    await p.waitForSelector(".qnotice-error");
+    const shown = await p.locator(".qnotice-error").innerText();
+    assert.match(shown, /3 erreurs/);
+    assert.match(shown, /data\.quotes\[0\]\.tvaRate : valeur non autorisée/);
+    assert.match(shown, /data\.quotes\[0\]\.lines\[0\]\.pa : format invalide/);
+    assert.match(shown, /data\.quotes\[0\]\.lines\[0\]\.type : valeur non autorisée/);
+    assert.equal(await p.locator(".qrow").count(), 1, "rien n'est importé");
+
+    // « Copier pour l'IA » → texte prêt à coller dans la conversation
+    await p.click('button:has-text("Copier pour l\'IA")');
+    const clip = await p.evaluate(() => navigator.clipboard.readText());
+    assert.match(clip, /refusé par ÉTABLI/);
+    assert.match(clip, /data\.quotes\[0\]\.tvaRate/);
+    assert.match(clip, /renvoie le fichier JSON COMPLET/);
+
+    // l'IA corrige → le fichier passe, le cadre d'erreur disparaît
+    q.tvaRate = 6; q.lines[0].pa = "12"; q.lines[0].type = "fourniture";
+    const goodFile = path.join(os.tmpdir(), "etabli-ia-corrige.json");
+    fs.writeFileSync(goodFile, JSON.stringify(bad));
+    await p.locator(".devis-file").setInputFiles(goodFile);
+    await p.waitForFunction(() => document.querySelectorAll(".qrow").length === 2);
+    assert.equal(await p.locator(".qnotice-error").count(), 0, "l'erreur précédente est effacée");
+    assert.deepEqual(p._errors, []);
+    await p.close();
+  });
+
+  await t.test("export IA: un devis complet produit par l'appli (4 types de lignes, ml, calepinage) respecte le schéma et se réimporte à l'identique", async () => {
+    const p = await newPage();
+    await clientField(p).fill("Dora");
+    const f = (line, label) => line.getByText(label, { exact: true }).locator("..").locator("input");
+
+    // fourniture normale
+    await p.click('button.add:has-text("Fourniture")');
+    await p.waitForSelector(".line");
+    await p.locator(".line").nth(0).locator(".line-title").fill("MDF");
+    await f(p.locator(".line").nth(0), "Prix d'achat / u").fill("30");
+    // fourniture au mètre linéaire
+    await p.click('button.add:has-text("Fourniture")');
+    const l1 = p.locator(".line").nth(1);
+    await l1.locator(".line-title").fill("Baguette");
+    await l1.locator(".ml-toggle input").check();
+    await l1.locator('.ml-row input[aria-label="Longueur"]').first().fill("2,4");
+    await l1.locator('.ml-row input[aria-label="Quantité de cette longueur"]').first().fill("3");
+    await l1.locator(".ml-perte input").fill("10");
+    // main-d'œuvre + forfait
+    await p.click('button.add:has-text("Main-d")');
+    await p.click('button.add:has-text("Forfait")');
+    // lignes issues du calepinage : un panneau et une barre
+    await p.click('button:has-text("Calepinage")');
+    await p.waitForSelector(".cl");
+    await p.locator(".cl .grid").getByText("Prix matière").locator("..").locator("input").fill("25");
+    await p.click('button.add:has-text("Ajouter une pièce")');
+    let row = p.locator(".cl-prow:not(.cl-prow-head)").first();
+    await row.locator("input").nth(1).fill("600");
+    await row.locator("input").nth(2).fill("400");
+    await row.locator("input").nth(3).fill("2");
+    await p.click("button.cl-lin-add");
+    await p.locator(".cl .grid").getByText("Prix matière").locator("..").locator("input").fill("4");
+    await p.click('button.add:has-text("Ajouter une pièce")');
+    row = p.locator(".cl-prow:not(.cl-prow-head)").first();
+    await row.locator("input").nth(1).fill("900");
+    await row.locator("input").nth(2).fill("3");
+    await p.waitForTimeout(250);
+    await p.click('button:has-text("Ajouter tout au devis")');
+    await p.waitForTimeout(200);
+    assert.equal(await p.locator(".line").count(), 6, "6 lignes au total");
+
+    await p.click('button:has-text("Enregistrer")');
+    await p.waitForTimeout(150);
+    await p.click('button:has-text("Mes devis")');
+    await p.waitForSelector(".qrow");
+    const ex = await exportRow(p, 0, "etabli-ia-4.json");
+
+    const v = CoreForTests.validateQuoteFile(ex.json);
+    assert.deepEqual(v.errors, [], "les lignes produites par l'appli respectent le schéma");
+    assert.deepEqual(v.warnings, [], "et n'ont aucun champ hors schéma");
+    assert.deepEqual(ex.json.data.quotes[0].lines.map((l) => l.type).sort(), ["forfait", "fourniture", "fourniture", "fourniture", "fourniture", "main"]);
+
+    // réimport du même fichier : identique → « déjà dans Mes devis », donc rien d'ajouté
+    await p.locator(".devis-file").setInputFiles(ex.file);
+    await p.waitForTimeout(250);
+    assert.equal(await p.locator(".qrow").count(), 1);
+    assert.match(await p.locator(".toast").innerText(), /déjà dans/);
+    assert.equal(await p.locator(".qnotice").count(), 0);
     assert.deepEqual(p._errors, []);
     await p.close();
   });

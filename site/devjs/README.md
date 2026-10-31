@@ -149,6 +149,53 @@ la sauvegarde complète ci-dessus. Le fichier d'un devis reprend la même envelo
 la sauvegarde complète (avec `kind: "quote"`), donc *Réglages → Restaurer…* sait aussi
 le relire, mais par **fusion** (un devis de même identifiant y est alors mis à jour).
 
+### Faire remplir un devis par une IA (ChatGPT, Claude…)
+
+Chaque fichier exporté **s'ouvre sur un en-tête destiné à l'IA**, avant les données :
+
+```json
+{
+  "_instructions": [ "CONSIGNES POUR L'IA …", "FORMAT DE SORTIE …", "RÈGLES MÉTIER …", … ],
+  "_schema": { "$schema": "https://json-schema.org/draft/2020-12/schema", … },
+  "app": "etabli", "kind": "quote", "version": 1, "exportedAt": "…",
+  "data": { "quotes": [ { …le devis… } ] }
+}
+```
+
+- `_instructions` : consignes en clair — sortie = un seul objet JSON valide ; ne jamais
+  calculer de totaux ni **inventer un prix ou une quantité** (laisser `""` ou poser la
+  question) ; format des nombres (chaînes sans symbole ni unité), TVA, lignes, mètre
+  linéaire, texte mis en forme, identifiants ; que faire si l'import échoue.
+- `_schema` : JSON Schema (2020-12) du fichier — types, valeurs autorisées, champs
+  obligatoires et, surtout, une `description` par champ. Les deux clés sont **ignorées
+  à l'import**, et l'IA peut les omettre dans sa réponse.
+
+**Mode d'emploi :** joindre le fichier exporté à la conversation, décrire le devis voulu
+(ou « modifie ce devis : … »), enregistrer la réponse de l'IA en `.json` ou `.txt`, puis
+*Mes devis → Importer un devis…*. Pour partir de zéro : *Nouveau*, puis *Exporter le devis
+en cours* — le modèle vide emporte les mêmes consignes.
+
+**Contrôle à l'import** (le même schéma sert de validateur, sans dépendance) :
+
+- *Lecteur tolérant sur la syntaxe* : JSON lu en strict d'abord ; sinon on retire le bloc
+  ```` ```json ````, le texte autour et les virgules finales, et on le signale (« JSON nettoyé
+  automatiquement »). Réponse tronquée ou sans objet → erreur explicite.
+- *Strict sur le fond* : un champ obligatoire manquant, une valeur hors liste (`tvaRate`
+  = `"6 %"`), un nombre avec symbole (`"12 €"`), une date mal formée… sont **refusés**, et
+  **toutes** les erreurs sont listées d'un coup, avec leur chemin
+  (`data.quotes[0].lines[2].pa : format invalide …`). Rien n'est deviné ni converti, aucune
+  valeur n'est inventée.
+- *Champs inconnus* : non bloquants, signalés dans une remarque et conservés tels quels.
+- Le cadre d'erreur reste affiché et son bouton **« Copier pour l'IA »** copie un message
+  prêt à coller (« le fichier a été refusé, voici les erreurs, corrige uniquement ces
+  points et renvoie le fichier complet ») : on boucle jusqu'à ce que l'import passe.
+
+**Limites** — le schéma garantit la *structure*, pas la justesse : l'IA peut produire un
+devis valide mais faux (mauvais prix, mauvaise quantité). Relire le devis importé, et
+surtout les montants, avant de l'envoyer. Les nombres sont acceptés en chaîne ou en nombre
+JSON. En conversation de chat, la génération contrainte par schéma des API (« structured
+outputs ») n'existe pas : seules comptent les consignes, le schéma et ce contrôle à l'import.
+
 ## Calepinage de panneaux (cutlist)
 
 Bouton **« Calepinage »** dans la barre du haut. Les panneaux s'achètent
@@ -201,8 +248,10 @@ et adapté au **système métrique** (mm + €/m²).
   les fichiers étrangers) et `mergeQuotes`/`mergeCatalog` (fusion sans perte).
   L'UI ne garde que le glue navigateur : téléchargement (Blob) et lecture de
   fichier (FileReader). L'**export/import d'un seul devis** y est pur aussi :
-  `buildQuoteExport`, `readQuoteExport` (valide la structure, refuse une sauvegarde
-  complète), `quoteFileName` et `addImportedQuote` (ajout sans écrasement :
+  `buildQuoteExport` (en-tête consignes IA + schéma), `readQuoteExport` /
+  `readQuoteExportDetailed` (lecteur tolérant `parseJSONLenient`, validateur léger
+  `validateQuoteFile` piloté par le schéma embarqué, refus d'une sauvegarde complète),
+  `quoteFeedbackPrompt`, `quoteFileName` et `addImportedQuote` (ajout sans écrasement :
   ajouté / déjà présent / copie, avertissement de numéro). Le **mètre linéaire** y vit aussi : `linearTotal` /
   `linearLineQty` / `linearDetailText` (lignes de fourniture, utilisés par
   `computeLine`), `calculateLinearCutlist` (découpe 1D), `linearMetrics` (coût au
@@ -238,7 +287,12 @@ npm test                          # tout
   aller-retour export/lecture, refus (JSON cassé, autre appli, sauvegarde complète,
   0 ou 2 devis, lignes illisibles), réparation (client, ids), nom de fichier, ajout
   additif (nouvel id, doublon identique ignoré, copie si contenu différent,
-  numéro déjà utilisé) ; **texte enrichi** :
+  numéro déjà utilisé) ; **export pour l'IA** : en-tête en premier dans le fichier,
+  export valide contre son propre schéma, toutes les erreurs d'un coup avec chemin, nombres
+  (chaîne/nombre acceptés, « 12 € » refusé), champs inconnus signalés sans bloquer, lecteur
+  tolérant (bloc de code, prose autour, virgules finales hors chaînes, réponse tronquée),
+  message de retour à l'IA, et garde-fous de dérive (champs cités dans les consignes
+  présents dans le schéma ; schéma limité aux mots-clés du validateur, description partout) ; **texte enrichi** :
   gras/italique/souligné/combinaisons, mots non balisés (`3*4`, `réf_12_B`),
   échappements, listes, HTML laissé en texte, entrées dégénérées, barre d'outils
   (bascule, sélection restituée, marques imbriquées, multi-lignes, listes) avec un
@@ -259,7 +313,11 @@ npm test                          # tout
   **devis seul** (exporter depuis « Mes devis » puis réimporter, import additif :
   doublon ignoré / copie / numéro déjà utilisé, brouillon exporté sans être
   enregistré, devis en cours intact, fichiers refusés, devis importé recalculé à
-  l'identique), **fourniture au mètre linéaire** (longueurs → ml → prix → feuille client,
+  l'identique), **export IA** (en-tête consignes + schéma en tête du fichier, réponse d'IA
+  collée avec bloc de code/virgule finale acceptée en `.txt`, JSON invalide → erreurs
+  listées + « Copier pour l'IA » + fichier corrigé accepté, devis complet produit par
+  l'appli — 4 types de lignes, mètre linéaire, calepinage — valide contre le schéma et
+  réimporté à l'identique), **fourniture au mètre linéaire** (longueurs → ml → prix → feuille client,
   conversion cm/mm), **calepinage de barres** (nombre de barres, coût, schémas,
   facturation au ml débité, pièce trop longue, panneau + barre ensemble) et
   **compatibilité** (calepinage et devis antérieurs, sans les nouveaux champs, se
