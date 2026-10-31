@@ -882,31 +882,33 @@ test("le fichier d'un devis reste lisible par « Restaurer » (readBackup) → f
 
 test("readQuoteExport: refus clairs (JSON cassé, autre appli, sauvegarde complète, 0 ou 2 devis)", () => {
   assert.throws(() => C.readQuoteExport("{pas du json"), /illisible|JSON/i);
+  assert.throws(() => C.readQuoteExport("texte sans aucun objet"), /aucun objet JSON/i);
   assert.throws(() => C.readQuoteExport(JSON.stringify({ app: "autre", data: {} })), /pas un devis/i);
   assert.throws(() => C.readQuoteExport("[]"), /pas un devis/i);
   assert.throws(() => C.readQuoteExport(JSON.stringify(C.buildBackup({ quotes: [mkQuote()] }, {}))), /sauvegarde complète.*Restaurer/i,
     "une sauvegarde complète (même avec 1 devis) n'est pas un devis seul");
   const two = C.buildQuoteExport(mkQuote(), {});
   two.data.quotes.push(mkQuote({ id: "q2" }));
-  assert.throws(() => C.readQuoteExport(two), /un seul devis/i);
+  assert.throws(() => C.readQuoteExport(two), /data\.quotes : 2 élément\(s\), attendu exactement 1/i);
   const zero = C.buildQuoteExport(mkQuote(), {});
   zero.data.quotes = [];
-  assert.throws(() => C.readQuoteExport(zero), /un seul devis/i);
+  assert.throws(() => C.readQuoteExport(zero), /data\.quotes : 0 élément\(s\)/i);
 });
 
-test("readQuoteExport: structure abîmée → erreur (ou réparée) plutôt qu'un plantage au chargement", () => {
+test("readQuoteExport: structure abîmée → erreur précise (chemin) ou réparée, jamais un plantage au chargement", () => {
   const wrap = (q) => ({ app: "etabli", kind: "quote", version: 1, data: { quotes: [q] } });
-  assert.throws(() => C.readQuoteExport(wrap("pas un objet")), /Devis invalide/);
-  assert.throws(() => C.readQuoteExport(wrap({ numero: "A" })), /lignes est absente/);
-  assert.throws(() => C.readQuoteExport(wrap({ lines: [42] })), /ligne 1 est illisible/);
-  assert.throws(() => C.readQuoteExport(wrap({ lines: [{ type: "fourniture" }, { type: "bizarre" }] })), /type inconnu à la ligne 2/);
+  const REQ = { numero: "A", dateISO: "2026-10-31", clientType: "particulier", tvaRate: 6, acompte: "30", validite: "30" };
+  assert.throws(() => C.readQuoteExport(wrap("pas un objet")), /data\.quotes\[0\] : attendu un objet/);
+  assert.throws(() => C.readQuoteExport(wrap({ ...REQ })), /data\.quotes\[0\]\.lines : champ obligatoire manquant/);
+  assert.throws(() => C.readQuoteExport(wrap({ ...REQ, lines: [42] })), /lines\[0\] : attendu un objet, reçu le nombre 42/);
+  assert.throws(() => C.readQuoteExport(wrap({ ...REQ, lines: [{ type: "fourniture" }, { type: "bizarre" }] })),
+    /lines\[1\]\.type : valeur non autorisée.*"fourniture", "main", "forfait"/);
   // réparé : client manquant, ids absents ou en double
-  const fixed = C.readQuoteExport(wrap({ lines: [{ type: "main" }, { id: "a", type: "main" }, { id: "a", type: "forfait" }] }));
+  const fixed = C.readQuoteExport(wrap({ ...REQ, lines: [{ type: "main" }, { id: "a", type: "main" }, { id: "a", type: "forfait" }] }));
   assert.deepEqual(fixed.client, { nom: "", adresse: "", email: "", tel: "" }, "client toujours présent");
   assert.ok(fixed.id, "id de devis généré");
   const ids = fixed.lines.map((l) => l.id);
   assert.equal(new Set(ids).size, 3, "ids de lignes présents et uniques");
-  assert.equal(fixed.numero, "");
 });
 
 test("quoteFileName: numéro nettoyé (accents, espaces, caractères interdits)", () => {
@@ -972,4 +974,214 @@ test("import additif: le devis importé se calcule comme à l'origine (lignes, m
   const after = back.lines.map((l) => C.computeLine(l));
   assert.deepEqual(after, before);
   assert.equal(C.hasRichFormatting(back.chantier), true, "le balisage du texte enrichi voyage avec le devis");
+});
+
+/* =========================================================================
+   EXPORT POUR L'IA — en-tête (consignes + schéma), lecteur tolérant, validateur léger
+   ========================================================================= */
+const AI_REQ = { numero: "A", dateISO: "2026-10-31", clientType: "particulier", tvaRate: 6, acompte: "30", validite: "30" };
+const aiWrap = (q, extra) => ({ app: "etabli", kind: "quote", version: 1, ...(extra || {}), data: { quotes: [q] } });
+
+test("buildQuoteExport: le fichier s'ouvre sur _instructions puis _schema, avant l'enveloppe et les données", () => {
+  const b = C.buildQuoteExport(mkQuote(), { exportedAt: "2026-10-31T11:00:00.000Z" });
+  assert.deepEqual(Object.keys(b), ["_instructions", "_schema", "app", "kind", "version", "exportedAt", "data"]);
+  // l'ordre survit à une sérialisation JSON (c'est ce que l'IA reçoit)
+  assert.deepEqual(Object.keys(JSON.parse(JSON.stringify(b))).slice(0, 3), ["_instructions", "_schema", "app"]);
+  assert.ok(Array.isArray(b._instructions) && b._instructions.length >= 8);
+  assert.equal(b._schema.$schema, "https://json-schema.org/draft/2020-12/schema");
+  assert.equal(b._schema.type, "object");
+  // copies : modifier l'export ne corrompt pas les constantes du noyau
+  b._instructions.push("x");
+  b._schema.title = "x";
+  assert.notEqual(C.buildQuoteExport(mkQuote(), {})._schema.title, "x");
+  assert.ok(C.buildQuoteExport(mkQuote(), {})._instructions.length < b._instructions.length);
+});
+
+test("buildQuoteExport: meta.aiHeader=false → export sans en-tête (enveloppe seule)", () => {
+  const b = C.buildQuoteExport(mkQuote(), { aiHeader: false });
+  assert.deepEqual(Object.keys(b), ["app", "kind", "version", "exportedAt", "data"]);
+});
+
+test("le fichier avec en-tête se relit à l'identique (en-tête ignoré) et reste lisible par « Restaurer »", () => {
+  const q = mkQuote();
+  const file = JSON.stringify(C.buildQuoteExport(q, {}), null, 2);
+  assert.deepEqual(C.readQuoteExport(file), q);
+  const r = C.readBackup(file);
+  assert.equal(r.quotes.length, 1);
+  assert.equal(r.settings, null);
+});
+
+test("un export de l'appli est valide contre son propre schéma, sans avertissement", () => {
+  const res = C.validateQuoteFile(C.buildQuoteExport(mkQuote(), {}));
+  assert.deepEqual(res.errors, []);
+  assert.deepEqual(res.warnings, []);
+  // y compris avec une ligne au mètre linéaire et une ligne de calepinage
+  const q = mkQuote({
+    lines: [
+      { id: "a", type: "fourniture", designation: "Baguette", detail: "", showDetail: true, showQty: true, qte: "", unite: "ml", pa: "4,2", marge: "30", tvaRate: "", heures: "", tauxVente: "", coutHoraire: "", mlOn: true, mlItems: [{ id: "i1", len: "2,4", qty: "3" }], mlUnit: "m", mlPerte: "10" },
+      { id: "b", type: "forfait", designation: "Forfait", pa: 100, marge: "10" },
+    ],
+  });
+  assert.deepEqual(C.validateQuoteFile(C.buildQuoteExport(q, {})).errors, []);
+});
+
+test("validateQuoteFile: TOUTES les erreurs d'un coup, avec chemin et message exploitable par l'IA", () => {
+  const bad = C.buildQuoteExport(mkQuote(), {});
+  const q = bad.data.quotes[0];
+  q.tvaRate = "6 %";            // chaîne au lieu d'un nombre de l'enum
+  q.dateISO = "31/10/2026";     // mauvais format de date
+  q.clientType = "particular";  // faute de frappe
+  delete q.numero;              // champ obligatoire absent
+  q.lines[0].pa = "12 €";       // symbole dans un nombre
+  q.lines[0].showDetail = "oui"; // booléen attendu
+  q.lines[1].type = "bizarre";
+  const { errors } = C.validateQuoteFile(bad);
+  const byPath = Object.fromEntries(errors.map((e) => [e.path, e.message]));
+  assert.equal(errors.length, 7, JSON.stringify(errors, null, 1));
+  assert.match(byPath["data.quotes[0].numero"], /obligatoire manquant/);
+  assert.match(byPath["data.quotes[0].tvaRate"], /valeur non autorisée.*6, 12, 21/);
+  assert.match(byPath["data.quotes[0].dateISO"], /format invalide.*AAAA-MM-JJ/);
+  assert.match(byPath["data.quotes[0].clientType"], /"particulier", "pro"/);
+  assert.match(byPath["data.quotes[0].lines[0].pa"], /format invalide.*sans symbole ni unité/, "la description du champ sert de message d'erreur");
+  assert.match(byPath["data.quotes[0].lines[0].showDetail"], /attendu un booléen/);
+  assert.match(byPath["data.quotes[0].lines[1].type"], /"fourniture", "main", "forfait"/);
+});
+
+test("validateQuoteFile: nombres JSON ou chaînes acceptés, virgule décimale et vide aussi", () => {
+  const ok = (pa) => C.validateQuoteFile(aiWrap({ ...AI_REQ, lines: [{ type: "fourniture", pa }] })).errors.length === 0;
+  for (const good of ["12", "12,5", "12.5", "-3", "", "  7 ", 12, 12.5, 0]) assert.ok(ok(good), JSON.stringify(good));
+  for (const bad of ["12 €", "1 234,5", "abc", "1,2,3", "€12", "12%", null, true]) assert.ok(!ok(bad), JSON.stringify(bad));
+});
+
+test("validateQuoteFile: champs inconnus = avertissements (jamais bloquants) ; clés « _… » réservées", () => {
+  const q = { ...AI_REQ, lines: [{ type: "main", total: 99 }], totalHT: 123 };
+  const res = C.validateQuoteFile(aiWrap(q, { _note: "ok", exportedAt: null }));
+  assert.deepEqual(res.errors, []);
+  const msgs = res.warnings.map((w) => w.path + " " + w.message).join("\n");
+  assert.match(msgs, /data\.quotes\[0\] .*« totalHT »/);
+  assert.match(msgs, /lines\[0\] .*« total »/);
+  assert.doesNotMatch(msgs, /_note|_instructions/, "les clés _… ne sont pas signalées");
+});
+
+test("readQuoteExportDetailed: avertissements remontés, devis conservé tel quel (champs inconnus inclus)", () => {
+  const r = C.readQuoteExportDetailed(aiWrap({ ...AI_REQ, lines: [{ type: "main", total: 99 }] }));
+  assert.equal(r.warnings.length, 1);
+  assert.match(r.warnings[0], /« total »/);
+  assert.equal(r.quote.lines[0].total, 99, "rien n'est supprimé en silence");
+});
+
+test("l'erreur de lecture porte la liste détaillée (error.details) et un message prêt à coller", () => {
+  let err;
+  try { C.readQuoteExport(aiWrap({ ...AI_REQ, tvaRate: 5, lines: [{ type: "x" }] })); } catch (e) { err = e; }
+  assert.ok(err, "doit lever");
+  assert.equal(err.details.length, 2);
+  assert.deepEqual(err.details.map((d) => d.path).sort(), ["data.quotes[0].lines[0].type", "data.quotes[0].tvaRate"]);
+  assert.match(err.message, /2 erreurs\) :\n• data\.quotes\[0\]/);
+  const fb = C.quoteFeedbackPrompt(err.message);
+  assert.match(fb, /refusé par ÉTABLI/);
+  assert.ok(fb.includes(err.message), "le message d'erreur est inclus tel quel");
+  assert.match(fb, /renvoie le fichier JSON COMPLET/);
+});
+
+test("l'affichage des erreurs est borné (20 lignes + « … et N autre(s) »)", () => {
+  const lines = Array.from({ length: 30 }, () => ({ type: "bizarre" }));
+  let err;
+  try { C.readQuoteExport(aiWrap({ ...AI_REQ, lines })); } catch (e) { err = e; }
+  assert.equal(err.details.length, 30, "toutes les erreurs sont conservées");
+  assert.equal(err.message.split("\n").filter((l) => l.startsWith("•")).length, 21);
+  assert.match(err.message, /… et 10 autre\(s\)/);
+});
+
+/* ---------- lecteur tolérant ---------- */
+const okJSON = JSON.stringify(aiWrap({ ...AI_REQ, lines: [{ type: "main", designation: "Pose, avec } et \"guillemets\"" }] }));
+
+test("parseJSONLenient: JSON propre → lu strict, non réparé (BOM toléré)", () => {
+  const r = C.parseJSONLenient(okJSON);
+  assert.equal(r.repaired, false);
+  assert.equal(C.parseJSONLenient("﻿" + okJSON).repaired, false);
+});
+
+test("parseJSONLenient: bloc ```json, phrases autour, virgules finales → réparé", () => {
+  const fenced = "Voici le devis mis à jour :\n\n```json\n" + okJSON + "\n```\n\nDis-moi si tu veux autre chose !";
+  const r1 = C.parseJSONLenient(fenced);
+  assert.equal(r1.repaired, true);
+  assert.equal(r1.value.data.quotes[0].lines[0].designation, "Pose, avec } et \"guillemets\"", "les accolades dans une chaîne ne cassent pas l'extraction");
+  const prose = "Bien sûr. " + okJSON + " Voilà.";
+  assert.equal(C.parseJSONLenient(prose).repaired, true);
+  const trailing = '{ "a": [1, 2, 3,], "b": "x,}" , "c": { "d": 1, }, }';
+  const r2 = C.parseJSONLenient(trailing);
+  assert.deepEqual(r2.value, { a: [1, 2, 3], b: "x,}", c: { d: 1 } }, "virgules finales retirées, pas celles DANS les chaînes");
+});
+
+test("parseJSONLenient: réponse tronquée / sans objet / vraiment cassée → erreur explicite", () => {
+  assert.throws(() => C.parseJSONLenient(okJSON.slice(0, 80)), /pas refermé.*tronquée/i);
+  assert.throws(() => C.parseJSONLenient("Désolé, je ne peux pas."), /aucun objet JSON/i);
+  assert.throws(() => C.parseJSONLenient('{ "a": nope }'), /JSON invalide/i);
+});
+
+test("readQuoteExportDetailed: une réponse d'IA collée telle quelle est acceptée, avec une remarque", () => {
+  const chat = "Voici ton devis :\n```json\n" + okJSON.replace('"kind":"quote"', '"kind":"quote"') + "\n```";
+  const r = C.readQuoteExportDetailed(chat);
+  assert.equal(r.quote.numero, "A");
+  assert.ok(r.warnings.some((w) => /nettoyé automatiquement/.test(w)));
+  // sans réparation nécessaire : pas de remarque
+  assert.deepEqual(C.readQuoteExportDetailed(okJSON).warnings, []);
+});
+
+test("le lecteur ne devine rien : champ obligatoire manquant ou type faux → refus, pas de valeur inventée", () => {
+  const noTva = { ...AI_REQ }; delete noTva.tvaRate;
+  assert.throws(() => C.readQuoteExport(aiWrap({ ...noTva, lines: [] })), /tvaRate : champ obligatoire manquant/);
+  assert.throws(() => C.readQuoteExport(aiWrap({ ...AI_REQ, tvaRate: "6", lines: [] })), /tvaRate : valeur non autorisée/);
+});
+
+/* ---------- cohérence consignes ⇄ schéma (garde-fou contre la dérive) ---------- */
+function schemaPropertyNames(node, acc) {
+  if (!node || typeof node !== "object") return acc;
+  if (node.properties) for (const k of Object.keys(node.properties)) { acc.add(k); schemaPropertyNames(node.properties[k], acc); }
+  if (node.items) schemaPropertyNames(node.items, acc);
+  return acc;
+}
+
+test("consignes IA: chaque champ cité existe dans le schéma, et les champs clés sont tous cités", () => {
+  const known = schemaPropertyNames(C.quoteJsonSchema, new Set());
+  const text = C.quoteAiInstructions.join("\n");
+  // mots techniques en minuscules/camelCase cités dans les consignes
+  const ALLOWED_NON_FIELDS = new Set(["json"]);
+  const cited = new Set((text.match(/\b[a-z]+(?:[A-Z][a-z]+)*\b/g) || []).filter((w) => known.has(w)));
+  for (const w of ["app", "kind", "version", "data", "tvaRate", "tvaFournitures", "clientType", "marge", "pa", "qte", "heures", "tauxVente",
+    "coutHoraire", "mlOn", "mlItems", "mlUnit", "mlPerte", "unite", "numero", "id", "detail", "chantier", "conditions"]) {
+    assert.ok(known.has(w), `le schéma doit définir « ${w} »`);
+    assert.ok(cited.has(w) || new RegExp("\\b" + w + "\\b").test(text), `les consignes doivent mentionner « ${w} »`);
+  }
+  // les noms entre « ( ) » ou après « : » dans un style code (ex. `mlItems`) existent bien
+  for (const m of text.matchAll(/\b(ml[A-Z]\w+|tva[A-Z]\w+|client[A-Z]\w+|taux[A-Z]\w+|cout[A-Z]\w+|show[A-Z]\w+|exported[A-Z]\w+)\b/g)) {
+    assert.ok(known.has(m[1]) || ALLOWED_NON_FIELDS.has(m[1]), `champ cité mais absent du schéma : ${m[1]}`);
+  }
+});
+
+test("le schéma embarqué n'utilise que les mots-clés que le validateur sait appliquer", () => {
+  const SUPPORTED = new Set(["$schema", "title", "description", "type", "const", "enum", "pattern", "required", "properties", "items", "minItems", "maxItems"]);
+  const bad = [];
+  (function walk(n, path) {
+    if (Array.isArray(n)) return n.forEach((x, i) => walk(x, path + "[" + i + "]"));
+    if (!n || typeof n !== "object") return;
+    const isPropsMap = /\.properties$/.test(path);
+    for (const k of Object.keys(n)) {
+      if (!isPropsMap && !SUPPORTED.has(k)) bad.push(path + "." + k);
+      if (k === "properties" || k === "items") walk(n[k], path + "." + k);
+    }
+    if (isPropsMap) for (const k of Object.keys(n)) walk(n[k], path + "." + k);
+  })(C.quoteJsonSchema, "$");
+  assert.deepEqual(bad, [], "mot-clé non supporté par le validateur léger");
+  // chaque champ documenté porte une description (c'est elle qui guide l'IA)
+  const noDesc = [];
+  (function walk(n, path) {
+    if (!n || typeof n !== "object") return;
+    if (n.properties) for (const k of Object.keys(n.properties)) {
+      if (!n.properties[k].description) noDesc.push(path + "." + k);
+      walk(n.properties[k], path + "." + k);
+    }
+    if (n.items) walk(n.items, path + "[]");
+  })(C.quoteJsonSchema, "$");
+  assert.deepEqual(noDesc, [], "champ sans description");
 });
