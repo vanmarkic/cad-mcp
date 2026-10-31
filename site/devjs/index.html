@@ -32,7 +32,7 @@ window.storage = {
 
 <script type="text/babel" data-presets="react">
 const { useState, useEffect, useMemo, useRef } = React;
-const { num, computeLine, tvaBreakdown, calculateCutlist, panelMetrics, cutListText, newQuoteId, upsertQuote, removeQuote, nextQuoteNumero, buildBackup, readBackup, mergeQuotes, catalogItemFromLine, upsertCatalogItem, removeCatalogItem, searchCatalog, applyCatalogItemToLine, mergeCatalog } = window.EtabliCore;
+const { num, computeLine, tvaBreakdown, calculateCutlist, panelMetrics, cutListText, newQuoteId, upsertQuote, removeQuote, nextQuoteNumero, buildBackup, readBackup, mergeQuotes, catalogItemFromLine, upsertCatalogItem, removeCatalogItem, searchCatalog, applyCatalogItemToLine, mergeCatalog, linearLineQty, linearDetailText, calculateLinearCutlist, linearMetrics, linearCutListText, parseRichText, hasRichFormatting, applyTextFormat } = window.EtabliCore;
 
 /* =========================================================================
    ÉTABLI — Générateur de devis pour menuisier
@@ -75,26 +75,28 @@ function Field({ label, hint, children, wide }) {
     </label>
   );
 }
-function TextIn({ value, onChange, placeholder, mono }) {
+function TextIn({ value, onChange, placeholder, mono, readOnly }) {
   return (
     <input
-      className={"in" + (mono ? " in-mono" : "")}
+      className={"in" + (mono ? " in-mono" : "") + (readOnly ? " in-ro" : "")}
       type="text"
       value={value ?? ""}
       placeholder={placeholder || ""}
+      readOnly={!!readOnly}
       onChange={(e) => onChange(e.target.value)}
     />
   );
 }
-function NumIn({ value, onChange, placeholder, suffix }) {
+function NumIn({ value, onChange, placeholder, suffix, readOnly }) {
   return (
     <span className="numwrap">
       <input
-        className="in in-mono in-num"
+        className={"in in-mono in-num" + (readOnly ? " in-ro" : "")}
         type="text"
         inputMode="decimal"
         value={value ?? ""}
         placeholder={placeholder || "0"}
+        readOnly={!!readOnly}
         onChange={(e) => onChange(e.target.value)}
       />
       {suffix ? <span className="numsfx">{suffix}</span> : null}
@@ -110,6 +112,125 @@ function AreaIn({ value, onChange, placeholder }) {
       placeholder={placeholder || ""}
       onChange={(e) => onChange(e.target.value)}
     />
+  );
+}
+
+/* ---------- texte enrichi (gras / italique / souligné / listes) ----------
+   Le texte reste une simple chaîne (balisage léger **gras** *italique*
+   __souligné__, « - » puces, « 1. » numérotation) ; tout le parsing et la
+   logique de la barre d'outils vivent dans lib/etabli-core.js. Le rendu produit
+   des éléments React — jamais de HTML injecté. */
+function RichText({ text, className }) {
+  const blocks = useMemo(() => parseRichText(text), [text]);
+  const runs = (rs) =>
+    rs.map((r, i) => {
+      let el = r.text;
+      if (r.u) el = <u>{el}</u>;
+      if (r.i) el = <em>{el}</em>;
+      if (r.b) el = <strong>{el}</strong>;
+      return <React.Fragment key={i}>{el}</React.Fragment>;
+    });
+  return (
+    <div className={"rt" + (className ? " " + className : "")}>
+      {blocks.map((b, i) =>
+        b.type === "p" ? (
+          <p key={i}>{runs(b.runs)}</p>
+        ) : b.type === "ul" ? (
+          <ul key={i}>{b.items.map((it, j) => <li key={j}>{runs(it)}</li>)}</ul>
+        ) : (
+          <ol key={i} start={b.start}>{b.items.map((it, j) => <li key={j}>{runs(it)}</li>)}</ol>
+        )
+      )}
+    </div>
+  );
+}
+
+const FORMAT_BUTTONS = [
+  { kind: "bold", label: <b>G</b>, title: "Gras (Ctrl+B)", aria: "Gras" },
+  { kind: "italic", label: <i>I</i>, title: "Italique (Ctrl+I)", aria: "Italique" },
+  { kind: "underline", label: <u>S</u>, title: "Souligné (Ctrl+U)", aria: "Souligné" },
+  { kind: "ul", label: "•", title: "Liste à puces", aria: "Liste à puces" },
+  { kind: "ol", label: "1.", title: "Liste numérotée", aria: "Liste numérotée" },
+];
+const FORMAT_KEYS = { b: "bold", i: "italic", u: "underline" };
+
+function RichArea({ value, onChange, placeholder, rows = 2, preview = true }) {
+  const ref = useRef(null);
+  const pending = useRef(null); // sélection à restaurer après le re-rendu contrôlé
+  useEffect(() => {
+    const sel = pending.current;
+    if (sel && ref.current) {
+      pending.current = null;
+      ref.current.focus();
+      ref.current.setSelectionRange(sel.start, sel.end);
+    }
+  });
+  const apply = (kind) => {
+    const ta = ref.current;
+    if (!ta) return;
+    const r = applyTextFormat(ta.value, ta.selectionStart, ta.selectionEnd, kind);
+    if (r.text === ta.value) {
+      ta.focus();
+      ta.setSelectionRange(r.start, r.end);
+      return;
+    }
+    pending.current = { start: r.start, end: r.end };
+    onChange(r.text);
+  };
+  const text = value ?? "";
+  return (
+    <div className="rich">
+      <div className="fmt-bar" role="toolbar" aria-label="Mise en forme">
+        {FORMAT_BUTTONS.map((b) => (
+          <button
+            key={b.kind}
+            type="button"
+            className="fmt-btn"
+            title={b.title}
+            aria-label={b.aria}
+            data-fmt={b.kind}
+            // mousedown + preventDefault : le champ garde le focus et la sélection.
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => apply(b.kind)}
+          >
+            {b.label}
+          </button>
+        ))}
+        <span className="fmt-help">**gras** · *italique* · __souligné__ · « - » puce</span>
+      </div>
+      <textarea
+        ref={ref}
+        className="in in-area"
+        rows={rows}
+        value={text}
+        placeholder={placeholder || ""}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          const kind = (e.ctrlKey || e.metaKey) && !e.altKey ? FORMAT_KEYS[e.key.toLowerCase()] : null;
+          if (kind) {
+            e.preventDefault();
+            apply(kind);
+          }
+        }}
+      />
+      {preview && hasRichFormatting(text) ? (
+        <div className="rt-preview">
+          <span className="rt-preview-lab">Aperçu</span>
+          <RichText text={text} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+// Comme Field, mais sans <label> englobant : la barre d'outils contient des
+// boutons, et un <label> redirigerait ses clics vers le premier d'entre eux.
+function RichField({ label, hint, wide, children }) {
+  return (
+    <div className={"fld" + (wide ? " fld-wide" : "")}>
+      <span className="fld-lab">{label}</span>
+      {children}
+      {hint ? <span className="fld-hint">{hint}</span> : null}
+    </div>
   );
 }
 
@@ -145,6 +266,11 @@ const newLine = (type, p) => ({
   unite: "u",
   pa: "",
   tvaRate: "", // "" = taux fournitures du devis ; sinon override de TVA de la ligne
+  // « Au mètre linéaire » (fournitures) : liste de longueurs → quantité en ml.
+  mlOn: false,
+  mlItems: [],
+  mlUnit: "m", // unité de saisie des longueurs : mm | cm | m
+  mlPerte: "", // chute / majoration en %
   marge: type === "forfait" || type === "fourniture" ? p.marge : "",
   heures: "",
   tauxVente: type === "main" ? p.tauxVente : "",
@@ -191,14 +317,22 @@ const newPiece = (i = 0) => ({
 // 18 mm à 30 €/m² ET aglo 8 mm à 15 €/m²) : chacun se débite sur SES plaques —
 // on ne mélange jamais deux matières sur une même plaque — et chacun produit sa
 // propre ligne de devis. Tout est en millimètres ; le prix matière est au m².
-const newMaterial = (i = 0) => ({
+// `kind` : "panel" (plaque, prix au m²) ou "linear" (barre / profilé / baguette
+// débitée en long, prix au ml ou à la barre). Pour un matériau linéaire, `w` des
+// pièces est la longueur (mm) ; `h` est ignoré.
+const newMaterial = (i = 0, kind = "panel") => ({
   id: uid(),
+  kind,
   material: "",
   pricePerM2: "",
   panelW: "2500",
   panelH: "1250",
   kerf: "3",
   grainDirection: false,
+  barLen: "2400", // longueur d'une barre de stock (mm)
+  linPrice: "", // prix saisi (€/ml ou €/barre selon linPriceUnit)
+  linPriceUnit: "ml", // "ml" | "bar"
+  linBilling: "bar", // "bar" = barres entières · "ml" = mètres réellement débités
   pieces: [],
 });
 const FIRST_MATERIAL = newMaterial(0);
@@ -235,11 +369,13 @@ function migrateCalep(raw) {
 }
 
 const nf1 = (n) => (isFinite(n) ? n : 0).toLocaleString("fr-BE", { maximumFractionDigits: 1 });
+const nf2 = (n) => (isFinite(n) ? n : 0).toLocaleString("fr-BE", { maximumFractionDigits: 2 });
 
 // Calepinage + métrique d'UN matériau (pur, sans DOM) : on convertit les
 // champs de saisie (w/h/qty en chaînes) vers le noyau, puis on délègue tout le
 // calcul à etabli-core (source unique de vérité).
 function computeMaterial(mat) {
+  if (mat.kind === "linear") return computeLinearMaterial(mat);
   const config = {
     width: num(mat.panelW),
     height: num(mat.panelH),
@@ -254,12 +390,60 @@ function computeMaterial(mat) {
   const metrics = panelMetrics(result, config, num(mat.pricePerM2), 0.001);
   const cutList = cutListText(piecesForCore, { unit: "mm" });
   const hasPieces = piecesForCore.some((p) => p.width > 0 && p.height > 0 && p.quantity > 0);
-  return { id: mat.id, config, piecesForCore, result, metrics, cutList, hasPieces };
+  return { id: mat.id, kind: "panel", units: metrics.totalSheets, config, piecesForCore, result, metrics, cutList, hasPieces };
+}
+
+// Équivalent pour un matériau LINÉAIRE (barre, baguette, profilé) : découpe 1D
+// dans des barres de stock, coût au ml ou à la barre selon la saisie.
+function computeLinearMaterial(mat) {
+  const config = { barLength: num(mat.barLen), kerf: num(mat.kerf) };
+  const piecesForCore = mat.pieces.map((p) => ({
+    id: p.id, label: p.label, length: num(p.w), quantity: num(p.qty), color: p.color,
+  }));
+  const result = calculateLinearCutlist(piecesForCore, config);
+  const metrics = linearMetrics(result, config, num(mat.linPrice), {
+    priceUnit: mat.linPriceUnit, billing: mat.linBilling, unitToM: 0.001,
+  });
+  const cutList = linearCutListText(piecesForCore, { unit: "mm" });
+  const hasPieces = piecesForCore.some((p) => p.length > 0 && p.quantity > 0);
+  return { id: mat.id, kind: "linear", units: metrics.totalBars, config, piecesForCore, result, metrics, cutList, hasPieces };
+}
+
+const round4 = (n) => Math.round(n * 10000) / 10000;
+
+// Ligne « fourniture » d'un matériau linéaire : soit N barres entières au prix
+// de la barre, soit les mètres réellement débités au prix du ml.
+function buildLinearCalepLine(mat, comp, marge) {
+  const { metrics, cutList } = comp;
+  const byMl = metrics.billing === "ml";
+  const detail = [
+    `${metrics.totalBars} barre(s) de ${num(mat.barLen)} mm — chute ${nf1(metrics.totalWastePercent)} %` +
+      (byMl ? ` — facturé au mètre débité (${nf2(metrics.usedM)} ml)` : ""),
+    cutList.text,
+  ].join("\n");
+  return {
+    id: uid(),
+    type: "fourniture",
+    designation: (mat.material || "Profilé") + " — débit calepiné",
+    detail,
+    showDetail: true,
+    showQty: true,
+    qte: byMl ? String(round4(metrics.usedM)) : String(metrics.totalBars),
+    unite: byMl ? "ml" : "barre",
+    pa: byMl ? String(round4(metrics.pricePerMl)) : String(Math.round(metrics.pricePerBar * 100) / 100),
+    tvaRate: "",
+    mlOn: false, mlItems: [], mlUnit: "m", mlPerte: "",
+    marge,
+    heures: "",
+    tauxVente: "",
+    coutHoraire: "",
+  };
 }
 
 // Ligne « fourniture » correspondant à un matériau calepiné : N panneaux entiers
 // au coût/panneau, avec la liste de débit pliée dans le métré.
 function buildCalepLine(mat, comp, marge) {
+  if (comp.kind === "linear") return buildLinearCalepLine(mat, comp, marge);
   const { metrics, cutList } = comp;
   const detail = [
     `${metrics.totalSheets} panneau(x) ${num(mat.panelW)}×${num(mat.panelH)} mm — chute ${nf1(metrics.totalWastePercent)} %`,
@@ -844,13 +1028,13 @@ function Atelier({
               onChange={(v) => setClient({ adresse: v })}
             />
           </Field>
-          <Field label="Description du chantier" wide>
-            <TextIn
+          <RichField label="Description du chantier" wide>
+            <RichArea
               value={devis.chantier}
               onChange={(v) => set({ chantier: v })}
               placeholder="Ex. fabrication et pose d'un dressing sur mesure"
             />
-          </Field>
+          </RichField>
         </div>
       </section>
 
@@ -979,9 +1163,9 @@ function Atelier({
           <Field label="Acompte à la commande">
             <NumIn value={devis.acompte} onChange={(v) => set({ acompte: v })} suffix="%" />
           </Field>
-          <Field label="Conditions (bas de devis)" wide>
-            <AreaIn value={devis.conditions} onChange={(v) => set({ conditions: v })} />
-          </Field>
+          <RichField label="Conditions (bas de devis)" wide>
+            <RichArea value={devis.conditions} onChange={(v) => set({ conditions: v })} rows={3} />
+          </RichField>
         </div>
       </section>
 
@@ -1061,6 +1245,27 @@ function LineCard({ line, index, last, setLine, delLine, moveLine, margeColor, t
   const typeLabel =
     l.type === "main" ? "Main-d'œuvre" : l.type === "forfait" ? "Forfait" : "Fourniture";
   const isFourn = l.type === "fourniture";
+
+  // Mètre linéaire : la quantité découle de la liste de longueurs (noyau).
+  const isMl = isFourn && !!l.mlOn;
+  const lin = linearLineQty(l);
+  const items = l.mlItems || [];
+  const setMlItem = (id, patch) =>
+    setLine(l.id, { mlItems: items.map((it) => (it.id === id ? { ...it, ...patch } : it)) });
+  const addMlItem = () => setLine(l.id, { mlItems: [...items, { id: uid(), len: "", qty: "1" }] });
+  const delMlItem = (id) => setLine(l.id, { mlItems: items.filter((it) => it.id !== id) });
+  const toggleMl = (on) => {
+    if (on) {
+      // première activation : une ligne de longueur prête à remplir ; l'unité
+      // passe à « ml » pour que le catalogue / la feuille client restent cohérents.
+      setLine(l.id, { mlOn: true, unite: "ml", mlItems: items.length ? items : [{ id: uid(), len: "", qty: "1" }] });
+    } else {
+      // on garde la quantité calculée comme valeur saisie (pas de saut à l'ancienne).
+      setLine(l.id, { mlOn: false, qte: String(lin.qteM).replace(".", ",") });
+    }
+  };
+  const fillDetail = () => setLine(l.id, { detail: linearDetailText(l), showDetail: true });
+
   // Auto-complétion depuis le catalogue (fournitures uniquement).
   const suggestions = isFourn && acOpen ? searchCatalog(catalog || [], l.designation, 6) : [];
   return (
@@ -1127,13 +1332,21 @@ function LineCard({ line, index, last, setLine, delLine, moveLine, margeColor, t
       <div className="line-body">
         {l.type === "fourniture" && (
           <>
-            <Field label="Quantité (métré)">
-              <NumIn value={l.qte} onChange={(v) => setLine(l.id, { qte: v })} />
+            <Field label="Quantité (métré)" hint={isMl ? "calculée ci-dessous" : undefined}>
+              {isMl ? (
+                <NumIn value={String(lin.qteM).replace(".", ",")} onChange={() => {}} suffix="ml" readOnly />
+              ) : (
+                <NumIn value={l.qte} onChange={(v) => setLine(l.id, { qte: v })} />
+              )}
             </Field>
             <Field label="Unité">
-              <TextIn value={l.unite} onChange={(v) => setLine(l.id, { unite: v })} placeholder="m², ml, pce…" />
+              {isMl ? (
+                <TextIn value="ml" onChange={() => {}} readOnly />
+              ) : (
+                <TextIn value={l.unite} onChange={(v) => setLine(l.id, { unite: v })} placeholder="m², ml, pce…" />
+              )}
             </Field>
-            <Field label="Prix d'achat / u" hint="HTVA — atelier">
+            <Field label={isMl ? "Prix d'achat / ml" : "Prix d'achat / u"} hint="HTVA — atelier">
               <NumIn value={l.pa} onChange={(v) => setLine(l.id, { pa: v })} suffix="€" />
             </Field>
             <Field label="Marge">
@@ -1184,9 +1397,77 @@ function LineCard({ line, index, last, setLine, delLine, moveLine, margeColor, t
         )}
       </div>
 
+      {/* mètre linéaire : liste de longueurs → quantité en ml */}
+      {isFourn && (
+        <div className="ml">
+          <label className="tog ml-toggle">
+            <input type="checkbox" checked={isMl} onChange={(e) => toggleMl(e.target.checked)} />
+            Calculer au mètre linéaire <span className="muted">(baguettes, profilés, plinthes…)</span>
+          </label>
+          {isMl && (
+            <div className="ml-box">
+              <div className="ml-head">
+                <span>Longueurs en</span>
+                <select
+                  className="in in-sel ml-unit"
+                  aria-label="Unité des longueurs"
+                  value={l.mlUnit || "m"}
+                  onChange={(e) => setLine(l.id, { mlUnit: e.target.value })}
+                >
+                  <option value="m">m</option>
+                  <option value="cm">cm</option>
+                  <option value="mm">mm</option>
+                </select>
+                <span className="ml-head-qty">× quantité</span>
+              </div>
+              {(l.mlItems || []).map((it) => (
+                <div className="ml-row" key={it.id}>
+                  <input
+                    className="in in-mono in-num"
+                    inputMode="decimal"
+                    aria-label="Longueur"
+                    placeholder="0"
+                    value={it.len}
+                    onChange={(e) => setMlItem(it.id, { len: e.target.value })}
+                  />
+                  <input
+                    className="in in-mono in-num"
+                    inputMode="numeric"
+                    aria-label="Quantité de cette longueur"
+                    placeholder="1"
+                    value={it.qty}
+                    onChange={(e) => setMlItem(it.id, { qty: e.target.value })}
+                  />
+                  <button className="ico ico-del" title="Supprimer cette longueur" onClick={() => delMlItem(it.id)}>✕</button>
+                </div>
+              ))}
+              <div className="ml-foot">
+                <button type="button" className="btn add sm" onClick={addMlItem}>+ Longueur</button>
+                <label className="ml-perte">
+                  <span>Chute / majoration</span>
+                  <NumIn value={l.mlPerte} onChange={(v) => setLine(l.id, { mlPerte: v })} suffix="%" />
+                </label>
+              </div>
+              <div className="ml-sum">
+                <span>
+                  {lin.pieces} pièce(s) · <b className="mono">{nf2(lin.totalM)} ml</b>
+                  {lin.perte > 0 ? <> + {nf1(lin.perte)} % de chute</> : null}
+                </span>
+                <span className="ml-qte">
+                  Quantité facturée <b className="mono">{nf2(lin.qteM)} ml</b>
+                </span>
+                <button type="button" className="btn add sm" onClick={fillDetail} disabled={lin.pieces === 0}>
+                  → Détail au métré
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* per-line metré detail */}
       <div className="line-detail">
-        <AreaIn
+        <RichArea
           value={l.detail}
           onChange={(v) => setLine(l.id, { detail: v })}
           placeholder="Métré / détail (ex. 3,20 × 2,10 m — façade + 2 portes). Visible sur le devis seulement si la case est cochée."
@@ -1292,7 +1573,11 @@ function ClientSheet({ devis, company, calc, onPrint }) {
           <div className="s-block">
             <div className="s-block-lab">Chantier</div>
             <div className="s-block-body">
-              {devis.chantier || devis.client.adresse || "—"}
+              {devis.chantier && devis.chantier.trim() ? (
+                <RichText text={devis.chantier} />
+              ) : (
+                devis.client.adresse || "—"
+              )}
             </div>
           </div>
         </section>
@@ -1319,7 +1604,7 @@ function ClientSheet({ devis, company, calc, onPrint }) {
                 <td className="c-desc">
                   <div className="s-desig">{l.designation || "—"}</div>
                   {l.showDetail && l.detail ? (
-                    <div className="s-detail">{l.detail}</div>
+                    <RichText className="s-detail" text={l.detail} />
                   ) : null}
                 </td>
                 <td className="c-qte mono">
@@ -1389,7 +1674,7 @@ function ClientSheet({ devis, company, calc, onPrint }) {
           </p>
         )}
 
-        {devis.conditions ? <p className="s-cond">{devis.conditions}</p> : null}
+        {devis.conditions ? <RichText className="s-cond" text={devis.conditions} /> : null}
 
         <section className="s-sign">
           <div className="s-sign-box">
@@ -1631,6 +1916,36 @@ function SheetSVG({ layout, panelW, panelH, index }) {
   );
 }
 
+// Schéma d'une barre débitée en long : un bandeau, les pièces posées bout à bout
+// (le trait de scie apparaît comme un petit vide), le reste = chute.
+function BarSVG({ layout, barLength, index }) {
+  const h = barLength / 14; // hauteur du bandeau (unités mm du viewBox)
+  const fs = h * 0.36;
+  const sw = barLength / 700;
+  return (
+    <figure className="cl-bar">
+      <figcaption className="cl-sheet-cap">
+        Barre {index + 1} · {layout.pieces.length} pièce(s) · chute {nf1(layout.wastePercent)} %
+        {" "}({Math.round(layout.wasteLength)} mm)
+      </figcaption>
+      <svg className="cl-svg cl-svg-bar" viewBox={`0 0 ${barLength} ${h}`} preserveAspectRatio="xMidYMid meet">
+        <rect x={0} y={0} width={barLength} height={h} className="cl-panel" />
+        {layout.pieces.map((p, i) => (
+          <g key={i}>
+            <title>{(p.label || "Pièce") + " — " + Math.round(p.length) + " mm"}</title>
+            <rect x={p.x} y={0} width={p.length} height={h} fill={p.color} fillOpacity={0.5} stroke={p.color} strokeWidth={sw} />
+            {p.length * 1 > fs * 2.4 ? (
+              <text x={p.x + p.length / 2} y={h / 2} fontSize={fs} textAnchor="middle" dominantBaseline="central" className="cl-piece-lab">
+                {Math.round(p.length)}
+              </text>
+            ) : null}
+          </g>
+        ))}
+      </svg>
+    </figure>
+  );
+}
+
 function Calepinage({ calep, setCalep, params, onAddToDevis, flash }) {
   // Liste des matériaux + matériau actif (avec garde si l'état est incomplet).
   const materials = calep.materials && calep.materials.length ? calep.materials : [newMaterial(0)];
@@ -1664,9 +1979,9 @@ function Calepinage({ calep, setCalep, params, onAddToDevis, flash }) {
 
   // Gestion des matériaux (onglets).
   const selectMat = (id) => setCalep((c) => ({ ...c, activeId: id }));
-  const addMaterial = () =>
+  const addMaterial = (kind = "panel") =>
     setCalep((c) => {
-      const m = newMaterial(c.materials.length);
+      const m = newMaterial(c.materials.length, kind);
       return { ...c, materials: [...c.materials, m], activeId: m.id };
     });
   const delMaterial = (id) =>
@@ -1682,14 +1997,19 @@ function Calepinage({ calep, setCalep, params, onAddToDevis, flash }) {
   const compById = (id) => computed.find((c) => c.id === id) || computeMaterial(activeMat);
   const active = compById(activeId);
   const { result, metrics, cutList, hasPieces } = active;
+  const isLinear = active.kind === "linear";
 
-  // Total tous matériaux confondus (uniquement ceux qui consomment ≥ 1 panneau).
+  // Total tous matériaux confondus (uniquement ceux qui consomment ≥ 1 panneau / barre).
   const grand = useMemo(() => {
-    let sheets = 0, cost = 0, lines = 0;
+    let sheets = 0, bars = 0, cost = 0, lines = 0;
     computed.forEach((c) => {
-      if (c.metrics.totalSheets > 0) { sheets += c.metrics.totalSheets; cost += c.metrics.totalCost; lines += 1; }
+      if (c.units > 0) {
+        if (c.kind === "linear") bars += c.units; else sheets += c.units;
+        cost += c.metrics.totalCost;
+        lines += 1;
+      }
     });
-    return { sheets, cost, lines };
+    return { sheets, bars, cost, lines };
   }, [computed]);
 
   const copyList = async () => {
@@ -1702,14 +2022,14 @@ function Calepinage({ calep, setCalep, params, onAddToDevis, flash }) {
   };
 
   const addActiveToDevis = () => {
-    if (metrics.totalSheets === 0) return;
+    if (active.units === 0) return;
     onAddToDevis(buildCalepLine(activeMat, active, params.marge));
   };
   const addAllToDevis = () => {
     const lines = [];
     materials.forEach((m) => {
       const c = compById(m.id);
-      if (c.metrics.totalSheets > 0) lines.push(buildCalepLine(m, c, params.marge));
+      if (c.units > 0) lines.push(buildCalepLine(m, c, params.marge));
     });
     if (lines.length) onAddToDevis(lines);
   };
@@ -1717,10 +2037,11 @@ function Calepinage({ calep, setCalep, params, onAddToDevis, flash }) {
   return (
     <div className="cl">
       <p className="muted tip">
-        Les panneaux s'achètent entiers. Ajoute un matériau par type de panneau
+        Les panneaux et les barres s'achètent entiers. Ajoute un matériau par type
         (ex. MDF 18 mm à 30 €/m², aglo blanc 8 mm à 15 €/m²) : chacun se débite sur
-        ses propres plaques et crée sa propre ligne de devis. Pour chaque matière,
-        indique la cote et le prix au m², puis liste les pièces (longueur × largeur, en mm).
+        ses propres plaques et crée sa propre ligne de devis. Pour les baguettes,
+        plinthes et profilés, ajoute un matériau « barre » : tu indiques la longueur
+        de la barre et son prix (au mètre linéaire ou à la barre), puis les longueurs à couper.
       </p>
 
       {/* onglets matériaux */}
@@ -1735,7 +2056,9 @@ function Calepinage({ calep, setCalep, params, onAddToDevis, flash }) {
               onClick={() => selectMat(m.id)}
             >
               <span className="cl-mat-name">{m.material || `Matière ${i + 1}`}</span>
-              <span className="cl-mat-badge">{c.metrics.totalSheets > 0 ? `${c.metrics.totalSheets} pann.` : "—"}</span>
+              <span className="cl-mat-badge">
+                {c.units > 0 ? `${c.units} ${c.kind === "linear" ? "barre" + (c.units > 1 ? "s" : "") : "pann."}` : "—"}
+              </span>
               {materials.length > 1 && (
                 <span
                   className="cl-mat-x"
@@ -1747,38 +2070,84 @@ function Calepinage({ calep, setCalep, params, onAddToDevis, flash }) {
             </button>
           );
         })}
-        <button type="button" className="btn add cl-mat-add" onClick={addMaterial}>+ Matière</button>
+        <button type="button" className="btn add cl-mat-add" onClick={() => addMaterial("panel")}>+ Matière</button>
+        <button
+          type="button"
+          className="btn add cl-lin-add"
+          title="Baguette, plinthe, profilé… débité en long dans des barres"
+          onClick={() => addMaterial("linear")}
+        >
+          + Barre / profilé
+        </button>
       </div>
 
       {/* stock + matière (matériau actif) */}
-      <div className="card-eyebrow">Panneau &amp; matière</div>
-      <div className="grid">
-        <Field label="Matière / désignation" wide>
-          <TextIn value={activeMat.material} onChange={(v) => setMat({ material: v })} placeholder="Ex. MDF 18 mm, aglo blanc 8 mm…" />
-        </Field>
-        <Field label="Longueur panneau">
-          <NumIn value={activeMat.panelW} onChange={(v) => setMat({ panelW: v })} suffix="mm" />
-        </Field>
-        <Field label="Largeur panneau">
-          <NumIn value={activeMat.panelH} onChange={(v) => setMat({ panelH: v })} suffix="mm" />
-        </Field>
-        <Field label="Prix matière" hint="HTVA, au m²">
-          <NumIn value={activeMat.pricePerM2} onChange={(v) => setMat({ pricePerM2: v })} suffix="€/m²" />
-        </Field>
-        <Field label="Trait de scie">
-          <NumIn value={activeMat.kerf} onChange={(v) => setMat({ kerf: v })} suffix="mm" />
-        </Field>
-        <Field label="Sens du fil">
-          <label className="tog cl-tog">
-            <input
-              type="checkbox"
-              checked={!!activeMat.grainDirection}
-              onChange={(e) => setMat({ grainDirection: e.target.checked })}
-            />
-            Bloquer la rotation
-          </label>
-        </Field>
-      </div>
+      <div className="card-eyebrow">{isLinear ? "Barre & matière" : "Panneau & matière"}</div>
+      {isLinear ? (
+        <div className="grid">
+          <Field label="Matière / désignation" wide>
+            <TextIn value={activeMat.material} onChange={(v) => setMat({ material: v })} placeholder="Ex. baguette chêne 20×20, profilé alu U…" />
+          </Field>
+          <Field label="Longueur de la barre" hint="longueur de stock vendue">
+            <NumIn value={activeMat.barLen} onChange={(v) => setMat({ barLen: v })} suffix="mm" />
+          </Field>
+          <Field label="Prix matière" hint="HTVA">
+            <div className="remise">
+              <NumIn value={activeMat.linPrice} onChange={(v) => setMat({ linPrice: v })} />
+              <select
+                className="in in-sel cl-pu"
+                aria-label="Unité du prix"
+                value={activeMat.linPriceUnit}
+                onChange={(e) => setMat({ linPriceUnit: e.target.value })}
+              >
+                <option value="ml">€ / ml</option>
+                <option value="bar">€ / barre</option>
+              </select>
+            </div>
+          </Field>
+          <Field label="Trait de scie">
+            <NumIn value={activeMat.kerf} onChange={(v) => setMat({ kerf: v })} suffix="mm" />
+          </Field>
+          <Field label="Facturation" hint="comment le fournisseur compte" wide>
+            <select
+              className="in in-sel"
+              value={activeMat.linBilling}
+              onChange={(e) => setMat({ linBilling: e.target.value })}
+            >
+              <option value="bar">Barres entières (on achète la barre complète)</option>
+              <option value="ml">Mètres débités (coupe à la demande, on ne paie que le ml utilisé)</option>
+            </select>
+          </Field>
+        </div>
+      ) : (
+        <div className="grid">
+          <Field label="Matière / désignation" wide>
+            <TextIn value={activeMat.material} onChange={(v) => setMat({ material: v })} placeholder="Ex. MDF 18 mm, aglo blanc 8 mm…" />
+          </Field>
+          <Field label="Longueur panneau">
+            <NumIn value={activeMat.panelW} onChange={(v) => setMat({ panelW: v })} suffix="mm" />
+          </Field>
+          <Field label="Largeur panneau">
+            <NumIn value={activeMat.panelH} onChange={(v) => setMat({ panelH: v })} suffix="mm" />
+          </Field>
+          <Field label="Prix matière" hint="HTVA, au m²">
+            <NumIn value={activeMat.pricePerM2} onChange={(v) => setMat({ pricePerM2: v })} suffix="€/m²" />
+          </Field>
+          <Field label="Trait de scie">
+            <NumIn value={activeMat.kerf} onChange={(v) => setMat({ kerf: v })} suffix="mm" />
+          </Field>
+          <Field label="Sens du fil">
+            <label className="tog cl-tog">
+              <input
+                type="checkbox"
+                checked={!!activeMat.grainDirection}
+                onChange={(e) => setMat({ grainDirection: e.target.checked })}
+              />
+              Bloquer la rotation
+            </label>
+          </Field>
+        </div>
+      )}
 
       {/* pièces (matériau actif) */}
       <div className="card-eyebrow mt">Pièces à débiter</div>
@@ -1787,20 +2156,24 @@ function Calepinage({ calep, setCalep, params, onAddToDevis, flash }) {
       )}
       {activeMat.pieces.length > 0 && (
         <div className="cl-pieces">
-          <div className="cl-prow cl-prow-head">
-            <span>Désignation</span><span>Long.</span><span>Larg.</span><span>Qté</span><span></span>
+          <div className={"cl-prow cl-prow-head" + (isLinear ? " cl-prow-lin" : "")}>
+            <span>Désignation</span><span>Long.{isLinear ? " (mm)" : ""}</span>
+            {!isLinear && <span>Larg.</span>}<span>Qté</span><span></span>
           </div>
           {activeMat.pieces.map((p) => (
-            <div className="cl-prow" key={p.id}>
+            <div className={"cl-prow" + (isLinear ? " cl-prow-lin" : "")} key={p.id}>
               <span className="cl-swatch-wrap">
                 <span className="cl-swatch" style={{ background: p.color }} />
-                <input className="in" type="text" value={p.label} placeholder="Ex. côté, étagère…"
+                <input className="in" type="text" value={p.label}
+                  placeholder={isLinear ? "Ex. plinthe salon, montant…" : "Ex. côté, étagère…"}
                   onChange={(e) => setPiece(p.id, { label: e.target.value })} />
               </span>
               <input className="in in-mono in-num" inputMode="decimal" value={p.w} placeholder="0"
                 onChange={(e) => setPiece(p.id, { w: e.target.value })} />
-              <input className="in in-mono in-num" inputMode="decimal" value={p.h} placeholder="0"
-                onChange={(e) => setPiece(p.id, { h: e.target.value })} />
+              {!isLinear && (
+                <input className="in in-mono in-num" inputMode="decimal" value={p.h} placeholder="0"
+                  onChange={(e) => setPiece(p.id, { h: e.target.value })} />
+              )}
               <input className="in in-mono in-num" inputMode="decimal" value={p.qty} placeholder="1"
                 onChange={(e) => setPiece(p.id, { qty: e.target.value })} />
               <button className="ico ico-del" title="Supprimer" onClick={() => delPiece(p.id)}>✕</button>
@@ -1816,34 +2189,72 @@ function Calepinage({ calep, setCalep, params, onAddToDevis, flash }) {
       {hasPieces && result && (
         <>
           <div className="card-eyebrow mt">Résultat — {activeMat.material || `Matière ${materials.indexOf(activeMat) + 1}`}</div>
-          <div className="sum-grid cl-stats">
-            <Stat label="Panneaux à acheter" value={String(metrics.totalSheets)} big />
-            <Stat label="Chute" value={nf1(metrics.totalWastePercent) + " %"} />
-            <Stat label="Coût / panneau" value={eur(metrics.costPerPanel)} muted />
-            <Stat label="Coût matière total" value={eur(metrics.totalCost)} color="var(--oak-2)" />
-          </div>
+          {isLinear ? (
+            <>
+              <div className="sum-grid cl-stats">
+                <Stat label="Barres à acheter" value={String(metrics.totalBars)} big />
+                <Stat label="Chute" value={nf1(metrics.totalWastePercent) + " %"} />
+                <Stat
+                  label={metrics.billing === "ml" ? "Mètres facturés" : "Mètres achetés"}
+                  value={nf2(metrics.billedM) + " ml"}
+                  sub={metrics.billing === "ml" ? undefined : `dont ${nf2(metrics.usedM)} ml utilisés`}
+                  muted
+                />
+                <Stat label="Coût matière total" value={eur(metrics.totalCost)} color="var(--oak-2)" />
+              </div>
+              <p className="muted tip cl-pu-note">
+                {eur(metrics.pricePerMl)} / ml · {eur(metrics.pricePerBar)} / barre de {num(activeMat.barLen)} mm
+              </p>
 
-          {result.unfitPieces.length > 0 && (
-            <div className="cl-warn">
-              ⚠ {result.unfitPieces.length} pièce(s) ne tiennent pas sur un panneau{" "}
-              {num(activeMat.panelW)}×{num(activeMat.panelH)} mm
-              {activeMat.grainDirection ? " (rotation bloquée — essaie de décocher « Bloquer la rotation »)" : ""}.
-              Vérifie les cotes : {result.unfitPieces.map((u) => u.label || "—").join(", ")}.
-            </div>
-          )}
+              {result.unfitPieces.length > 0 && (
+                <div className="cl-warn">
+                  ⚠ {result.unfitPieces.length} pièce(s) plus longues qu'une barre de {num(activeMat.barLen)} mm
+                  — impossible de les débiter d'un seul tenant. Vérifie les cotes :{" "}
+                  {result.unfitPieces.map((u) => u.label || "—").join(", ")}.
+                </div>
+              )}
 
-          {result.sheets.length > 0 && (
-            <div className="cl-sheets">
-              {result.sheets.map((s) => (
-                <SheetSVG key={s.sheetIndex} layout={s} panelW={num(activeMat.panelW)} panelH={num(activeMat.panelH)} index={s.sheetIndex} />
-              ))}
-            </div>
+              {result.bars.length > 0 && (
+                <div className="cl-bars">
+                  {result.bars.map((b) => (
+                    <BarSVG key={b.barIndex} layout={b} barLength={num(activeMat.barLen)} index={b.barIndex} />
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="sum-grid cl-stats">
+                <Stat label="Panneaux à acheter" value={String(metrics.totalSheets)} big />
+                <Stat label="Chute" value={nf1(metrics.totalWastePercent) + " %"} />
+                <Stat label="Coût / panneau" value={eur(metrics.costPerPanel)} muted />
+                <Stat label="Coût matière total" value={eur(metrics.totalCost)} color="var(--oak-2)" />
+              </div>
+
+              {result.unfitPieces.length > 0 && (
+                <div className="cl-warn">
+                  ⚠ {result.unfitPieces.length} pièce(s) ne tiennent pas sur un panneau{" "}
+                  {num(activeMat.panelW)}×{num(activeMat.panelH)} mm
+                  {activeMat.grainDirection ? " (rotation bloquée — essaie de décocher « Bloquer la rotation »)" : ""}.
+                  Vérifie les cotes : {result.unfitPieces.map((u) => u.label || "—").join(", ")}.
+                </div>
+              )}
+
+              {result.sheets.length > 0 && (
+                <div className="cl-sheets">
+                  {result.sheets.map((s) => (
+                    <SheetSVG key={s.sheetIndex} layout={s} panelW={num(activeMat.panelW)} panelH={num(activeMat.panelH)} index={s.sheetIndex} />
+                  ))}
+                </div>
+              )}
+            </>
           )}
 
           {/* liste de débit copiable */}
           <div className="card-eyebrow mt">Liste de débit — à copier pour le fournisseur</div>
           <p className="muted tip">
-            {cutList.totalPieces} pièce(s) · {cutList.distinct} cote(s) différente(s). Colonnes séparées
+            {cutList.totalPieces} pièce(s) · {cutList.distinct} cote(s) différente(s)
+            {isLinear ? ` · ${nf2(cutList.totalLength / 1000)} ml à débiter` : ""}. Colonnes séparées
             par des tabulations — colle directement dans un mail ou un tableur.
           </p>
           <textarea
@@ -1855,8 +2266,10 @@ function Calepinage({ calep, setCalep, params, onAddToDevis, flash }) {
           />
           <div className="add-row cl-actions">
             <button className="btn ghost" onClick={copyList}>Copier la liste</button>
-            <button className="btn" onClick={addActiveToDevis} disabled={metrics.totalSheets === 0}>
-              Ajouter au devis ({metrics.totalSheets} panneau{metrics.totalSheets > 1 ? "x" : ""})
+            <button className="btn" onClick={addActiveToDevis} disabled={active.units === 0}>
+              {isLinear
+                ? `Ajouter au devis (${metrics.totalBars} barre${metrics.totalBars > 1 ? "s" : ""}${metrics.billing === "ml" ? ` · ${nf2(metrics.usedM)} ml` : ""})`
+                : `Ajouter au devis (${metrics.totalSheets} panneau${metrics.totalSheets > 1 ? "x" : ""})`}
             </button>
           </div>
         </>
@@ -1866,7 +2279,11 @@ function Calepinage({ calep, setCalep, params, onAddToDevis, flash }) {
       {grand.lines > 1 && (
         <div className="cl-grand">
           <div className="cl-grand-sum">
-            <span><strong>{grand.sheets}</strong> panneau(x) · <strong>{grand.lines}</strong> matières chiffrées</span>
+            <span>
+              {grand.sheets > 0 && <><strong>{grand.sheets}</strong> panneau(x) · </>}
+              {grand.bars > 0 && <><strong>{grand.bars}</strong> barre(s) · </>}
+              <strong>{grand.lines}</strong> matières chiffrées
+            </span>
             <span className="cl-grand-cost">{eur(grand.cost)}</span>
           </div>
           <button type="button" className="btn" onClick={addAllToDevis}>
@@ -2157,6 +2574,45 @@ const CSS = `
 .cl-grand-sum{display:flex; flex-direction:column; gap:2px; font-size:13px; color:var(--ink-2)}
 .cl-grand-cost{font-family:var(--mono); font-size:16px; font-weight:700; color:var(--oak-2)}
 
+/* formatage du texte libre */
+.rich{display:flex; flex-direction:column}
+.fmt-bar{display:flex; align-items:center; gap:4px; margin-bottom:5px; flex-wrap:wrap}
+.fmt-btn{
+  min-width:28px; height:26px; padding:0 7px; border:1px solid var(--line); background:#fff;
+  border-radius:6px; cursor:pointer; color:var(--ink-2); font-family:var(--body); font-size:12.5px; line-height:1;
+}
+.fmt-btn:hover{border-color:var(--oak); color:var(--oak)}
+.fmt-help{margin-left:auto; font-size:10.5px; color:var(--ink-3)}
+.rt-preview{margin-top:6px; padding:8px 10px; border:1px dashed var(--line); border-radius:7px; background:#fffdf8; font-size:12.5px}
+.rt-preview-lab{display:block; font-family:var(--display); font-size:9.5px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--oak-2); margin-bottom:3px}
+.rt p{margin:0; white-space:pre-wrap}
+.rt p + p, .rt p + ul, .rt p + ol, .rt ul + p, .rt ol + p{margin-top:4px}
+.rt ul, .rt ol{margin:3px 0; padding-left:20px}
+.rt li{margin:0}
+.in-ro{background:#f3efe6; color:var(--ink-2); cursor:default}
+
+/* mètre linéaire (fournitures) */
+.ml{padding:2px 12px 0}
+.ml-toggle{margin:4px 0 6px}
+.ml-box{border:1px solid var(--line); border-radius:8px; background:#fffdf8; padding:10px 11px; display:flex; flex-direction:column; gap:7px; margin-bottom:8px}
+.ml-head{display:flex; align-items:center; gap:8px; font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-3); font-weight:600}
+.ml-unit{width:72px; padding:4px 6px; text-transform:none; letter-spacing:0}
+.ml-row{display:grid; grid-template-columns:150px 80px 30px; gap:8px; align-items:center}
+.ml-row .in{padding:7px 9px; font-size:13px}
+.ml-foot{display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap}
+.ml-perte{display:flex; align-items:center; gap:8px; font-size:11.5px; color:var(--ink-2)}
+.ml-perte .numwrap{width:96px}
+.ml-sum{display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; font-size:12px; color:var(--ink-2); border-top:1px dashed var(--line); padding-top:8px}
+.ml-qte b{color:var(--oak-2)}
+
+/* calepinage : barres / profilés */
+.cl-prow-lin{grid-template-columns:1fr 110px 70px 30px}
+.cl-bars{display:flex; flex-direction:column; gap:10px; margin:4px 0 6px}
+.cl-bar{margin:0}
+.cl-lin-add{padding:7px 11px}
+.remise .cl-pu{width:104px; flex:none}
+.cl-pu-note{margin:-6px 0 10px}
+
 .toast{position:fixed; bottom:22px; left:50%; transform:translateX(-50%); background:var(--ink); color:#fff; padding:11px 20px; border-radius:8px; font-size:13px; font-weight:500; z-index:60; box-shadow:0 8px 24px rgba(0,0,0,.3)}
 
 /* responsive */
@@ -2173,6 +2629,7 @@ const CSS = `
   .s-parties{grid-template-columns:1fr}
   .s-totals{width:100%}
   .cl-prow{grid-template-columns:1fr 64px 64px 50px 28px; gap:6px}
+  .cl-prow-lin{grid-template-columns:1fr 84px 50px 28px}
   .cl-sheet{max-width:none}
 }
 
