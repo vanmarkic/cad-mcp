@@ -726,4 +726,195 @@ test("UI", { skip: chromium ? false : "playwright not installed" }, async (t) =>
     assert.deepEqual(p._errors, []);
     await p.close();
   });
+  /* ======================= export / import d'UN devis (additif) ======================= */
+  const clientField = (p) => p.locator('label.fld:has(span.fld-lab:text-is("Client")) input');
+  const rowsMeta = (p) => p.locator(".qrow-meta").allInnerTexts();
+  const exportRow = async (p, i, name) => {
+    const [download] = await Promise.all([
+      p.waitForEvent("download"),
+      p.locator(".qrow").nth(i).locator('button:has-text("Exporter")').click(),
+    ]);
+    const file = path.join(os.tmpdir(), name);
+    await download.saveAs(file);
+    return { file, name: download.suggestedFilename(), json: JSON.parse(fs.readFileSync(file, "utf8")) };
+  };
+
+  await t.test("devis seul: exporter depuis « Mes devis », supprimer, réimporter → le devis revient", async () => {
+    const p = await newPage();
+    await clientField(p).fill("Alice");
+    await p.click('button:has-text("Enregistrer")');
+    await p.waitForTimeout(150);
+    await p.click('button:has-text("Mes devis")');
+    await p.waitForSelector(".qrow");
+
+    const ex = await exportRow(p, 0, "etabli-un-devis-1.json");
+    assert.match(ex.name, /^etabli-devis-DEV-\d{4}-001-\d{4}-\d{2}-\d{2}\.json$/, "nom de fichier = numéro + date");
+    assert.equal(ex.json.app, "etabli");
+    assert.equal(ex.json.kind, "quote");
+    assert.equal(ex.json.data.quotes.length, 1, "un seul devis dans le fichier");
+    assert.equal(ex.json.data.quotes[0].client.nom, "Alice");
+
+    await p.click(".qrow .btn.danger");
+    await p.waitForTimeout(120);
+    assert.equal(await p.locator(".qrow").count(), 0);
+
+    await p.locator(".devis-file").setInputFiles(ex.file);
+    await p.waitForSelector(".qrow");
+    assert.equal(await p.locator(".qrow").count(), 1, "le devis importé est dans la liste");
+    assert.match((await rowsMeta(p))[0], /Alice/);
+    assert.match(await p.locator(".toast").innerText(), /Devis importé/);
+    assert.deepEqual(p._errors, []);
+    await p.close();
+  });
+
+  await t.test("devis seul: import additif — même fichier deux fois = pas de doublon ; contenu modifié = copie, l'original reste", async () => {
+    const p = await newPage();
+    await clientField(p).fill("Alice");
+    await p.click('button:has-text("Enregistrer")');
+    await p.waitForTimeout(150);
+    await p.click('button:has-text("Mes devis")');
+    await p.waitForSelector(".qrow");
+    const ex = await exportRow(p, 0, "etabli-un-devis-2.json");
+
+    // 1) même fichier, même contenu : « déjà là », rien d'ajouté
+    await p.locator(".devis-file").setInputFiles(ex.file);
+    await p.waitForTimeout(200);
+    assert.equal(await p.locator(".qrow").count(), 1, "pas de doublon");
+    assert.match(await p.locator(".toast").innerText(), /déjà dans/);
+
+    // 2) on modifie le devis (même id) puis on réimporte l'ancien fichier → copie
+    await p.keyboard.press("Escape");
+    await clientField(p).fill("Alice v2");
+    await p.click('button:has-text("Enregistrer")');
+    await p.waitForTimeout(150);
+    await p.click('button:has-text("Mes devis")');
+    await p.waitForSelector(".qrow");
+    assert.equal(await p.locator(".qrow").count(), 1, "l'enregistrement met à jour sur place");
+    await p.locator(".devis-file").setInputFiles(ex.file);
+    await p.waitForTimeout(250);
+    assert.equal(await p.locator(".qrow").count(), 2, "le devis importé est AJOUTÉ");
+    const metas = await rowsMeta(p);
+    assert.ok(metas.some((m) => /Alice v2/.test(m)), "la version modifiée n'est pas écrasée");
+    assert.ok(metas.some((m) => /Alice(?! v2)/.test(m)), "la version importée est présente");
+    assert.match(await p.locator(".toast").innerText(), /copie/);
+    assert.deepEqual(p._errors, []);
+    await p.close();
+  });
+
+  await t.test("devis seul: « Exporter le devis en cours » exporte le brouillon sans l'enregistrer", async () => {
+    const p = await newPage();
+    await clientField(p).fill("Zoé");
+    await p.click('button:has-text("Mes devis")');
+    await p.waitForSelector(".qtools");
+    const [download] = await Promise.all([
+      p.waitForEvent("download"),
+      p.click('button:has-text("Exporter le devis en cours")'),
+    ]);
+    const file = path.join(os.tmpdir(), "etabli-un-devis-3.json");
+    await download.saveAs(file);
+    const json = JSON.parse(fs.readFileSync(file, "utf8"));
+    assert.equal(json.kind, "quote");
+    assert.equal(json.data.quotes[0].client.nom, "Zoé", "les modifications non enregistrées sont exportées");
+    assert.equal(await p.locator(".qrow").count(), 0, "exporter n'enregistre pas le devis");
+    assert.deepEqual(p._errors, []);
+    await p.close();
+  });
+
+  await t.test("devis seul: l'import ne touche pas au devis en cours, et signale un numéro déjà utilisé", async () => {
+    const p = await newPage();
+    await clientField(p).fill("Alice");
+    await p.click('button:has-text("Enregistrer")');
+    await p.waitForTimeout(150);
+    await p.click('button:has-text("Mes devis")');
+    await p.waitForSelector(".qrow");
+    const numero = (await p.locator(".qrow-num").first().innerText()).trim();
+    await p.keyboard.press("Escape");
+
+    // brouillon en cours (non enregistré) que l'import ne doit pas toucher
+    await clientField(p).fill("Brouillon en cours");
+
+    // un devis venu d'un autre poste : autre id, MÊME numéro
+    const foreign = {
+      app: "etabli", kind: "quote", version: 1, exportedAt: null,
+      data: { quotes: [{ id: "q_autre_poste", numero, dateISO: "2026-10-30", client: { nom: "Bob", adresse: "", email: "", tel: "" },
+        chantier: "", clientType: "particulier", tvaRate: 6, tvaFournitures: "", remiseType: "eur", remiseVal: "", deplacement: "",
+        deplacementCout: "", acompte: "30", validite: "30", conditions: "",
+        lines: [{ id: "l1", type: "forfait", designation: "Forfait", pa: "100", marge: "10" }] }] },
+    };
+    const file = path.join(os.tmpdir(), "etabli-un-devis-4.json");
+    fs.writeFileSync(file, JSON.stringify(foreign));
+    await p.click('button:has-text("Mes devis")');
+    await p.waitForSelector(".qrow");
+    await p.locator(".devis-file").setInputFiles(file);
+    await p.waitForTimeout(250);
+    assert.equal(await p.locator(".qrow").count(), 2, "ajouté à côté de l'existant");
+    assert.match(await p.locator(".toast").innerText(), /porte déjà ce numéro/);
+    const nums = await p.locator(".qrow-num").allInnerTexts();
+    assert.deepEqual(nums.map((n) => n.trim()), [numero, numero], "le numéro n'est pas modifié");
+
+    await p.keyboard.press("Escape");
+    assert.equal(await clientField(p).inputValue(), "Brouillon en cours", "le devis en cours est intact");
+    assert.deepEqual(p._errors, []);
+    await p.close();
+  });
+
+  await t.test("devis seul: un fichier invalide ou une sauvegarde complète est refusé sans rien changer", async () => {
+    const p = await newPage();
+    await clientField(p).fill("Alice");
+    await p.click('button:has-text("Enregistrer")');
+    await p.waitForTimeout(150);
+    await p.click('button:has-text("Mes devis")');
+    await p.waitForSelector(".qrow");
+
+    const bad = path.join(os.tmpdir(), "etabli-un-devis-bad.json");
+    fs.writeFileSync(bad, "{pas du json");
+    await p.locator(".devis-file").setInputFiles(bad);
+    await p.waitForTimeout(200);
+    assert.match(await p.locator(".toast").innerText(), /Échec.*(illisible|JSON)/i);
+
+    const full = path.join(os.tmpdir(), "etabli-un-devis-full.json");
+    fs.writeFileSync(full, JSON.stringify({ app: "etabli", version: 1, data: { quotes: [{ id: "x", numero: "X", lines: [] }] } }));
+    await p.locator(".devis-file").setInputFiles(full);
+    await p.waitForTimeout(200);
+    assert.match(await p.locator(".toast").innerText(), /sauvegarde complète/i);
+
+    const broken = path.join(os.tmpdir(), "etabli-un-devis-broken.json");
+    fs.writeFileSync(broken, JSON.stringify({ app: "etabli", kind: "quote", version: 1, data: { quotes: [{ id: "x", numero: "X", lines: [{ type: "bizarre" }] }] } }));
+    await p.locator(".devis-file").setInputFiles(broken);
+    await p.waitForTimeout(200);
+    assert.match(await p.locator(".toast").innerText(), /type inconnu/i);
+
+    assert.equal(await p.locator(".qrow").count(), 1, "la liste n'a pas bougé");
+    assert.deepEqual(p._errors, []);
+    await p.close();
+  });
+
+  await t.test("devis seul: un devis importé se charge et se calcule comme à l'origine", async () => {
+    const p = await newPage();
+    // devis avec une fourniture (2 × 30 € + 20 %) et du texte enrichi dans le détail
+    await clientField(p).fill("Carla");
+    await p.click('button.add:has-text("Fourniture")');
+    await p.waitForSelector(".line");
+    const line = p.locator(".line").first();
+    await line.locator(".line-title").fill("MDF 18");
+    await line.getByText("Quantité (métré)").locator("..").locator("input").fill("2");
+    await line.getByText("Prix d'achat / u").locator("..").locator("input").fill("30");
+    await line.getByText("Marge", { exact: true }).locator("..").locator("input").fill("20");
+    await line.locator(".line-detail textarea").fill("Pose **soignée**");
+    await p.click('button:has-text("Enregistrer")');
+    await p.waitForTimeout(150);
+    await p.click('button:has-text("Mes devis")');
+    await p.waitForSelector(".qrow");
+    const ex = await exportRow(p, 0, "etabli-un-devis-5.json");
+    await p.click(".qrow .btn.danger");
+    await p.locator(".devis-file").setInputFiles(ex.file);
+    await p.waitForSelector(".qrow");
+    await p.click('.qrow .btn:has-text("Charger")');
+    await p.waitForSelector(".line");
+    assert.equal(await clientField(p).inputValue(), "Carla");
+    assert.match(await p.locator(".line-figs").innerText(), /Vente HTVA\s+72,00/, "2 × 30 € + 20 % = 72 €");
+    assert.equal(await p.locator(".line .line-detail textarea").inputValue(), "Pose **soignée**");
+    assert.deepEqual(p._errors, []);
+    await p.close();
+  });
 });

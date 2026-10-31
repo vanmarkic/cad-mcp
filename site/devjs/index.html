@@ -32,7 +32,7 @@ window.storage = {
 
 <script type="text/babel" data-presets="react">
 const { useState, useEffect, useMemo, useRef } = React;
-const { num, computeLine, tvaBreakdown, calculateCutlist, panelMetrics, cutListText, newQuoteId, upsertQuote, removeQuote, nextQuoteNumero, buildBackup, readBackup, mergeQuotes, catalogItemFromLine, upsertCatalogItem, removeCatalogItem, searchCatalog, applyCatalogItemToLine, mergeCatalog, linearLineQty, linearDetailText, calculateLinearCutlist, linearMetrics, linearCutListText, parseRichText, hasRichFormatting, applyTextFormat } = window.EtabliCore;
+const { num, computeLine, tvaBreakdown, calculateCutlist, panelMetrics, cutListText, newQuoteId, upsertQuote, removeQuote, nextQuoteNumero, buildBackup, readBackup, mergeQuotes, catalogItemFromLine, upsertCatalogItem, removeCatalogItem, searchCatalog, applyCatalogItemToLine, mergeCatalog, linearLineQty, linearDetailText, calculateLinearCutlist, linearMetrics, linearCutListText, parseRichText, hasRichFormatting, applyTextFormat, buildQuoteExport, readQuoteExport, quoteFileName, addImportedQuote } = window.EtabliCore;
 
 /* =========================================================================
    ÉTABLI — Générateur de devis pour menuisier
@@ -476,6 +476,8 @@ function App() {
   const [params, setParams] = useState(DEFAULT_PARAMS);
   const [devis, setDevis] = useState(() => newDevis(DEFAULT_COMPANY, DEFAULT_PARAMS));
   const [saved, setSaved] = useState([]);
+  const savedRef = useRef([]); // dernier `saved` — lu par les callbacks asynchrones (FileReader)
+  savedRef.current = saved;
   const [catalog, setCatalog] = useState([]); // fournitures réutilisables
   const [modal, setModal] = useState(null); // 'reglages' | 'mesdevis' | 'catalogue' | 'calepinage' | null
   const [toast, setToast] = useState("");
@@ -529,9 +531,9 @@ function App() {
     } catch (e) {}
   }, [calep]);
 
-  const flash = (m) => {
+  const flash = (m, ms = 2200) => {
     setToast(m);
-    setTimeout(() => setToast(""), 2200);
+    setTimeout(() => setToast(""), ms);
   };
 
   const persistSettings = async (c, p) => {
@@ -734,21 +736,64 @@ function App() {
 
   /* ---------- sauvegarde / restauration de TOUTES les données ---------- */
   // Télécharge un .json regroupant réglages + devis + calepinage + catalogue.
+  const downloadJSON = (obj, filename) => {
+    const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  };
   const exportAll = () => {
     const bundle = buildBackup(
       { settings: { company, params }, quotes: saved, calepinage: calep, catalogue: catalog },
       { exportedAt: new Date().toISOString() }
     );
-    const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "etabli-sauvegarde-" + todayISO() + ".json";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 0);
+    downloadJSON(bundle, "etabli-sauvegarde-" + todayISO() + ".json");
     flash("Sauvegarde téléchargée (" + saved.length + " devis)");
+  };
+
+  /* ---------- export / import d'UN SEUL devis (additif) ---------- */
+  // Télécharge un devis (celui d'une ligne de « Mes devis », ou le devis en cours).
+  const exportQuote = (q) => {
+    downloadJSON(buildQuoteExport(q, { exportedAt: new Date().toISOString() }), quoteFileName(q, todayISO()));
+    flash("Devis exporté : " + (q.numero || "sans numéro"));
+  };
+  // AJOUTE le devis du fichier à « Mes devis » : n'écrase rien, ne touche ni au devis
+  // en cours, ni aux réglages, ni au catalogue (voir addImportedQuote dans le noyau).
+  const importQuote = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      let incoming;
+      try {
+        incoming = readQuoteExport(String(reader.result));
+      } catch (e) {
+        flash("Échec : " + (e && e.message ? e.message : "fichier invalide"), 5000);
+        return;
+      }
+      const res = addImportedQuote(savedRef.current, { ...incoming, _savedAt: new Date().toISOString() });
+      const label = incoming.numero || "sans numéro";
+      if (res.status === "duplicate") {
+        flash("Ce devis est déjà dans « Mes devis » (" + label + ") — rien n'a été ajouté", 4500);
+        return;
+      }
+      savedRef.current = res.list;
+      setSaved(res.list);
+      persistQuotes(res.list);
+      if (res.status === "copy") {
+        flash("Importé comme copie : un devis de même identifiant mais de contenu différent existe déjà (" + label + ")", 6000);
+      } else if (res.numeroClash) {
+        flash("Devis importé : " + label + " — attention, un autre devis porte déjà ce numéro", 6000);
+      } else {
+        flash("Devis importé : " + label);
+      }
+    };
+    reader.onerror = () => flash("Échec de lecture du fichier");
+    reader.readAsText(file);
   };
   // Réimporte une sauvegarde : réglages/calepinage remplacés, devis FUSIONNÉS
   // par id (rien n'est supprimé). Tolère les sections absentes.
@@ -925,37 +970,14 @@ function App() {
       )}
       {modal === "mesdevis" && (
         <Modal title="Mes devis" onClose={() => setModal(null)}>
-          {saved.length === 0 ? (
-            <p className="muted">
-              Aucun devis enregistré pour l'instant. Clique sur « Enregistrer »
-              pour garder un devis ici.
-            </p>
-          ) : (
-            <ul className="qlist">
-              {saved.map((q) => (
-                <li key={q.id || q.numero} className="qrow">
-                  <div>
-                    <div className="qrow-num">{q.numero}</div>
-                    <div className="qrow-meta">
-                      {q.client?.nom || "Client —"} · {frDate(q.dateISO)} ·{" "}
-                      {q.lines?.length || 0} ligne(s)
-                    </div>
-                  </div>
-                  <div className="qrow-act">
-                    <button className="btn sm" onClick={() => loadQuote(q)}>
-                      Charger
-                    </button>
-                    <button
-                      className="btn sm danger"
-                      onClick={() => deleteQuote(q.id || q.numero)}
-                    >
-                      Suppr.
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
+          <MesDevis
+            saved={saved}
+            onLoad={loadQuote}
+            onDelete={deleteQuote}
+            onExport={exportQuote}
+            onExportCurrent={() => exportQuote(devis)}
+            onImport={importQuote}
+          />
         </Modal>
       )}
 
@@ -1695,6 +1717,72 @@ function ClientSheet({ devis, company, calc, onPrint }) {
 /* =========================================================================
    REGLAGES
    ========================================================================= */
+/* =========================================================================
+   MODAL Mes devis — liste + export / import d'un seul devis
+   ========================================================================= */
+function MesDevis({ saved, onLoad, onDelete, onExport, onExportCurrent, onImport }) {
+  const fileRef = useRef(null);
+  return (
+    <div>
+      <div className="qtools">
+        <button className="btn sm" onClick={() => fileRef.current && fileRef.current.click()}>
+          Importer un devis…
+        </button>
+        <button className="btn sm add" onClick={onExportCurrent}>
+          Exporter le devis en cours
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="application/json,.json"
+          className="devis-file"
+          onChange={(e) => {
+            const f = e.target.files && e.target.files[0];
+            e.target.value = "";
+            onImport(f);
+          }}
+        />
+      </div>
+      <p className="muted qtools-note">
+        L'import <strong>ajoute</strong> le devis du fichier à cette liste : il n'écrase aucun
+        devis existant et ne touche pas au devis en cours. Pour tout transférer d'un coup,
+        utilise <em>Réglages → Sauvegarde des données</em>.
+      </p>
+      {saved.length === 0 ? (
+        <p className="muted">
+          Aucun devis enregistré pour l'instant. Clique sur « Enregistrer »
+          pour garder un devis ici.
+        </p>
+      ) : (
+        <ul className="qlist">
+          {saved.map((q) => (
+            <li key={q.id || q.numero} className="qrow">
+              <div>
+                <div className="qrow-num">{q.numero}</div>
+                <div className="qrow-meta">
+                  {q.client?.nom || "Client —"} · {frDate(q.dateISO)} ·{" "}
+                  {q.lines?.length || 0} ligne(s)
+                </div>
+              </div>
+              <div className="qrow-act">
+                <button className="btn sm" onClick={() => onLoad(q)}>
+                  Charger
+                </button>
+                <button className="btn sm add" title="Télécharger ce devis en .json" onClick={() => onExport(q)}>
+                  Exporter
+                </button>
+                <button className="btn sm danger" onClick={() => onDelete(q.id || q.numero)}>
+                  Suppr.
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 /* =========================================================================
    MODAL Catalogue — piocher / gérer les fournitures réutilisables
    ========================================================================= */
@@ -2536,7 +2624,10 @@ const CSS = `
 .qrow{display:flex; align-items:center; justify-content:space-between; gap:12px; border:1px solid var(--line); border-radius:9px; padding:11px 13px; background:#fff}
 .qrow-num{font-family:var(--mono); font-weight:600; font-size:13.5px}
 .qrow-meta{font-size:11.5px; color:var(--ink-3); margin-top:2px}
-.qrow-act{display:flex; gap:7px}
+.qrow-act{display:flex; gap:7px; flex-wrap:wrap; justify-content:flex-end}
+.qtools{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px}
+.qtools-note{margin:0 0 14px; font-size:12px; line-height:1.5}
+.devis-file{display:none}
 
 /* calepinage */
 .cl .grid{margin-bottom:4px}

@@ -326,6 +326,153 @@
   }
 
   /* =========================================================================
+     EXPORT / IMPORT D'UN SEUL DEVIS — strictement ADDITIF.
+     Un fichier .json = un devis. L'import AJOUTE le devis à « Mes devis » :
+     il n'écrase jamais un devis existant et ne touche ni au devis en cours, ni
+     aux réglages, ni au catalogue.
+       - identifiant absent de la liste → ajouté tel quel ;
+       - même identifiant ET même contenu → déjà là, rien n'est ajouté
+         (réimporter deux fois le même fichier ne crée pas de doublon) ;
+       - même identifiant mais contenu différent → ajouté comme COPIE, sous un
+         nouvel identifiant (l'existant reste intact).
+     Le fichier reprend l'enveloppe de la sauvegarde complète (`data.quotes`, ici
+     à un seul élément) + `kind:"quote"` : « Réglages → Restaurer » sait donc le
+     relire aussi (par fusion), alors que l'import d'un seul devis refuse une
+     sauvegarde complète — on n'ajoute pas 50 devis par erreur.
+     ========================================================================= */
+  var QUOTE_FILE_KIND = "quote";
+  var LINE_TYPES = ["fourniture", "main", "forfait"];
+
+  function cloneJSON(v) { return JSON.parse(JSON.stringify(v)); }
+  function isPlainObject(v) { return !!v && typeof v === "object" && !Array.isArray(v); }
+  function strOf(v) { return v == null ? "" : String(v); }
+
+  var _lineSeq = 0;
+  function newLineId() {
+    _lineSeq += 1;
+    return "l_" + Date.now().toString(36) + "_" + _lineSeq.toString(36) + Math.floor(Math.random() * 1e6).toString(36);
+  }
+
+  // Emballe UN devis. `_savedAt` (horodatage local de « Enregistrer ») n'est pas
+  // exporté ; un devis sans id reçoit un identifiant stable.
+  function buildQuoteExport(quote, meta) {
+    meta = meta || {};
+    var q = cloneJSON(quote || {});
+    delete q._savedAt;
+    if (q.id == null || q.id === "") q.id = newQuoteId();
+    return {
+      app: BACKUP_APP,
+      kind: QUOTE_FILE_KIND,
+      version: BACKUP_VERSION,
+      exportedAt: meta.exportedAt != null ? meta.exportedAt : null,
+      data: { quotes: [q] },
+    };
+  }
+
+  // Nom de fichier : etabli-devis-<numéro>-<date>.json (numéro nettoyé : sans accents
+  // ni caractères interdits dans un nom de fichier).
+  function quoteFileName(quote, dateISO) {
+    var n = strOf(quote && quote.numero).trim();
+    if (n.normalize) n = n.normalize("NFD").replace(/[̀-ͯ]/g, "");
+    n = n.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+    return "etabli-devis-" + (n || "sans-numero") + (dateISO ? "-" + dateISO : "") + ".json";
+  }
+
+  // Valide la STRUCTURE d'un devis venu d'un fichier (pas ses montants) pour qu'il
+  // ne puisse pas faire planter l'appli au chargement : client objet, lignes
+  // objets de type connu, identifiants présents et uniques. Un devis bien formé
+  // (celui que produit l'export) ressort identique.
+  function normalizeQuote(q) {
+    if (!isPlainObject(q)) throw new Error("Devis invalide.");
+    if (!Array.isArray(q.lines)) throw new Error("Devis invalide : la liste des lignes est absente.");
+    var out = cloneJSON(q);
+    delete out._savedAt;
+    if (out.id == null || out.id === "") out.id = newQuoteId();
+    out.numero = strOf(out.numero);
+    var c = isPlainObject(out.client) ? out.client : {};
+    ["nom", "adresse", "email", "tel"].forEach(function (k) { c[k] = strOf(c[k]); });
+    out.client = c;
+    var seen = {};
+    out.lines = out.lines.map(function (l, i) {
+      if (!isPlainObject(l)) throw new Error("Devis invalide : la ligne " + (i + 1) + " est illisible.");
+      if (LINE_TYPES.indexOf(l.type) < 0) throw new Error("Devis invalide : type inconnu à la ligne " + (i + 1) + ".");
+      if (l.id == null || l.id === "" || seen["k:" + l.id]) l.id = newLineId();
+      seen["k:" + l.id] = true;
+      return l;
+    });
+    return out;
+  }
+
+  // Lit un fichier d'export d'UN devis (chaîne JSON ou objet) → le devis normalisé.
+  // Erreurs explicites : JSON invalide, autre appli, sauvegarde complète, devis abîmé.
+  function readQuoteExport(input) {
+    var obj;
+    if (typeof input === "string") {
+      try { obj = JSON.parse(input); }
+      catch (e) { throw new Error("Fichier illisible (JSON invalide)."); }
+    } else {
+      obj = input;
+    }
+    if (!isPlainObject(obj) || obj.app !== BACKUP_APP || !isPlainObject(obj.data)) {
+      throw new Error("Ce fichier n'est pas un devis Établi.");
+    }
+    if (obj.kind !== QUOTE_FILE_KIND) {
+      throw new Error("C'est une sauvegarde complète, pas un devis seul : utilise Réglages → « Restaurer… ».");
+    }
+    var list = obj.data.quotes;
+    if (!Array.isArray(list) || list.length !== 1) {
+      throw new Error("Fichier de devis invalide (un seul devis attendu).");
+    }
+    return normalizeQuote(list[0]);
+  }
+
+  // Sérialisation JSON à clés triées : deux devis de même contenu donnent la même chaîne.
+  function stableStringify(v) {
+    if (Array.isArray(v)) return "[" + v.map(stableStringify).join(",") + "]";
+    if (v && typeof v === "object") {
+      return "{" + Object.keys(v).sort().filter(function (k) { return v[k] !== undefined; }).map(function (k) {
+        return JSON.stringify(k) + ":" + stableStringify(v[k]);
+      }).join(",") + "}";
+    }
+    return JSON.stringify(v);
+  }
+  // Même devis, hors horodatage d'enregistrement ?
+  function sameQuoteContent(a, b) {
+    function bare(q) { var c = {}; for (var k in q) if (Object.prototype.hasOwnProperty.call(q, k) && k !== "_savedAt") c[k] = q[k]; return c; }
+    return stableStringify(bare(a || {})) === stableStringify(bare(b || {}));
+  }
+
+  // Ajoute un devis importé à la liste, SANS rien écraser.
+  // Rend { list, status, quote, numeroClash } :
+  //   status "added"     — nouvel identifiant : ajouté en tête ;
+  //   status "duplicate" — même id et même contenu : liste inchangée ;
+  //   status "copy"      — même id, contenu différent : ajouté sous un NOUVEL id ;
+  //   numeroClash        — un autre devis (autre id) porte déjà ce numéro (information :
+  //                        le numéro n'est jamais modifié, il appartient à l'utilisateur).
+  function addImportedQuote(list, quote) {
+    list = Array.isArray(list) ? list.slice() : [];
+    var q = quote, status = "added", key = quoteKey(quote);
+    for (var i = 0; i < list.length; i++) {
+      if (quoteKey(list[i]) !== key) continue;
+      if (sameQuoteContent(list[i], quote)) {
+        return { list: list, status: "duplicate", quote: list[i], numeroClash: false };
+      }
+      q = {};
+      for (var k in quote) if (Object.prototype.hasOwnProperty.call(quote, k)) q[k] = quote[k];
+      q.id = newQuoteId();
+      status = "copy";
+      break;
+    }
+    var clash = false;
+    if (strOf(q.numero) !== "") {
+      for (var j = 0; j < list.length; j++) {
+        if (list[j] && strOf(list[j].numero) === strOf(q.numero) && quoteKey(list[j]) !== quoteKey(q)) { clash = true; break; }
+      }
+    }
+    return { list: [q].concat(list), status: status, quote: q, numeroClash: clash };
+  }
+
+  /* =========================================================================
      CALEPINAGE — bin packing « guillotine » tenant compte du trait de scie.
      Toutes les longueurs partagent la même unité (l'UI utilise le mm).
      On essaie plusieurs heuristiques (tri × score × découpe) et on garde le
@@ -1103,6 +1250,10 @@
     buildBackup: buildBackup,
     readBackup: readBackup,
     mergeQuotes: mergeQuotes,
+    buildQuoteExport: buildQuoteExport,
+    readQuoteExport: readQuoteExport,
+    quoteFileName: quoteFileName,
+    addImportedQuote: addImportedQuote,
     newCatalogItemId: newCatalogItemId,
     catalogItemFromLine: catalogItemFromLine,
     upsertCatalogItem: upsertCatalogItem,
