@@ -121,6 +121,34 @@ puis les longueurs à couper (désignation, longueur, quantité). L'outil calcul
 utilisé → ligne `X ml × prix/ml`). Panneaux et barres cohabitent dans un même
 calepinage ; « Ajouter tout au devis » crée une ligne par matière.
 
+## Exporter / importer UN seul devis (additif)
+
+Dans **« Mes devis »** :
+
+- **« Exporter »** (sur chaque ligne) télécharge ce devis en
+  `etabli-devis-<numéro>-AAAA-MM-JJ.json` ; **« Exporter le devis en cours »**
+  fait de même pour le brouillon en cours d'édition (même non enregistré, sans
+  l'enregistrer).
+- **« Importer un devis… »** relit un tel fichier et **ajoute** le devis à la liste.
+  L'import est strictement additif : il n'écrase aucun devis existant et ne touche
+  ni au devis en cours, ni aux réglages, ni au catalogue.
+
+Comportement selon ce que la liste contient déjà :
+
+| Cas | Résultat |
+|---|---|
+| Identifiant inconnu | ajouté en tête de liste |
+| Même identifiant **et** même contenu | « déjà dans Mes devis » — rien n'est ajouté (réimporter deux fois le même fichier ne crée pas de doublon) |
+| Même identifiant, contenu **différent** (ex. le devis a été modifié depuis l'export) | ajouté comme **copie**, sous un nouvel identifiant ; l'existant reste tel quel |
+| Un autre devis porte déjà le même **numéro** (cas courant entre deux postes) | ajouté, avec un avertissement ; le numéro n'est jamais modifié |
+
+Un fichier illisible, d'une autre application, abîmé (lignes manquantes ou de type
+inconnu) ou une **sauvegarde complète** est refusé avec un message clair, sans rien
+changer — on n'ajoute pas cinquante devis par erreur : pour tout transférer, utiliser
+la sauvegarde complète ci-dessus. Le fichier d'un devis reprend la même enveloppe que
+la sauvegarde complète (avec `kind: "quote"`), donc *Réglages → Restaurer…* sait aussi
+le relire, mais par **fusion** (un devis de même identifiant y est alors mis à jour).
+
 ## Calepinage de panneaux (cutlist)
 
 Bouton **« Calepinage »** dans la barre du haut. Les panneaux s'achètent
@@ -172,7 +200,10 @@ et adapté au **système métrique** (mm + €/m²).
   devis + calepinage + catalogue), `readBackup` (relit/valide un fichier, refuse
   les fichiers étrangers) et `mergeQuotes`/`mergeCatalog` (fusion sans perte).
   L'UI ne garde que le glue navigateur : téléchargement (Blob) et lecture de
-  fichier (FileReader). Le **mètre linéaire** y vit aussi : `linearTotal` /
+  fichier (FileReader). L'**export/import d'un seul devis** y est pur aussi :
+  `buildQuoteExport`, `readQuoteExport` (valide la structure, refuse une sauvegarde
+  complète), `quoteFileName` et `addImportedQuote` (ajout sans écrasement :
+  ajouté / déjà présent / copie, avertissement de numéro). Le **mètre linéaire** y vit aussi : `linearTotal` /
   `linearLineQty` / `linearDetailText` (lignes de fourniture, utilisés par
   `computeLine`), `calculateLinearCutlist` (découpe 1D), `linearMetrics` (coût au
   ml ou à la barre, barres entières ou ml débités) et `linearCutListText`. Le
@@ -203,7 +234,11 @@ npm test                          # tout
   extraction depuis une ligne, dédoublonnage par désignation, recherche
   préfixe-d'abord, remplissage d'une ligne, fusion sans perte ; **sauvegarde** :
   aller-retour `buildBackup`/`readBackup` (catalogue inclus), refus d'un fichier
-  étranger, fusion `mergeQuotes`/`mergeCatalog` sans perte ; **texte enrichi** :
+  étranger, fusion `mergeQuotes`/`mergeCatalog` sans perte ; **devis seul** :
+  aller-retour export/lecture, refus (JSON cassé, autre appli, sauvegarde complète,
+  0 ou 2 devis, lignes illisibles), réparation (client, ids), nom de fichier, ajout
+  additif (nouvel id, doublon identique ignoré, copie si contenu différent,
+  numéro déjà utilisé) ; **texte enrichi** :
   gras/italique/souligné/combinaisons, mots non balisés (`3*4`, `réf_12_B`),
   échappements, listes, HTML laissé en texte, entrées dégénérées, barre d'outils
   (bascule, sélection restituée, marques imbriquées, multi-lignes, listes) avec un
@@ -221,7 +256,10 @@ npm test                          # tout
   sauvegarde**, parcours complet du calepinage, et **deux matériaux distincts →
   deux lignes de devis** (« Ajouter tout au devis »), **formatage** (barre
   d'outils, raccourci Ctrl+B, rendu chez le client, HTML non interprété),
-  **fourniture au mètre linéaire** (longueurs → ml → prix → feuille client,
+  **devis seul** (exporter depuis « Mes devis » puis réimporter, import additif :
+  doublon ignoré / copie / numéro déjà utilisé, brouillon exporté sans être
+  enregistré, devis en cours intact, fichiers refusés, devis importé recalculé à
+  l'identique), **fourniture au mètre linéaire** (longueurs → ml → prix → feuille client,
   conversion cm/mm), **calepinage de barres** (nombre de barres, coût, schémas,
   facturation au ml débité, pièce trop longue, panneau + barre ensemble) et
   **compatibilité** (calepinage et devis antérieurs, sans les nouveaux champs, se

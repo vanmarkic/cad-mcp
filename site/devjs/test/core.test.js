@@ -835,3 +835,141 @@ test("parseRichText: robuste sur des entrées dégénérées (pas de boucle infi
   const long = "*a ".repeat(2000) + "**b ".repeat(2000);
   assert.doesNotThrow(() => C.parseRichText(long));
 });
+
+/* =========================================================================
+   EXPORT / IMPORT D'UN SEUL DEVIS (additif)
+   ========================================================================= */
+const mkQuote = (over) => ({
+  id: "q1", numero: "DEV-2026-001", dateISO: "2026-10-31",
+  client: { nom: "Alice", adresse: "Rue X 1", email: "", tel: "" },
+  chantier: "Dressing **sur mesure**", clientType: "particulier", tvaRate: 6, tvaFournitures: "",
+  remiseType: "eur", remiseVal: "", deplacement: "", deplacementCout: "", acompte: "30", validite: "30", conditions: "- acompte 30 %",
+  lines: [
+    { id: "l1", type: "fourniture", designation: "MDF", qte: "2", unite: "m²", pa: "30", marge: "20", mlOn: false, mlItems: [] },
+    { id: "l2", type: "main", designation: "Pose", heures: "4", tauxVente: "55", coutHoraire: "35" },
+  ],
+  ...over,
+});
+
+test("buildQuoteExport: enveloppe Établi à UN devis, sans _savedAt, id garanti, source intacte", () => {
+  const q = mkQuote({ _savedAt: "2026-10-31T10:00:00.000Z" });
+  const b = C.buildQuoteExport(q, { exportedAt: "2026-10-31T11:00:00.000Z" });
+  assert.equal(b.app, "etabli");
+  assert.equal(b.kind, "quote");
+  assert.equal(b.exportedAt, "2026-10-31T11:00:00.000Z");
+  assert.equal(b.data.quotes.length, 1);
+  assert.equal(b.data.quotes[0].numero, "DEV-2026-001");
+  assert.equal(b.data.quotes[0]._savedAt, undefined, "l'horodatage local n'est pas exporté");
+  assert.equal(q._savedAt, "2026-10-31T10:00:00.000Z", "le devis d'origine n'est pas modifié");
+  const noId = C.buildQuoteExport({ numero: "X", lines: [] }, {});
+  assert.ok(noId.data.quotes[0].id, "un devis sans id reçoit un identifiant");
+});
+
+test("buildQuoteExport → readQuoteExport: aller-retour identique (chaîne JSON ou objet)", () => {
+  const q = mkQuote();
+  const file = JSON.stringify(C.buildQuoteExport(q, {}));
+  assert.deepEqual(C.readQuoteExport(file), q);
+  assert.deepEqual(C.readQuoteExport(C.buildQuoteExport(q, {})), q);
+});
+
+test("le fichier d'un devis reste lisible par « Restaurer » (readBackup) → fusion d'un devis", () => {
+  const r = C.readBackup(JSON.stringify(C.buildQuoteExport(mkQuote(), {})));
+  assert.equal(r.quotes.length, 1);
+  assert.equal(r.settings, null);
+  assert.equal(r.calepinage, null);
+  assert.deepEqual(r.catalogue, []);
+});
+
+test("readQuoteExport: refus clairs (JSON cassé, autre appli, sauvegarde complète, 0 ou 2 devis)", () => {
+  assert.throws(() => C.readQuoteExport("{pas du json"), /illisible|JSON/i);
+  assert.throws(() => C.readQuoteExport(JSON.stringify({ app: "autre", data: {} })), /pas un devis/i);
+  assert.throws(() => C.readQuoteExport("[]"), /pas un devis/i);
+  assert.throws(() => C.readQuoteExport(JSON.stringify(C.buildBackup({ quotes: [mkQuote()] }, {}))), /sauvegarde complète.*Restaurer/i,
+    "une sauvegarde complète (même avec 1 devis) n'est pas un devis seul");
+  const two = C.buildQuoteExport(mkQuote(), {});
+  two.data.quotes.push(mkQuote({ id: "q2" }));
+  assert.throws(() => C.readQuoteExport(two), /un seul devis/i);
+  const zero = C.buildQuoteExport(mkQuote(), {});
+  zero.data.quotes = [];
+  assert.throws(() => C.readQuoteExport(zero), /un seul devis/i);
+});
+
+test("readQuoteExport: structure abîmée → erreur (ou réparée) plutôt qu'un plantage au chargement", () => {
+  const wrap = (q) => ({ app: "etabli", kind: "quote", version: 1, data: { quotes: [q] } });
+  assert.throws(() => C.readQuoteExport(wrap("pas un objet")), /Devis invalide/);
+  assert.throws(() => C.readQuoteExport(wrap({ numero: "A" })), /lignes est absente/);
+  assert.throws(() => C.readQuoteExport(wrap({ lines: [42] })), /ligne 1 est illisible/);
+  assert.throws(() => C.readQuoteExport(wrap({ lines: [{ type: "fourniture" }, { type: "bizarre" }] })), /type inconnu à la ligne 2/);
+  // réparé : client manquant, ids absents ou en double
+  const fixed = C.readQuoteExport(wrap({ lines: [{ type: "main" }, { id: "a", type: "main" }, { id: "a", type: "forfait" }] }));
+  assert.deepEqual(fixed.client, { nom: "", adresse: "", email: "", tel: "" }, "client toujours présent");
+  assert.ok(fixed.id, "id de devis généré");
+  const ids = fixed.lines.map((l) => l.id);
+  assert.equal(new Set(ids).size, 3, "ids de lignes présents et uniques");
+  assert.equal(fixed.numero, "");
+});
+
+test("quoteFileName: numéro nettoyé (accents, espaces, caractères interdits)", () => {
+  assert.equal(C.quoteFileName({ numero: "DEV-2026-003" }, "2026-10-31"), "etabli-devis-DEV-2026-003-2026-10-31.json");
+  assert.equal(C.quoteFileName({ numero: "Devis été/2026 n°4" }, "2026-10-31"), "etabli-devis-Devis-ete-2026-n-4-2026-10-31.json");
+  assert.equal(C.quoteFileName({ numero: "  " }, "2026-10-31"), "etabli-devis-sans-numero-2026-10-31.json");
+  assert.equal(C.quoteFileName({}, ""), "etabli-devis-sans-numero.json");
+});
+
+test("addImportedQuote: nouvel identifiant → ajouté en tête, l'existant est intact", () => {
+  const list = [mkQuote({ id: "a", numero: "DEV-1" }), mkQuote({ id: "b", numero: "DEV-2" })];
+  const r = C.addImportedQuote(list, mkQuote({ id: "c", numero: "DEV-3" }));
+  assert.equal(r.status, "added");
+  assert.equal(r.numeroClash, false);
+  assert.deepEqual(r.list.map((q) => q.id), ["c", "a", "b"]);
+  assert.equal(list.length, 2, "la liste d'entrée n'est pas mutée");
+});
+
+test("addImportedQuote: même id ET même contenu → déjà là, rien n'est ajouté (idempotent, _savedAt ignoré)", () => {
+  const list = [mkQuote({ _savedAt: "2026-01-01T00:00:00.000Z" })];
+  const r = C.addImportedQuote(list, mkQuote({ _savedAt: "2026-10-31T00:00:00.000Z" }));
+  assert.equal(r.status, "duplicate");
+  assert.equal(r.list.length, 1);
+  assert.equal(r.list[0]._savedAt, "2026-01-01T00:00:00.000Z", "l'existant n'est pas touché");
+});
+
+test("addImportedQuote: même id mais contenu différent → COPIE sous un nouvel id, l'original reste intact", () => {
+  const original = mkQuote({ client: { nom: "Alice", adresse: "", email: "", tel: "" } });
+  const edited = mkQuote({ client: { nom: "Alice modifiée", adresse: "", email: "", tel: "" } });
+  const r = C.addImportedQuote([original], edited);
+  assert.equal(r.status, "copy");
+  assert.equal(r.list.length, 2);
+  assert.notEqual(r.quote.id, "q1", "la copie a un nouvel identifiant");
+  assert.equal(r.quote.client.nom, "Alice modifiée");
+  const kept = r.list.find((q) => q.id === "q1");
+  assert.equal(kept.client.nom, "Alice", "l'existant n'est pas écrasé");
+  assert.equal(edited.id, "q1", "le devis entrant n'est pas muté");
+});
+
+test("addImportedQuote: un autre devis porte déjà ce numéro → signalé, numéro jamais modifié", () => {
+  const list = [mkQuote({ id: "a", numero: "DEV-2026-001" })];
+  const r = C.addImportedQuote(list, mkQuote({ id: "z", numero: "DEV-2026-001", client: { nom: "Zoé", adresse: "", email: "", tel: "" } }));
+  assert.equal(r.status, "added");
+  assert.equal(r.numeroClash, true);
+  assert.equal(r.quote.numero, "DEV-2026-001", "le numéro appartient à l'utilisateur : inchangé");
+  assert.equal(r.list.length, 2);
+  // numéro vide : jamais un « conflit »
+  assert.equal(C.addImportedQuote([mkQuote({ id: "a", numero: "" })], mkQuote({ id: "b", numero: "" })).numeroClash, false);
+});
+
+test("addImportedQuote: liste vide / absente, et devis hérités sans id (clé = numéro)", () => {
+  assert.equal(C.addImportedQuote(undefined, mkQuote()).list.length, 1);
+  const legacy = [{ numero: "DEV-OLD", client: { nom: "Ancien" }, lines: [] }];
+  const r = C.addImportedQuote(legacy, mkQuote({ id: "n", numero: "DEV-NEW" }));
+  assert.equal(r.status, "added");
+  assert.equal(r.list.length, 2);
+});
+
+test("import additif: le devis importé se calcule comme à l'origine (lignes, montants, texte enrichi)", () => {
+  const q = mkQuote();
+  const back = C.readQuoteExport(JSON.stringify(C.buildQuoteExport(q, {})));
+  const before = q.lines.map((l) => C.computeLine(l));
+  const after = back.lines.map((l) => C.computeLine(l));
+  assert.deepEqual(after, before);
+  assert.equal(C.hasRichFormatting(back.chantier), true, "le balisage du texte enrichi voyage avec le devis");
+});
