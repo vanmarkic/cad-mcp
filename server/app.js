@@ -3,6 +3,7 @@
    Aucune dépendance. Voir README.md (dossier deploy/) pour l'exploitation. */
 const fs = require("node:fs");
 const path = require("node:path");
+const net = require("node:net");
 const { Store, ID_RE } = require("./lib/store.js");
 const Auth = require("./lib/auth.js");
 
@@ -44,12 +45,16 @@ function createApp(userCfg) {
     res.end(body);
   }
 
-  // IP du client (limitation des tentatives). Derrière un proxy, l'en-tête n'est digne de
-  // confiance QUE si le serveur n'est joignable que par ce proxy (voir deploy/README.md).
+  // IP du client (limitation des tentatives). Derrière un proxy, l'en-tête n'est digne de confiance QUE si le
+  // serveur ne reçoit que du trafic de ce proxy (voir deploy/README.md et cloudflare-ips.sh). Une valeur qui
+  // n'est pas une adresse IP valide est ignorée : on retombe sur l'adresse de la connexion.
   function clientIp(req) {
-    if (cfg.trustProxy === "cf" && req.headers["cf-connecting-ip"]) return String(req.headers["cf-connecting-ip"]).trim();
-    if (cfg.trustProxy === "xff" && req.headers["x-forwarded-for"]) return String(req.headers["x-forwarded-for"]).split(",")[0].trim();
-    return req.socket.remoteAddress || "?";
+    const sock = req.socket.remoteAddress || "?";
+    let h = "";
+    if (cfg.trustProxy === "cf") h = req.headers["cf-connecting-ip"];
+    else if (cfg.trustProxy === "xff") h = String(req.headers["x-forwarded-for"] || "").split(",")[0];
+    h = h ? String(h).trim() : "";
+    return h && net.isIP(h) ? h : sock;
   }
 
   // Protection CSRF : requête du même site uniquement (en plus de SameSite=Lax et du Content-Type JSON).

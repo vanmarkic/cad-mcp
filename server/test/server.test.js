@@ -171,6 +171,21 @@ test("auth: IP réelle lue dans CF-Connecting-IP uniquement si TRUST_PROXY=cf", 
   });
 });
 
+test("auth: un en-tête d'IP qui n'est pas une adresse valide est ignoré (impossible d'éviter le verrou avec des valeurs inventées)", () => withServer(async (s) => {
+  await s.app.users.add("paul", "motdepasse-solide");
+  const c = client(s.base);
+  for (let i = 0; i < 5; i++) await c.post("/api/login", { login: "paul", password: "x" }, { "CF-Connecting-IP": "n-importe-quoi-" + i });
+  assert.equal((await c.post("/api/login", { login: "paul", password: "motdepasse-solide" }, { "CF-Connecting-IP": "encore-autre-chose" })).status, 429);
+}, { cfg: { trustProxy: "cf" } }));
+
+test("auth: X-Forwarded-For (TRUST_PROXY=xff) — premier élément valide utilisé, IPv6 acceptée", () => withServer(async (s) => {
+  await s.app.users.add("paul", "motdepasse-solide");
+  const c = client(s.base);
+  for (let i = 0; i < 5; i++) await c.post("/api/login", { login: "paul", password: "x" }, { "X-Forwarded-For": "2001:db8::1, 10.0.0.1" });
+  assert.equal((await c.post("/api/login", { login: "paul", password: "motdepasse-solide" }, { "X-Forwarded-For": "2001:db8::1" })).status, 429);
+  assert.equal((await c.post("/api/login", { login: "paul", password: "motdepasse-solide" }, { "X-Forwarded-For": "2001:db8::2" })).status, 200, "autre IP : non verrouillée");
+}, { cfg: { trustProxy: "xff" } }));
+
 /* ---------------------------------------------------------------- CSRF / entrées */
 test("CSRF: Origin étranger, Sec-Fetch-Site cross-site ou Content-Type non JSON → refusé", () => withServer(async (s) => {
   const c = await loggedIn(s);

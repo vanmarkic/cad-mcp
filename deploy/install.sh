@@ -59,6 +59,7 @@ git -C "$TMP/r" sparse-checkout set deploy
 D="$TMP/r/deploy"
 install -m 755 -o root -g root "$D/update.sh" "$BASE/update.sh"
 install -m 755 -o root -g root "$D/backup.sh" "$BASE/backup.sh"
+install -m 755 -o root -g root "$D/cloudflare-ips.sh" "$BASE/cloudflare-ips.sh"
 install -m 755 "$D/etabli-admin" /usr/local/bin/etabli-admin
 for u in etabli.service etabli-update.service etabli-update.timer etabli-backup.service etabli-backup.timer; do
   install -m 644 "$D/$u" "/etc/systemd/system/$u"

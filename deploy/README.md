@@ -22,11 +22,12 @@
 
 | Élément | Vérifié ? |
 |---|---|
-| Serveur : authentification, stockage, conflits, import additif, protections (traversée de répertoire, CSRF, limitation des tentatives, 413) | Oui — 28 tests |
+| Serveur : authentification, stockage, conflits, import additif, protections (traversée de répertoire, CSRF, limitation des tentatives, IP invalide, 413) | Oui — 30 tests |
 | Application en mode serveur dans un vrai navigateur : connexion, persistance, conflit entre 2 appareils, session expirée, réseau coupé, **migration entre 2 origines** | Oui — 11 tests Playwright |
 | `update.sh` (tirage, tests, bascule, retour arrière, nettoyage, verrou) et `backup.sh`, contre un faux GitHub local | Oui — 9 tests |
 | Clone partiel + sparse checkout contre le **vrai** dépôt public | Oui (0,6 Mo au lieu de 527 Mo) |
-| `install.sh`, unités systemd, `cloud-init.yaml`, Caddy, pare-feu sur un **vrai serveur** | **Non** — syntaxe vérifiée seulement. À essayer sur un serveur jetable d'abord. |
+| Caddyfile d'exemple (options A et B) : syntaxe **et** comportement réel (403 hors Cloudflare, proxy depuis une plage autorisée), avec Caddy 2.6.2 | Oui — 5 tests |
+| `install.sh`, unités systemd, `cloud-init.yaml`, certificats Let's Encrypt, pare-feu sur un **vrai serveur** | **Non** — syntaxe vérifiée seulement. À essayer sur un serveur jetable d'abord. |
 | Un navigateur réel (autre que Chromium) | Non |
 
 ## Installation
@@ -53,13 +54,26 @@ Caddy, ÉTABLI, pare-feu local, et construit le nom `<ip>.sslip.io`. Il reste à
 
 ## Nom de domaine : sslip.io ou Cloudflare, pas les deux
 
-- **sslip.io** (`46-224-43-248.sslip.io` → `46.224.43.248`) : aucun DNS à gérer, Caddy obtient le certificat
+- **sslip.io** (`203-0-113-10.sslip.io` → `203.0.113.10`) : aucun DNS à gérer, Caddy obtient le certificat
   Let's Encrypt. Le serveur est alors exposé directement : `TRUST_PROXY=xff`.
-- **« Derrière Cloudflare »** exige un nom de domaine qui est une zone **de votre compte Cloudflare**. C'est
-  impossible avec sslip.io (la zone DNS n'est pas à vous). Il faut un domaine à vous : `TRUST_PROXY=cf`, SSL
-  « Full (strict) », et ports 80/443 ouverts **uniquement aux adresses de Cloudflare**. Sans cela, l'en-tête
-  `CF-Connecting-IP` est falsifiable en visitant directement l'IP du serveur, ce qui contourne la limitation des
-  tentatives de connexion.
+- **Derrière Cloudflare** exige un nom de domaine qui est une zone **de votre compte Cloudflare** (impossible avec
+  sslip.io : la zone DNS n'est pas à vous). Mise en place :
+  1. Cloudflare → DNS : enregistrement **A** `etabli` → IP du serveur, **Proxied** (nuage orange).
+  2. Cloudflare → SSL/TLS : mode **Full (strict)**.
+  3. Serveur, `/etc/etabli/env` : `TRUST_PROXY=cf`, puis `systemctl restart etabli`.
+  4. Serveur : `sudo /opt/etabli/cloudflare-ips.sh` (écrit `/etc/caddy/etabli-cloudflare.caddy`), puis le bloc
+     « Option B » de `Caddyfile.example` dans votre Caddyfile, puis `systemctl reload caddy`.
+  5. Rafraîchir les plages de temps en temps (elles changent rarement) :
+     `0 4 * * 1  root  /opt/etabli/cloudflare-ips.sh && systemctl reload caddy` dans `/etc/cron.d/etabli-cloudflare`.
+
+  **Pourquoi l'étape 4 compte.** ÉTABLI lit l'IP du visiteur dans `CF-Connecting-IP`. Si le serveur répond aussi à
+  des connexions directes, cet en-tête est falsifiable : chaque essai de mot de passe peut prétendre venir d'une IP
+  différente, et le verrouillage ne se déclenche jamais. Le fichier généré fait répondre **403** à tout ce qui ne
+  vient pas d'une plage Cloudflare, avant d'atteindre ÉTABLI, **pour ce site seulement** (les autres sites du même
+  Caddy et le pare-feu ne sont pas touchés). Si les plages deviennent périmées, des visiteurs légitimes peuvent
+  recevoir un 403 : d'où le rafraîchissement.
+  Certificat d'origine : Caddy demande normalement un certificat Let's Encrypt, ce qui doit fonctionner derrière le
+  proxy ; si la validation échoue, utilisez un **certificat d'origine Cloudflare** (SSL/TLS → Origin Server) à la place.
 
 ## Comptes
 
@@ -126,8 +140,8 @@ anti-framing ; seuls `index.html`, `migrate.html` et `lib/*.js` sont servis ; se
 
 **À votre charge** :
 - HTTPS (Caddy) et le choix sslip.io / domaine (voir plus haut) ; pare-feu (Hetzner Cloud Firewall et/ou `ufw`).
-  Le serveur actuel `ubuntu-8gb-fsn1-1` n'a **aucun** pare-feu Hetzner attaché et héberge d'autres services : un
-  serveur dédié limite l'exposition des données entre services.
+  Sur un serveur qui héberge d'autres services, les données d'ÉTABLI partagent leur exposition : un serveur dédié
+  est plus sûr.
 - Données personnelles : les devis contiennent nom, adresse, e-mail et téléphone de clients finaux. Hébergement
   dans l'UE (Falkenstein, Allemagne), accès par compte, sauvegardes : à documenter pour votre client
   (responsable de traitement / sous-traitant). Ce n'est pas un avis juridique.
@@ -142,8 +156,8 @@ la saisie reste à l'écran) ; deux appareils sur le même devis : le second est
 ## Tests
 
 ```bash
-cd server && npm test                              # serveur (28 tests, sans réseau)
+cd server && npm test                              # serveur (30 tests, sans réseau)
 cd site/devjs && npm run test:unit                 # noyau + couche de stockage (hors ligne)
 cd site/devjs && npm run test:ui                   # navigateur : mode local + mode serveur (Playwright)
-node --test deploy/test/update.test.js             # update.sh / backup.sh contre un faux GitHub local
+node --test deploy/test/*.test.js                  # update.sh / backup.sh (faux GitHub local) et cloudflare-ips.sh (Caddy si installé)
 ```
