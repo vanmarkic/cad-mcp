@@ -155,6 +155,15 @@
           return r.status === 200 ? { ok: true, summary: r.json } : toFailure(null, r);
         }, function (e) { return toFailure(e); });
       },
+      // Changement de mot de passe : { ok } ou { ok:false, kind:"invalid"|"locked"|…, message }.
+      changePassword: function (current, next) {
+        return call("POST", "/api/password", { current: current, next: next }).then(function (r) {
+          if (r.status === 200) return OK;
+          if (r.status === 400) return fail("invalid", (r.json && r.json.error) || "Changement refusé.");
+          if (r.status === 429) return fail("locked", (r.json && r.json.error) || "Trop de tentatives.", { retryAfter: Number(r.headers && r.headers.get && r.headers.get("retry-after")) || 0 });
+          return toFailure(null, r);
+        }, function (e) { return toFailure(e); });
+      },
       skipMigration: function () { return call("POST", "/api/migrated", {}).then(function (r) { return r.status === 200 ? OK : toFailure(null, r); }, function (e) { return toFailure(e); }); },
     };
   }

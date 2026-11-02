@@ -172,6 +172,31 @@ function createApp(userCfg) {
       if (m === "DELETE") { await store.deleteQuote(who, id); return send(res, 200, { ok: true }); }
     }
 
+    // Changement de mot de passe par l'utilisateur lui-même : l'ancien est exigé (et compte dans la limitation
+    // des tentatives, comme une connexion). Toutes les AUTRES sessions sont déconnectées ; celle-ci reçoit un
+    // nouveau cookie. Erreurs en 400 (pas 401 : la session reste valide).
+    if (p === "/api/password" && m === "POST") {
+      const body = await readJSONBody(req, res);
+      const current = typeof body.current === "string" ? body.current : "";
+      const next = typeof body.next === "string" ? body.next : "";
+      const ip = clientIp(req), k1 = ip + "|" + who;
+      const lock = limitLogin.check(k1).locked ? limitLogin.check(k1) : limitIp.check(ip);
+      if (lock.locked) return send(res, 429, { error: "Trop de tentatives. Réessayez plus tard." }, { "Retry-After": String(lock.retryAfterSec) });
+      if (next.length < 10) return send(res, 400, { error: "Nouveau mot de passe trop court (10 caractères minimum)." });
+      if (next.length > 256) return send(res, 400, { error: "Nouveau mot de passe trop long (256 caractères maximum)." });
+      if (next === current) return send(res, 400, { error: "Le nouveau mot de passe doit être différent de l'actuel." });
+      const ok = current.length <= 256 ? await users.check(who, current) : null;
+      if (!ok) {
+        limitLogin.fail(k1); limitIp.fail(ip);
+        return send(res, 400, { error: "Mot de passe actuel incorrect." });
+      }
+      limitLogin.success(k1);
+      await users.setPassword(who, next); // incrémente l'epoch : les autres sessions tombent
+      const rec = (await users.load()).users[who];
+      const token = Auth.signSession(secret, { login: who, epoch: rec.epoch || 1 }, ttlMs);
+      return send(res, 200, { ok: true }, { "Set-Cookie": Auth.cookieHeader(token, { secure: cfg.cookieSecure, maxAgeSec: Math.floor(ttlMs / 1000) }) });
+    }
+
     if (p === "/api/import" && m === "POST") {
       const body = await readJSONBody(req, res);
       try { return send(res, 200, await store.importBackup(who, body.backup)); }

@@ -202,3 +202,13 @@ test("serveur: importBackup et skipMigration", async () => {
   const err = await S.createServerStore(fakeFetch(() => ({ status: 400, json: { error: "Ce fichier n'est pas une sauvegarde Établi." } }))).importBackup({});
   assert.deepEqual([err.ok, err.kind], [false, "server"]);
 });
+
+test("serveur: changePassword — succès, refus (400 → « invalid », sans déconnexion), verrouillage", async () => {
+  let unauth = 0;
+  const mk = (r) => S.createServerStore(fakeFetch(() => r), () => unauth++);
+  assert.deepEqual(await mk({ status: 200, json: { ok: true } }).changePassword("a", "b"), { ok: true });
+  const bad = await mk({ status: 400, json: { error: "Mot de passe actuel incorrect." } }).changePassword("a", "b");
+  assert.deepEqual([bad.ok, bad.kind, bad.message, unauth], [false, "invalid", "Mot de passe actuel incorrect.", 0]);
+  const lock = await mk({ status: 429, json: { error: "Trop de tentatives." }, headers: { "retry-after": "600" } }).changePassword("a", "b");
+  assert.deepEqual([lock.kind, lock.retryAfter], ["locked", 600]);
+});

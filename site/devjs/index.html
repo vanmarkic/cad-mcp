@@ -1186,6 +1186,8 @@ function App({ store, me, onLogout }) {
         <Modal title="Réglages" onClose={() => setModal(null)} wide>
           <Reglages
             onMigrate={serverMode && me && me.legacyUrl ? () => setModal("migration") : null}
+            onChangePassword={serverMode ? (cur, nxt) => store.changePassword(cur, nxt) : null}
+            account={serverMode && me ? me.login : null}
             company={company}
             params={params}
             quoteCount={saved.length}
@@ -2140,7 +2142,57 @@ function Catalogue({ catalog, onInsert, onDelete }) {
   );
 }
 
-function Reglages({ company, params, onSave, onExport, onImport, quoteCount, onMigrate }) {
+// Changement de mot de passe (mode serveur) : ancien + nouveau + confirmation ; les autres appareils sont
+// déconnectés, celui-ci reste connecté.
+function PasswordForm({ account, onChange }) {
+  const [cur, setCur] = useState("");
+  const [nxt, setNxt] = useState("");
+  const [conf, setConf] = useState("");
+  const [msg, setMsg] = useState(null); // { ok, text }
+  const [busy, setBusy] = useState(false);
+  const tooShort = nxt.length > 0 && nxt.length < 10;
+  const mismatch = conf.length > 0 && conf !== nxt;
+  const submit = async (e) => {
+    e.preventDefault();
+    if (nxt.length < 10 || nxt !== conf) return;
+    setBusy(true); setMsg(null);
+    const r = await onChange(cur, nxt);
+    setBusy(false);
+    if (r.ok) {
+      setCur(""); setNxt(""); setConf("");
+      setMsg({ ok: true, text: "Mot de passe changé. Vos autres appareils devront se reconnecter." });
+    } else {
+      setCur("");
+      setMsg({ ok: false, text: r.kind === "locked" ? `${r.message} Réessayez dans ${Math.max(1, Math.ceil((r.retryAfter || 60) / 60))} min.` : r.message });
+    }
+  };
+  return (
+    <form className="pwform" onSubmit={submit}>
+      <div className="card-eyebrow mt">Mon compte{account ? ` — ${account}` : ""}</div>
+      {/* champ caché : aide les gestionnaires de mots de passe à associer l'identifiant */}
+      <input type="text" name="username" autoComplete="username" value={account || ""} readOnly hidden />
+      <div className="grid">
+        <Field label="Mot de passe actuel">
+          <input className="in" type="password" name="current-password" autoComplete="current-password" value={cur} onChange={(e) => setCur(e.target.value)} />
+        </Field>
+        <Field label="Nouveau mot de passe" hint={tooShort ? "10 caractères minimum" : "10 caractères minimum ; une phrase de passe est idéale"}>
+          <input className="in" type="password" name="new-password" autoComplete="new-password" value={nxt} onChange={(e) => setNxt(e.target.value)} />
+        </Field>
+        <Field label="Confirmer" hint={mismatch ? "ne correspond pas" : undefined}>
+          <input className="in" type="password" name="confirm-password" autoComplete="new-password" value={conf} onChange={(e) => setConf(e.target.value)} />
+        </Field>
+      </div>
+      {msg ? <p className={"pw-msg " + (msg.ok ? "pw-ok" : "pw-err")} role="status">{msg.text}</p> : null}
+      <div className="reglages-backup-act">
+        <button className="btn" type="submit" disabled={busy || !cur || nxt.length < 10 || nxt !== conf}>
+          {busy ? "Changement…" : "Changer le mot de passe"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function Reglages({ company, params, onSave, onExport, onImport, quoteCount, onMigrate, onChangePassword, account }) {
   const [c, setC] = useState(company);
   const [p, setP] = useState(params);
   const fileRef = useRef(null);
@@ -2231,6 +2283,8 @@ function Reglages({ company, params, onSave, onExport, onImport, quoteCount, onM
           }}
         />
       </div>
+
+      {onChangePassword ? <PasswordForm account={account} onChange={onChangePassword} /> : null}
 
       {onMigrate ? (
         <>
@@ -2945,6 +2999,10 @@ const CSS = `
 .qtools{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px}
 .qtools-note{margin:0 0 14px; font-size:12px; line-height:1.5}
 .devis-file{display:none}
+.pw-msg{margin:10px 0 0; padding:8px 10px; border-radius:7px; font-size:13px}
+.pw-ok{background:#e2eee5; color:#2d5238}
+.pw-err{background:#f6e9e2; color:#7c2a1d}
+.btn:disabled{opacity:.55; cursor:default}
 .bar-user{align-self:center; font-size:12px; color:#c9bda6; padding:0 4px; letter-spacing:.02em}
 .syncbar{background:#f6e9e2; border-bottom:2px solid var(--brick); color:#7c2a1d; padding:9px 18px; font-size:13px; display:flex; gap:10px; align-items:center; flex-wrap:wrap}
 .btn.ghost-dark{background:transparent; color:var(--ink-2); border:1px solid var(--line)}
