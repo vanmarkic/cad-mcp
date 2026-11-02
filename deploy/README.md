@@ -22,7 +22,7 @@
 
 | Élément | Vérifié ? |
 |---|---|
-| Serveur : authentification, stockage, conflits, import additif, protections (traversée de répertoire, CSRF, limitation des tentatives, IP invalide, secret d'origine EDGE_SECRET, 413) | Oui — 33 tests |
+| Serveur : authentification, stockage, conflits, import additif, protections (traversée de répertoire, CSRF, limitation des tentatives, IP invalide, secret d'origine EDGE_SECRET, changement de mot de passe, 413) | Oui — 36 tests |
 | Application en mode serveur dans un vrai navigateur : connexion, persistance, conflit entre 2 appareils, session expirée, réseau coupé, **migration entre 2 origines** | Oui — 11 tests Playwright |
 | `update.sh` (tirage, tests, bascule, retour arrière, nettoyage, verrou) et `backup.sh`, contre un faux GitHub local (dont le contrôle de santé sur HOST/PORT) | Oui — 11 tests |
 | Clone partiel + sparse checkout contre le **vrai** dépôt public | Oui (0,6 Mo au lieu de 527 Mo) |
@@ -143,7 +143,8 @@ etabli-admin revoke <login>                    # déconnecte toutes les sessions
 etabli-admin list
 ```
 Chaque compte a ses données dans `accounts/<login>/` : un compte ne voit jamais celles d'un autre.
-Il n'y a pas (encore) de changement de mot de passe par l'utilisateur lui-même : c'est `etabli-admin passwd`.
+L'utilisateur peut aussi changer son mot de passe lui-même : *Réglages → Mon compte* (l'ancien est exigé et compte dans
+la limitation des tentatives ; ses autres appareils sont déconnectés, celui-ci reste connecté). En cas d'oubli : `etabli-admin passwd`.
 
 ## Migration depuis l'ancienne adresse (1re connexion)
 
@@ -211,12 +212,12 @@ anti-framing ; seuls `index.html`, `migrate.html` et `lib/*.js` sont servis ; se
 
 Un seul serveur (pas de haute disponibilité) ; pas de mode hors connexion (un réseau coupé affiche un bandeau et
 la saisie reste à l'écran) ; deux appareils sur le même devis : le second est averti d'un conflit et rien n'est
-écrasé, mais il n'y a pas de fusion automatique ; pas de réinitialisation du mot de passe en libre-service.
+écrasé, mais il n'y a pas de fusion automatique ; pas de réinitialisation du mot de passe oublié en libre-service (c'est `etabli-admin passwd`).
 
 ## Tests
 
 ```bash
-cd server && npm test                              # serveur (33 tests, sans réseau)
+cd server && npm test                              # serveur (36 tests, sans réseau)
 cd site/devjs && npm run test:unit                 # noyau + couche de stockage (hors ligne)
 cd site/devjs && npm run test:ui                   # navigateur : mode local + mode serveur (Playwright)
 node --test deploy/test/*.test.js                  # update.sh / backup.sh (faux GitHub local) et cloudflare-ips.sh (Caddy si installé)

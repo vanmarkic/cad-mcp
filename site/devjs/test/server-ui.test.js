@@ -447,4 +447,44 @@ test("UI serveur", { skip: !chromium ? "playwright non installé" : !createApp ?
       assert.equal(await p.locator("text=Ancienne adresse").count(), 0);
     } finally { await s.close(); }
   });
+
+  await t.test("mot de passe: le menuisier le change dans Réglages ; erreur claire si l'ancien est faux ; l'ancien ne marche plus", async () => {
+    const s = await setup({ noLegacy: true });
+    try {
+      const p = await s.open();
+      await ready(p);
+      await p.click('button:has-text("Réglages")');
+      await p.waitForSelector("text=Mon compte");
+      const f = (l) => p.locator(`label.fld:has(span.fld-lab:text-is("${l}")) input`);
+      const btn = p.locator('button:has-text("Changer le mot de passe")');
+      await f("Mot de passe actuel").fill("faux-mot-de-passe");
+      await f("Nouveau mot de passe").fill("court");
+      assert.equal(await btn.isDisabled(), true, "désactivé tant que le nouveau est trop court");
+      await f("Nouveau mot de passe").fill("nouvelle phrase de passe");
+      await f("Confirmer").fill("autre chose");
+      assert.equal(await btn.isDisabled(), true, "désactivé si la confirmation diffère");
+      await f("Confirmer").fill("nouvelle phrase de passe");
+      await btn.click();
+      await p.waitForSelector(".pw-err");
+      assert.match(await p.locator(".pw-err").innerText(), /actuel incorrect/);
+      await f("Mot de passe actuel").fill(PW);
+      await btn.click();
+      await p.waitForSelector(".pw-ok");
+      // toujours connecté ici
+      await p.keyboard.press("Escape");
+      await p.reload();
+      await ready(p);
+      // l'ancien mot de passe ne fonctionne plus, le nouveau oui
+      const ctx2 = await mkContext();
+      const q = await ctx2.newPage();
+      await q.goto(s.srv.base + "/");
+      await loginUI(q, "paul", PW);
+      await q.waitForSelector(".login-err");
+      await q.fill('input[name="password"]', "nouvelle phrase de passe");
+      await q.click('button:has-text("Se connecter")');
+      await ready(q);
+      await ctx2.close();
+      assert.deepEqual(p._errors, []);
+    } finally { await s.close(); }
+  });
 });

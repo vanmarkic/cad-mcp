@@ -35,7 +35,7 @@ window.storage = {
 <script type="text/babel" data-presets="react">
 const { useState, useEffect, useMemo, useRef } = React;
 const { createLocalStore, createServerStore, detectBackend } = window.EtabliStore;
-const { num, computeLine, tvaBreakdown, calculateCutlist, panelMetrics, cutListText, newQuoteId, upsertQuote, removeQuote, nextQuoteNumero, buildBackup, readBackup, mergeQuotes, catalogItemFromLine, upsertCatalogItem, removeCatalogItem, searchCatalog, applyCatalogItemToLine, mergeCatalog, linearLineQty, linearDetailText, calculateLinearCutlist, linearMetrics, linearCutListText, parseRichText, hasRichFormatting, applyTextFormat, buildQuoteExport, readQuoteExportDetailed, quoteFeedbackPrompt, quoteFileName, addImportedQuote } = window.EtabliCore;
+const { num, computeLine, tvaBreakdown, calculateCutlist, panelMetrics, cutListText, newQuoteId, upsertQuote, removeQuote, nextQuoteNumero, buildBackup, readBackup, mergeQuotes, catalogItemFromLine, upsertCatalogItem, removeCatalogItem, searchCatalog, applyCatalogItemToLine, mergeCatalog, linearLineQty, linearDetailText, calculateLinearCutlist, linearMetrics, linearCutListText, parseRichText, hasRichFormatting, applyTextFormat, buildQuoteExport, readQuoteExportDetailed, quoteFeedbackPrompt, quoteTodoPrompt, quoteFileName, addImportedQuote } = window.EtabliCore;
 
 /* =========================================================================
    ÉTABLI — Générateur de devis pour menuisier
@@ -92,7 +92,7 @@ function TextIn({ value, onChange, placeholder, mono, readOnly }) {
 }
 function NumIn({ value, onChange, placeholder, suffix, readOnly }) {
   return (
-    <span className="numwrap">
+    <span className={"numwrap" + (suffix && String(suffix).length > 2 ? " sfx-long" : "")}>
       <input
         className={"in in-mono in-num" + (readOnly ? " in-ro" : "")}
         type="text"
@@ -644,6 +644,7 @@ function App({ store, me, onLogout }) {
   const [params, setParams] = useState(DEFAULT_PARAMS);
   const [devis, setDevis] = useState(() => newDevis(DEFAULT_COMPANY, DEFAULT_PARAMS));
   const [saved, setSaved] = useState([]);
+  const [importTodo, setImportTodo] = useState(null); // [{ path, message }] — champs laissés vides par l'IA
   const [importNotice, setImportNotice] = useState(null); // { level, title, body, feedback } — résultat de l'import d'un devis
   const savedRef = useRef([]); // dernier `saved` — lu par les callbacks asynchrones (FileReader)
   savedRef.current = saved;
@@ -932,14 +933,15 @@ function App({ store, me, onLogout }) {
   };
   // AJOUTE le devis du fichier à « Mes devis » : n'écrase rien, ne touche ni au devis
   // en cours, ni aux réglages, ni au catalogue (voir addImportedQuote dans le noyau).
-  const importQuote = (file) => {
-    if (!file) return;
+  // Importe un devis depuis du TEXTE : fichier lu, ou réponse d'IA collée telle quelle.
+  // Rend true si un devis a été ajouté.
+  const importQuoteText = (text) => {
     setImportNotice(null);
-    const reader = new FileReader();
-    reader.onload = () => {
+    setImportTodo(null);
+    {
       let read;
       try {
-        read = readQuoteExportDetailed(String(reader.result));
+        read = readQuoteExportDetailed(String(text));
       } catch (e) {
         const msg = e && e.message ? e.message : "fichier invalide";
         // Avis persistant (les erreurs sont longues) + texte prêt à coller à l'IA.
@@ -959,6 +961,7 @@ function App({ store, me, onLogout }) {
       }
       commitQuotes(() => res.list);
       setImportNotice(notice);
+      setImportTodo(read.todo && read.todo.length ? read.todo : null);
       if (res.status === "copy") {
         flash("Importé comme copie : un devis de même identifiant mais de contenu différent existe déjà (" + label + ")", 6000);
       } else if (res.numeroClash) {
@@ -966,9 +969,25 @@ function App({ store, me, onLogout }) {
       } else {
         flash("Devis importé : " + label);
       }
-    };
+      return true;
+    }
+  };
+  const importQuote = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => importQuoteText(String(reader.result));
     reader.onerror = () => flash("Échec de lecture du fichier");
     reader.readAsText(file);
+  };
+  // Copie le devis « prêt pour l'IA » (consignes + schéma + données) pour le coller dans une conversation.
+  const copyQuoteForAI = async (q) => {
+    const text = JSON.stringify(buildQuoteExport(q, { exportedAt: new Date().toISOString() }), null, 2);
+    try {
+      await navigator.clipboard.writeText(text);
+      flash("Devis copié avec ses consignes : collez-le dans la conversation avec l'IA, puis décrivez ce que vous voulez", 5000);
+    } catch (e) {
+      flash("Copie impossible : utilisez « Exporter le devis en cours » (fichier)", 4000);
+    }
   };
   // Copie le message d'erreur prêt à coller à l'IA (boucle « valider → renvoyer les erreurs »).
   const copyFeedback = async (text) => {
@@ -1072,7 +1091,7 @@ function App({ store, me, onLogout }) {
           <button className="btn ghost" onClick={() => setModal("reglages")}>
             Réglages
           </button>
-          <button className="btn ghost" onClick={() => { setImportNotice(null); setModal("mesdevis"); }}>
+          <button className="btn ghost" onClick={() => { setImportNotice(null); setImportTodo(null); setModal("mesdevis"); }}>
             Mes devis {saved.length ? `(${saved.length})` : ""}
           </button>
           <button className="btn ghost" onClick={resetQuote}>
@@ -1167,6 +1186,8 @@ function App({ store, me, onLogout }) {
         <Modal title="Réglages" onClose={() => setModal(null)} wide>
           <Reglages
             onMigrate={serverMode && me && me.legacyUrl ? () => setModal("migration") : null}
+            onChangePassword={serverMode ? (cur, nxt) => store.changePassword(cur, nxt) : null}
+            account={serverMode && me ? me.login : null}
             company={company}
             params={params}
             quoteCount={saved.length}
@@ -1191,6 +1212,11 @@ function App({ store, me, onLogout }) {
             onExport={exportQuote}
             onExportCurrent={() => exportQuote(devis)}
             onImport={importQuote}
+            onImportText={importQuoteText}
+            onCopyCurrentForAI={() => copyQuoteForAI(devis)}
+            todo={importTodo}
+            onDismissTodo={() => setImportTodo(null)}
+            onCopyTodo={() => copyFeedback(quoteTodoPrompt(importTodo))}
             notice={importNotice}
             onDismissNotice={() => setImportNotice(null)}
             onCopyFeedback={copyFeedback}
@@ -1937,8 +1963,10 @@ function ClientSheet({ devis, company, calc, onPrint }) {
 /* =========================================================================
    MODAL Mes devis — liste + export / import d'un seul devis
    ========================================================================= */
-function MesDevis({ saved, onLoad, onDelete, onExport, onExportCurrent, onImport, notice, onDismissNotice, onCopyFeedback }) {
+function MesDevis({ saved, onLoad, onDelete, onExport, onExportCurrent, onImport, onImportText, onCopyCurrentForAI, todo, onDismissTodo, onCopyTodo, notice, onDismissNotice, onCopyFeedback }) {
   const fileRef = useRef(null);
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [pasted, setPasted] = useState("");
   return (
     <div>
       <div className="qtools">
@@ -1947,6 +1975,12 @@ function MesDevis({ saved, onLoad, onDelete, onExport, onExportCurrent, onImport
         </button>
         <button className="btn sm add" onClick={onExportCurrent}>
           Exporter le devis en cours
+        </button>
+        <button className="btn sm add" onClick={onCopyCurrentForAI} title="Consignes + schéma + devis, à coller dans ChatGPT, Claude…">
+          Copier pour une IA
+        </button>
+        <button className="btn sm add" onClick={() => setPasteOpen((o) => !o)} aria-expanded={pasteOpen}>
+          Coller une réponse d'IA…
         </button>
         <input
           ref={fileRef}
@@ -1971,6 +2005,39 @@ function MesDevis({ saved, onLoad, onDelete, onExport, onExportCurrent, onImport
         nouveau, puis enregistre la réponse en <code>.json</code> (ou <code>.txt</code>) et importe-la.
         Si elle est refusée, copie les erreurs pour l'IA depuis le cadre ci-dessous.
       </p>
+      {pasteOpen && (
+        <div className="qpaste">
+          <label className="fld-lab" htmlFor="qpaste-ta">Réponse de l'IA (JSON, bloc de code et texte autour acceptés)</label>
+          <textarea
+            id="qpaste-ta"
+            className="in in-area qpaste-ta"
+            rows={6}
+            value={pasted}
+            placeholder={'Collez ici la réponse complète : « Voici le devis… ```json { "app": "etabli", … } ``` »'}
+            onChange={(e) => setPasted(e.target.value)}
+          />
+          <div className="qnotice-act">
+            <button className="btn sm" disabled={!pasted.trim()} onClick={() => { if (onImportText(pasted)) { setPasted(""); setPasteOpen(false); } }}>
+              Importer ce texte
+            </button>
+            <button className="btn sm ghost-dark" onClick={() => { setPasted(""); setPasteOpen(false); }}>Annuler</button>
+          </div>
+        </div>
+      )}
+      {todo && todo.length ? (
+        <div className="qnotice qnotice-todo" role="status">
+          <div className="qnotice-head">
+            <strong>À compléter ({todo.length})</strong>
+            <button className="ico" aria-label="Fermer la liste à compléter" onClick={onDismissTodo}>✕</button>
+          </div>
+          <p className="muted qtodo-note">Le devis est importé. Ces champs sont vides : complétez-les dans l'atelier, ou demandez-les à l'IA.</p>
+          <pre className="qnotice-body">{todo.map((t) => "• " + t.path + " : " + t.message).join("\n")}</pre>
+          <div className="qnotice-act">
+            <button className="btn sm" onClick={onCopyTodo}>Copier pour l'IA</button>
+            <span className="muted">Elle vous posera les questions, sans inventer de valeurs.</span>
+          </div>
+        </div>
+      ) : null}
       {notice && (
         <div className={"qnotice qnotice-" + notice.level} role="alert">
           <div className="qnotice-head">
@@ -2075,7 +2142,57 @@ function Catalogue({ catalog, onInsert, onDelete }) {
   );
 }
 
-function Reglages({ company, params, onSave, onExport, onImport, quoteCount, onMigrate }) {
+// Changement de mot de passe (mode serveur) : ancien + nouveau + confirmation ; les autres appareils sont
+// déconnectés, celui-ci reste connecté.
+function PasswordForm({ account, onChange }) {
+  const [cur, setCur] = useState("");
+  const [nxt, setNxt] = useState("");
+  const [conf, setConf] = useState("");
+  const [msg, setMsg] = useState(null); // { ok, text }
+  const [busy, setBusy] = useState(false);
+  const tooShort = nxt.length > 0 && nxt.length < 10;
+  const mismatch = conf.length > 0 && conf !== nxt;
+  const submit = async (e) => {
+    e.preventDefault();
+    if (nxt.length < 10 || nxt !== conf) return;
+    setBusy(true); setMsg(null);
+    const r = await onChange(cur, nxt);
+    setBusy(false);
+    if (r.ok) {
+      setCur(""); setNxt(""); setConf("");
+      setMsg({ ok: true, text: "Mot de passe changé. Vos autres appareils devront se reconnecter." });
+    } else {
+      setCur("");
+      setMsg({ ok: false, text: r.kind === "locked" ? `${r.message} Réessayez dans ${Math.max(1, Math.ceil((r.retryAfter || 60) / 60))} min.` : r.message });
+    }
+  };
+  return (
+    <form className="pwform" onSubmit={submit}>
+      <div className="card-eyebrow mt">Mon compte{account ? ` — ${account}` : ""}</div>
+      {/* champ caché : aide les gestionnaires de mots de passe à associer l'identifiant */}
+      <input type="text" name="username" autoComplete="username" value={account || ""} readOnly hidden />
+      <div className="grid">
+        <Field label="Mot de passe actuel">
+          <input className="in" type="password" name="current-password" autoComplete="current-password" value={cur} onChange={(e) => setCur(e.target.value)} />
+        </Field>
+        <Field label="Nouveau mot de passe" hint={tooShort ? "10 caractères minimum" : "10 caractères minimum ; une phrase de passe est idéale"}>
+          <input className="in" type="password" name="new-password" autoComplete="new-password" value={nxt} onChange={(e) => setNxt(e.target.value)} />
+        </Field>
+        <Field label="Confirmer" hint={mismatch ? "ne correspond pas" : undefined}>
+          <input className="in" type="password" name="confirm-password" autoComplete="new-password" value={conf} onChange={(e) => setConf(e.target.value)} />
+        </Field>
+      </div>
+      {msg ? <p className={"pw-msg " + (msg.ok ? "pw-ok" : "pw-err")} role="status">{msg.text}</p> : null}
+      <div className="reglages-backup-act">
+        <button className="btn" type="submit" disabled={busy || !cur || nxt.length < 10 || nxt !== conf}>
+          {busy ? "Changement…" : "Changer le mot de passe"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function Reglages({ company, params, onSave, onExport, onImport, quoteCount, onMigrate, onChangePassword, account }) {
   const [c, setC] = useState(company);
   const [p, setP] = useState(params);
   const fileRef = useRef(null);
@@ -2166,6 +2283,8 @@ function Reglages({ company, params, onSave, onExport, onImport, quoteCount, onM
           }}
         />
       </div>
+
+      {onChangePassword ? <PasswordForm account={account} onChange={onChangePassword} /> : null}
 
       {onMigrate ? (
         <>
@@ -2734,6 +2853,7 @@ const CSS = `
 .numwrap{position:relative; display:block}
 .numsfx{position:absolute; right:10px; top:50%; transform:translateY(-50%); font-size:11px; color:var(--ink-3); font-family:var(--mono); pointer-events:none}
 .numwrap .in{padding-right:26px}
+.numwrap.sfx-long .in{padding-right:46px}
 
 /* lines */
 .empty{padding:22px; text-align:center; color:var(--ink-3); border:1px dashed var(--line); border-radius:9px; font-size:13px}
@@ -2879,6 +2999,10 @@ const CSS = `
 .qtools{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px}
 .qtools-note{margin:0 0 14px; font-size:12px; line-height:1.5}
 .devis-file{display:none}
+.pw-msg{margin:10px 0 0; padding:8px 10px; border-radius:7px; font-size:13px}
+.pw-ok{background:#e2eee5; color:#2d5238}
+.pw-err{background:#f6e9e2; color:#7c2a1d}
+.btn:disabled{opacity:.55; cursor:default}
 .bar-user{align-self:center; font-size:12px; color:#c9bda6; padding:0 4px; letter-spacing:.02em}
 .syncbar{background:#f6e9e2; border-bottom:2px solid var(--brick); color:#7c2a1d; padding:9px 18px; font-size:13px; display:flex; gap:10px; align-items:center; flex-wrap:wrap}
 .btn.ghost-dark{background:transparent; color:var(--ink-2); border:1px solid var(--line)}
@@ -2899,6 +3023,10 @@ const CSS = `
 .qtools-note code{background:var(--paper-2,#efeae0); padding:1px 5px; border-radius:4px; font-size:.9em}
 .qnotice{border:1px solid var(--brick); background:#f6e9e2; border-radius:9px; padding:10px 12px; margin:0 0 14px}
 .qnotice-info{border-color:var(--amber); background:#f7efdc}
+.qnotice-todo{border-color:var(--ink-3); background:var(--line-2)}
+.qtodo-note{margin:0 0 6px; font-size:12px}
+.qpaste{border:1px solid var(--line); border-radius:9px; padding:10px 12px; margin:0 0 14px; background:#fff; display:flex; flex-direction:column; gap:8px}
+.qpaste-ta{font-family:var(--mono); font-size:12px}
 .qnotice-head{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px; font-size:13px}
 .qnotice-body{margin:0 0 8px; font-family:var(--mono); font-size:11.5px; line-height:1.5; white-space:pre-wrap; word-break:break-word; max-height:220px; overflow:auto; user-select:text}
 .qnotice-act{display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-size:11.5px}
@@ -2996,6 +3124,51 @@ const CSS = `
   .cl-prow{grid-template-columns:1fr 64px 64px 50px 28px; gap:6px}
   .cl-prow-lin{grid-template-columns:1fr 84px 50px 28px}
   .cl-sheet{max-width:none}
+}
+
+/* téléphone : barre compacte, champs à 16 px (pas de zoom iOS), cibles tactiles ≥ 36 px */
+@media (max-width:600px){
+  .bar{padding:8px 12px; gap:8px; row-gap:8px}
+  .brand{margin-right:0}
+  .brand-mark{font-size:17px; padding:3px 6px}
+  .brand-name{font-size:14px; letter-spacing:.16em}
+  .flip{margin-left:auto}
+  .flip-btn{padding:7px 11px; font-size:11.5px}
+  .bar-actions{flex:1 1 100%; flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; padding-bottom:2px}
+  .bar-actions::-webkit-scrollbar{display:none}
+  .bar-actions .btn{flex:none; white-space:nowrap}
+  .wrap{padding:14px 10px 60px; gap:14px}
+  .card{padding:14px 12px 16px}
+  .in, .in-sel, .ml-unit, textarea.in, .ml-row .in, .cl-prow .in, .line-title, .remise .in{font-size:16px}
+  .ico{width:36px; height:36px; font-size:15px}
+  .btn{min-height:36px}
+  .btn.sm{min-height:34px}
+  .fmt-btn{min-width:36px; height:34px}
+  .fmt-help{display:none}
+  .line-head{flex-wrap:wrap; row-gap:8px}
+  .line-title-wrap{order:3; flex:1 1 100%}
+  .line-ord{margin-left:auto}
+  .line-body{padding:12px 10px 4px}
+  .line-foot{flex-direction:column; align-items:flex-start}
+  .ml-row{grid-template-columns:1fr 80px 36px}
+  .ml-foot, .ml-sum{flex-direction:column; align-items:flex-start}
+  .sheet-stage{padding:14px 8px 60px}
+  .sheet{padding:20px 14px; font-size:12.5px}
+  .s-table th, .s-table td{padding:7px 5px}
+  .c-desc{width:auto}
+  .cl-prow{grid-template-columns:1fr 1fr 1fr 36px}
+  .cl-prow-lin{grid-template-columns:1fr 1fr 36px}
+  .cl-prow > .cl-swatch-wrap, .cl-prow-head > span:first-child{grid-column:1/-1}
+  .overlay{padding:0; align-items:stretch}
+  .modal, .modal-wide{max-width:none; border-radius:0; min-height:100%}
+  .modal-head{position:sticky; top:0; background:var(--card); z-index:2}
+  .modal-body{padding:14px 12px 40px}
+  .qrow{flex-direction:column; align-items:stretch}
+  .qrow-act{justify-content:flex-start}
+  .sum-grid{gap:8px}
+  .stat-val{font-size:16px}
+  .stat-big .stat-val{font-size:19px}
+  .toast{left:12px; right:12px; transform:none; text-align:center}
 }
 
 /* print */

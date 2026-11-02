@@ -946,7 +946,8 @@ test("UI", { skip: chromium ? false : "playwright not installed" }, async (t) =>
     await p.locator(".devis-file").setInputFiles(ex.file);
     await p.waitForSelector(".qrow");
     assert.equal(await p.locator(".qrow").count(), 1);
-    assert.equal(await p.locator(".qnotice").count(), 0, "aucune remarque pour un fichier de l'appli");
+    assert.equal(await p.locator(".qnotice-error, .qnotice-info").count(), 0, "aucune erreur ni remarque de format pour un fichier de l'appli");
+    assert.match(await p.locator(".qnotice-todo").innerText(), /lines\[0\]\.pa : prix d'achat non renseigné/, "la fourniture sans prix est listée « à compléter »");
     assert.match(await p.locator(".qrow-meta").first().innerText(), /Alice/);
     assert.deepEqual(p._errors, []);
     await p.close();
@@ -1087,6 +1088,118 @@ test("UI", { skip: chromium ? false : "playwright not installed" }, async (t) =>
     assert.match(await p.locator(".toast").innerText(), /déjà dans/);
     assert.equal(await p.locator(".qnotice").count(), 0);
     assert.deepEqual(p._errors, []);
+    await p.close();
+  });
+
+  /* ======================= téléphone (390 px) ======================= */
+  await t.test("mobile: aucune vue ne déborde en largeur, champs ≥ 16 px (pas de zoom iOS), cibles tactiles ≥ 34 px", async () => {
+    const mctx = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    await mctx.addInitScript(() => { try { localStorage.clear(); } catch (e) {} });
+    const p = await mctx.newPage();
+    const errors = [];
+    p.on("pageerror", (e) => errors.push(e.message));
+    await p.goto(base, { waitUntil: "load", timeout: 45000 });
+    await p.waitForSelector(".brand-name");
+    const noOverflow = async (where) => {
+      const r = await p.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
+      assert.ok(r.sw <= r.cw, `${where} : la page déborde (${r.sw} > ${r.cw})`);
+    };
+    await p.click('button.add:has-text("Fourniture")');
+    await p.click('button.add:has-text("Main-d")');
+    await p.locator(".line").first().locator(".ml-toggle input").check();
+    await noOverflow("atelier");
+    // la désignation d'une ligne a toute la largeur (elle était écrasée par les icônes)
+    const tw = await p.locator(".line .line-title").first().evaluate((e) => e.getBoundingClientRect().width);
+    assert.ok(tw > 300, "désignation lisible : " + tw + " px");
+    // police des champs ≥ 16 px (sinon Safari iOS zoome à chaque saisie)
+    const small = await p.evaluate(() => [...document.querySelectorAll("input.in, textarea.in, select.in")]
+      .filter((e) => e.offsetParent && parseFloat(getComputedStyle(e).fontSize) < 16).length);
+    assert.equal(small, 0, "champs en moins de 16 px");
+    const tiny = await p.evaluate(() => [...document.querySelectorAll("button.ico, button.fmt-btn")]
+      .filter((e) => e.offsetParent && e.getBoundingClientRect().height < 34).length);
+    assert.equal(tiny, 0, "boutons trop petits pour un doigt");
+    // la barre du haut reste compacte (elle prenait ~180 px)
+    const barH = await p.locator("header.bar").evaluate((e) => e.getBoundingClientRect().height);
+    assert.ok(barH <= 110, "barre du haut : " + barH + " px");
+    // toutes les actions restent atteignables (rangée défilante)
+    await p.locator('.bar-actions button:has-text("Enregistrer")').scrollIntoViewIfNeeded();
+    await p.locator('.bar-actions button:has-text("Enregistrer")').click();
+    await p.waitForTimeout(150);
+    await p.click('button:has-text("Devis client")');
+    await p.waitForSelector(".sheet");
+    await noOverflow("devis client");
+    await p.locator('.bar-actions button:has-text("Calepinage")').click();
+    await p.waitForSelector(".cl");
+    await p.click('button.add:has-text("Ajouter une pièce")');
+    await noOverflow("calepinage");
+    const lw = await p.locator(".cl-prow:not(.cl-prow-head) .cl-swatch-wrap input").first().evaluate((e) => e.getBoundingClientRect().width);
+    assert.ok(lw > 250, "désignation de pièce lisible : " + lw + " px");
+    await p.keyboard.press("Escape");
+    await p.locator('.bar-actions button:has-text("Mes devis")').click();
+    await p.waitForSelector(".qrow");
+    await noOverflow("mes devis");
+    assert.deepEqual(errors, []);
+    await mctx.close();
+  });
+
+  /* ======================= coller / copier pour l'IA, « à compléter » ======================= */
+  await t.test("IA: « Copier pour une IA » met consignes + schéma + devis dans le presse-papiers", async () => {
+    await ctx.grantPermissions(["clipboard-read", "clipboard-write"]);
+    const p = await newPage();
+    await clientField(p).fill("Copie IA");
+    await p.click('button:has-text("Mes devis")');
+    await p.waitForSelector(".qtools");
+    await p.click('button:has-text("Copier pour une IA")');
+    await p.waitForTimeout(200);
+    const json = JSON.parse(await p.evaluate(() => navigator.clipboard.readText()));
+    assert.deepEqual(Object.keys(json).slice(0, 3), ["_instructions", "_schema", "app"]);
+    assert.equal(json.data.quotes[0].client.nom, "Copie IA");
+    assert.equal(await p.locator(".qrow").count(), 0, "copier n'enregistre rien");
+    assert.deepEqual(p._errors, []);
+    await p.close();
+  });
+
+  await t.test("IA: coller la réponse telle quelle (texte + bloc ```json) l'importe ; champs vides listés « à compléter » + copiables pour l'IA", async () => {
+    await ctx.grantPermissions(["clipboard-read", "clipboard-write"]);
+    const p = await newPage();
+    const quote = { id: "q_colle", numero: "DEV-IA-1", dateISO: "2026-11-02", client: { nom: "Client collé", adresse: "", email: "", tel: "" },
+      chantier: "", clientType: "particulier", tvaRate: 6, tvaFournitures: "", remiseType: "eur", remiseVal: "", deplacement: "", deplacementCout: "",
+      acompte: "30", validite: "30", conditions: "",
+      lines: [{ id: "l1", type: "fourniture", designation: "Plinthe chêne", qte: "12", unite: "ml", pa: "", marge: "30" },
+              { id: "l2", type: "main", designation: "Pose", heures: "6", tauxVente: "55", coutHoraire: "35" }] };
+    const reply = "Voici le devis :\n```json\n" + JSON.stringify({ app: "etabli", kind: "quote", version: 1, data: { quotes: [quote] } }, null, 2) + "\n```\nJe n'ai pas mis de prix pour la plinthe.";
+    await p.click('button:has-text("Mes devis")');
+    await p.waitForSelector(".qtools");
+    await p.click('button:has-text("Coller une réponse d\'IA")');
+    await p.fill("#qpaste-ta", reply);
+    await p.click('button:has-text("Importer ce texte")');
+    await p.waitForSelector(".qrow");
+    assert.match(await p.locator(".qrow-meta").first().innerText(), /Client collé/);
+    assert.equal(await p.locator("#qpaste-ta").count(), 0, "zone de collage refermée après succès");
+    const todo = await p.locator(".qnotice-todo").innerText();
+    assert.match(todo, /À compléter \(1\)/);
+    assert.match(todo, /lines\[0\]\.pa : prix d'achat non renseigné/);
+    assert.match(await p.locator(".qnotice-info").innerText(), /nettoyé automatiquement/, "bloc de code retiré, signalé");
+    await p.locator(".qnotice-todo").locator('button:has-text("Copier pour l\'IA")').click();
+    await p.waitForTimeout(200);
+    const clip = await p.evaluate(() => navigator.clipboard.readText());
+    assert.match(clip, /Ces champs sont vides/);
+    assert.match(clip, /n'invente aucune valeur/);
+    assert.deepEqual(p._errors, []);
+    await p.close();
+  });
+
+  await t.test("IA: un texte collé invalide est refusé avec la liste d'erreurs, le texte reste dans la zone", async () => {
+    const p = await newPage();
+    await p.click('button:has-text("Mes devis")');
+    await p.waitForSelector(".qtools");
+    await p.click('button:has-text("Coller une réponse d\'IA")');
+    await p.fill("#qpaste-ta", '{"app":"etabli","kind":"quote","version":1,"data":{"quotes":[{"numero":"X","lines":[{"type":"bizarre"}]}]}}');
+    await p.click('button:has-text("Importer ce texte")');
+    await p.waitForSelector(".qnotice-error");
+    assert.match(await p.locator(".qnotice-error").innerText(), /lines\[0\]\.type : valeur non autorisée/);
+    assert.notEqual(await p.locator("#qpaste-ta").inputValue(), "", "le texte n'est pas perdu");
+    assert.equal(await p.locator(".qrow").count(), 0);
     await p.close();
   });
 });

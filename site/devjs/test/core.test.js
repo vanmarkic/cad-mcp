@@ -1185,3 +1185,36 @@ test("le schéma embarqué n'utilise que les mots-clés que le validateur sait a
   })(C.quoteJsonSchema, "$");
   assert.deepEqual(noDesc, [], "champ sans description");
 });
+
+/* ---------- « à compléter » ---------- */
+test("lintQuote: liste les champs vides utiles (prix, quantités, heures, ml), sans bloquer", () => {
+  const q = mkQuote({ client: { nom: "", adresse: "", email: "", tel: "" }, lines: [
+    { id: "a", type: "fourniture", designation: "MDF", qte: "", pa: "", marge: "" },
+    { id: "b", type: "fourniture", designation: "Baguette", mlOn: true, mlItems: [], unite: "m", pa: "4", marge: "30" },
+    { id: "c", type: "fourniture", designation: "Vis", qte: "2", pa: "1", marge: "10", mlOn: false, mlItems: [{ len: "1", qty: "1" }] },
+    { id: "d", type: "main", designation: "", heures: "", tauxVente: "" },
+    { id: "e", type: "forfait", designation: "Transport", pa: "" },
+  ] });
+  const paths = C.lintQuote(q).map((x) => x.path);
+  assert.deepEqual(paths, [
+    "data.quotes[0].client.nom",
+    "data.quotes[0].lines[0].qte", "data.quotes[0].lines[0].pa", "data.quotes[0].lines[0].marge",
+    "data.quotes[0].lines[1].mlItems", "data.quotes[0].lines[1].unite",
+    "data.quotes[0].lines[2].mlItems",
+    "data.quotes[0].lines[3].designation", "data.quotes[0].lines[3].heures", "data.quotes[0].lines[3].tauxVente",
+    "data.quotes[0].lines[4].pa",
+  ]);
+});
+
+test("lintQuote: devis complet → rien à compléter ; devis vide → signalé", () => {
+  assert.deepEqual(C.lintQuote(mkQuote()), []);
+  assert.deepEqual(C.lintQuote(mkQuote({ lines: [] })).map((x) => x.path), ["data.quotes[0].lines"]);
+});
+
+test("readQuoteExportDetailed: rend « todo » (lintQuote) ; quoteTodoPrompt demande les valeurs à l'IA sans invention", () => {
+  const r = C.readQuoteExportDetailed(C.buildQuoteExport(mkQuote({ lines: [{ id: "a", type: "forfait", designation: "X", pa: "" }] }), {}));
+  assert.deepEqual(r.todo.map((x) => x.path), ["data.quotes[0].lines[0].pa"]);
+  const prompt = C.quoteTodoPrompt(r.todo);
+  assert.match(prompt, /data\.quotes\[0\]\.lines\[0\]\.pa/);
+  assert.match(prompt, /n'invente aucune valeur/);
+});

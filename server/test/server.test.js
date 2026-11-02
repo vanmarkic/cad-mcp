@@ -488,3 +488,38 @@ test("admin: add / passwd / revoke / list, mot de passe généré affiché une f
     assert.equal(await admin.main([], { DATA_DIR: dir }), 2);
   } finally { console.log = orig; }
 });
+
+/* ---------------------------------------------------------------- changement de mot de passe */
+test("mot de passe: changement par l'utilisateur — la session courante reste ouverte, les autres sont déconnectées", () => withServer(async (s) => {
+  const a = await loggedIn(s);                 // cet appareil
+  const b = client(s.base);                    // un autre appareil, même compte
+  assert.equal((await b.post("/api/login", { login: "paul", password: "motdepasse-solide" })).status, 200);
+  const r = await a.post("/api/password", { current: "motdepasse-solide", next: "nouveau-secret-2026" });
+  assert.equal(r.status, 200, r.text);
+  assert.match(r.setCookie[0], /etabli_session=.+HttpOnly/);
+  assert.equal((await a.get("/api/me")).status, 200, "la session qui a changé le mot de passe reste valide");
+  assert.equal((await b.get("/api/me")).status, 401, "l'autre appareil est déconnecté");
+  assert.equal((await client(s.base).post("/api/login", { login: "paul", password: "motdepasse-solide" })).status, 401, "ancien mot de passe refusé");
+  assert.equal((await client(s.base).post("/api/login", { login: "paul", password: "nouveau-secret-2026" })).status, 200);
+}));
+
+test("mot de passe: ancien incorrect (400, pas de déconnexion), trop court, identique, et verrouillage après 5 essais", () => withServer(async (s) => {
+  const a = await loggedIn(s);
+  const bad = await a.post("/api/password", { current: "faux", next: "nouveau-secret-2026" });
+  assert.equal(bad.status, 400);
+  assert.match(bad.json.error, /actuel incorrect/);
+  assert.equal((await a.get("/api/me")).status, 200, "une erreur de saisie ne déconnecte pas");
+  assert.match((await a.post("/api/password", { current: "motdepasse-solide", next: "court" })).json.error, /trop court/);
+  assert.match((await a.post("/api/password", { current: "motdepasse-solide", next: "motdepasse-solide" })).json.error, /différent/);
+  for (let i = 0; i < 4; i++) await a.post("/api/password", { current: "faux" + i, next: "nouveau-secret-2026" });
+  const locked = await a.post("/api/password", { current: "motdepasse-solide", next: "nouveau-secret-2026" });
+  assert.equal(locked.status, 429, "deviner l'ancien mot de passe est limité comme une connexion");
+}));
+
+test("mot de passe: exige une session et respecte la protection CSRF", () => withServer(async (s) => {
+  await s.app.users.add("paul", "motdepasse-solide");
+  assert.equal((await client(s.base).post("/api/password", { current: "motdepasse-solide", next: "nouveau-secret-2026" })).status, 401);
+  const a = await loggedIn(s);
+  assert.equal((await a.post("/api/password", { current: "motdepasse-solide", next: "nouveau-secret-2026" }, { Origin: "http://evil.example" })).status, 403);
+  assert.equal((await client(s.base).post("/api/login", { login: "paul", password: "motdepasse-solide" })).status, 200, "rien n'a changé");
+}));
