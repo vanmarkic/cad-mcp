@@ -186,6 +186,45 @@ test("auth: X-Forwarded-For (TRUST_PROXY=xff) — premier élément valide utili
   assert.equal((await c.post("/api/login", { login: "paul", password: "motdepasse-solide" }, { "X-Forwarded-For": "2001:db8::2" })).status, 200, "autre IP : non verrouillée");
 }, { cfg: { trustProxy: "xff" } }));
 
+/* ---------------------------------------------------------------- secret partagé (Cloudflare) */
+const EDGE = "0123456789abcdef0123456789abcdef0123456789abcdef";
+test("EDGE_SECRET: sans le bon en-tête X-Etabli-Edge → 403 partout (page, API, connexion), sauf /api/health", () => withServer(async (s) => {
+  await s.app.users.add("paul", "motdepasse-solide");
+  const c = client(s.base);
+  for (const [m, u, b] of [["GET", "/"], ["GET", "/index.html"], ["GET", "/lib/etabli-core.js"], ["GET", "/api/me"], ["POST", "/api/login", { login: "paul", password: "motdepasse-solide" }]]) {
+    const r = await c.raw(m, u, b);
+    assert.equal(r.status, 403, `${m} ${u}`);
+    assert.doesNotMatch(r.text, /ÉTABLI|createApp/, "rien ne fuit dans la réponse");
+    assert.equal(r.setCookie.length, 0, "aucun cookie n'est posé");
+  }
+  assert.equal((await c.get("/api/health")).status, 200, "contrôle de santé local exempté");
+  // en-tête faux, tronqué, trop long, vide
+  for (const bad of ["x", EDGE.slice(0, -1), EDGE + "0", EDGE.toUpperCase(), ""]) {
+    assert.equal((await c.get("/", { "X-Etabli-Edge": bad })).status, 403, JSON.stringify(bad));
+  }
+  assert.equal((await c.post("/api/login", { login: "paul", password: "motdepasse-solide" }, { "X-Etabli-Edge": "faux" })).status, 403);
+}, { cfg: { edgeSecret: EDGE } }));
+
+test("EDGE_SECRET: avec le bon en-tête, tout fonctionne comme d'habitude (connexion, devis)", () => withServer(async (s) => {
+  await s.app.users.add("paul", "motdepasse-solide");
+  const h = { "X-Etabli-Edge": EDGE };
+  const c = client(s.base);
+  assert.equal((await c.get("/", h)).status, 200);
+  assert.equal((await c.post("/api/login", { login: "paul", password: "motdepasse-solide" }, h)).status, 200);
+  assert.equal((await c.get("/api/me", h)).json.login, "paul");
+  assert.equal((await c.put("/api/quotes/q_test_1", { quote: quote(), baseRev: null }, h)).status, 200);
+  // le cookie de session seul ne suffit pas : le secret est exigé à chaque requête
+  assert.equal((await c.get("/api/me")).status, 403);
+}, { cfg: { edgeSecret: EDGE } }));
+
+test("EDGE_SECRET non configuré: aucun contrôle ; configuré trop court: le serveur refuse de démarrer", () => withServer(async (s) => {
+  assert.equal((await client(s.base).get("/")).status, 200);
+  const { configFromEnv } = require("../server.js");
+  assert.throws(() => configFromEnv({ EDGE_SECRET: "trop-court" }), /EDGE_SECRET trop court/);
+  assert.equal(configFromEnv({ EDGE_SECRET: EDGE }).edgeSecret, EDGE);
+  assert.equal(configFromEnv({}).edgeSecret, "");
+}));
+
 /* ---------------------------------------------------------------- CSRF / entrées */
 test("CSRF: Origin étranger, Sec-Fetch-Site cross-site ou Content-Type non JSON → refusé", () => withServer(async (s) => {
   const c = await loggedIn(s);

@@ -22,12 +22,12 @@
 
 | Élément | Vérifié ? |
 |---|---|
-| Serveur : authentification, stockage, conflits, import additif, protections (traversée de répertoire, CSRF, limitation des tentatives, IP invalide, 413) | Oui — 30 tests |
+| Serveur : authentification, stockage, conflits, import additif, protections (traversée de répertoire, CSRF, limitation des tentatives, IP invalide, secret d'origine EDGE_SECRET, 413) | Oui — 33 tests |
 | Application en mode serveur dans un vrai navigateur : connexion, persistance, conflit entre 2 appareils, session expirée, réseau coupé, **migration entre 2 origines** | Oui — 11 tests Playwright |
-| `update.sh` (tirage, tests, bascule, retour arrière, nettoyage, verrou) et `backup.sh`, contre un faux GitHub local | Oui — 9 tests |
+| `update.sh` (tirage, tests, bascule, retour arrière, nettoyage, verrou) et `backup.sh`, contre un faux GitHub local (dont le contrôle de santé sur HOST/PORT) | Oui — 11 tests |
 | Clone partiel + sparse checkout contre le **vrai** dépôt public | Oui (0,6 Mo au lieu de 527 Mo) |
-| Caddyfile d'exemple (options A et B) : syntaxe **et** comportement réel (403 hors Cloudflare, proxy depuis une plage autorisée), avec Caddy 2.6.2 | Oui — 5 tests |
-| `install.sh`, unités systemd, `cloud-init.yaml`, certificats Let's Encrypt, pare-feu sur un **vrai serveur** | **Non** — syntaxe vérifiée seulement. À essayer sur un serveur jetable d'abord. |
+| Caddyfile d'exemple (options A et B) : syntaxe **et** comportement réel (403 hors Cloudflare, proxy depuis une plage autorisée), avec Caddy 2.6.2, plus le bloc Coolify et la preuve qu'un fragment est invalide au niveau global | Oui — 7 tests |
+| `install.sh`, unités systemd, `cloud-init.yaml`, certificats Let's Encrypt, pare-feu, **proxy Coolify** (chemins fournis par l'exploitant, non éprouvés par moi) sur un **vrai serveur** | **Non** — syntaxe vérifiée seulement. À essayer sur un serveur jetable d'abord. |
 | Un navigateur réel (autre que Chromium) | Non |
 
 ## Installation
@@ -43,7 +43,8 @@ système `etabli`, déploie, active le service et les minuteurs (mise à jour, s
 Puis :
 
 1. `etabli-admin add <login>` — crée le compte, le mot de passe généré s'affiche **une seule fois**.
-2. Ajoutez le bloc de `Caddyfile.example` à votre Caddyfile, puis `systemctl reload caddy`.
+2. Ajoutez le site au proxy : Caddy classique → bloc de `Caddyfile.example` (options A/B) puis `systemctl reload caddy` ;
+   proxy Coolify (Caddy dans Docker) → section « Serveur avec Coolify » ci-dessous (l'étape 1 est à adapter : `HOST`, `EDGE_SECRET`).
 3. Renseignez `LEGACY_URL` dans `/etc/etabli/env` (voir « Migration »), puis `systemctl restart etabli`.
 
 ### Sur un serveur dédié neuf
@@ -59,21 +60,79 @@ Caddy, ÉTABLI, pare-feu local, et construit le nom `<ip>.sslip.io`. Il reste à
 - **Derrière Cloudflare** exige un nom de domaine qui est une zone **de votre compte Cloudflare** (impossible avec
   sslip.io : la zone DNS n'est pas à vous). Mise en place :
   1. Cloudflare → DNS : enregistrement **A** `etabli` → IP du serveur, **Proxied** (nuage orange).
-  2. Cloudflare → SSL/TLS : mode **Full (strict)**.
+  2. SSL/TLS de la zone : « Full » ou « Full (strict) » (pas « Flexible » : boucle de redirections). Ce réglage
+     concerne **toute la zone** : vérifiez-le avant de le modifier, vos autres sous-domaines en dépendent.
   3. Serveur, `/etc/etabli/env` : `TRUST_PROXY=cf`, puis `systemctl restart etabli`.
-  4. Serveur : `sudo /opt/etabli/cloudflare-ips.sh` (écrit `/etc/caddy/etabli-cloudflare.caddy`), puis le bloc
-     « Option B » de `Caddyfile.example` dans votre Caddyfile, puis `systemctl reload caddy`.
-  5. Rafraîchir les plages de temps en temps (elles changent rarement) :
-     `0 4 * * 1  root  /opt/etabli/cloudflare-ips.sh && systemctl reload caddy` dans `/etc/cron.d/etabli-cloudflare`.
+  4. **Protéger l'origine** (voir ci-dessous), puis ajouter le site au proxy.
 
   **Pourquoi l'étape 4 compte.** ÉTABLI lit l'IP du visiteur dans `CF-Connecting-IP`. Si le serveur répond aussi à
   des connexions directes, cet en-tête est falsifiable : chaque essai de mot de passe peut prétendre venir d'une IP
-  différente, et le verrouillage ne se déclenche jamais. Le fichier généré fait répondre **403** à tout ce qui ne
-  vient pas d'une plage Cloudflare, avant d'atteindre ÉTABLI, **pour ce site seulement** (les autres sites du même
-  Caddy et le pare-feu ne sont pas touchés). Si les plages deviennent périmées, des visiteurs légitimes peuvent
-  recevoir un 403 : d'où le rafraîchissement.
-  Certificat d'origine : Caddy demande normalement un certificat Let's Encrypt, ce qui doit fonctionner derrière le
-  proxy ; si la validation échoue, utilisez un **certificat d'origine Cloudflare** (SSL/TLS → Origin Server) à la place.
+  différente, et le verrouillage ne se déclenche jamais. Deux façons de ne répondre qu'à Cloudflare :
+
+  - **Secret partagé `EDGE_SECRET` (recommandé, et indispensable derrière Docker/Coolify).** Cloudflare ajoute un
+    en-tête secret à chaque requête ; ÉTABLI répond **403** à toute requête qui ne le porte pas (sauf
+    `/api/health`, contrôle local sans donnée). Aucune liste d'IP à entretenir, aucun fichier dans le proxy.
+    ```
+    SECRET=$(openssl rand -hex 32)                                  # 64 caractères hexadécimaux
+    echo "EDGE_SECRET=$SECRET" | sudo tee -a /etc/etabli/env >/dev/null && sudo systemctl restart etabli
+    echo "$SECRET"                                                  # à coller dans Cloudflare, ne le partagez pas
+    ```
+    Cloudflare → Rules → Transform Rules → *Modify Request Header* → nouvelle règle : condition « Hostname égal à
+    `etabli.example.com` », action « Set static » `X-Etabli-Edge` = le secret. (Disponibilité sur votre formule
+    Cloudflare : à vérifier dans le tableau de bord.) Sans cette règle, le site répond 403 à tout le monde.
+  - **Plages d'IP de Cloudflare dans Caddy** (Caddy classique installé sur l'hôte uniquement) :
+    `sudo /opt/etabli/cloudflare-ips.sh` écrit `/etc/caddy/etabli-cloudflare.caddy` (fragment à `import` dans le bloc
+    du site, voir `Caddyfile.example` option B) ; rafraîchir avec
+    `0 4 * * 1  root  /opt/etabli/cloudflare-ips.sh && systemctl reload caddy` dans `/etc/cron.d/etabli-cloudflare`.
+    **Jamais** dans un dossier importé au niveau global du proxy (Coolify : le script le refuse).
+
+  Certificat d'origine : le proxy demande normalement un certificat Let's Encrypt. Si les autres sites de la zone en
+  obtiennent derrière Cloudflare, celui-ci fera de même ; sinon utilisez un **certificat d'origine Cloudflare**
+  (SSL/TLS → Origin Server).
+
+## Serveur avec Coolify (Caddy dans Docker)
+
+Sur un serveur géré par Coolify dont le proxy est Caddy (conteneur `coolify-proxy`, image
+`lucaslorentz/caddy-docker-proxy`), il n'y a ni `/etc/caddy` ni `systemctl reload caddy`. ÉTABLI reste un service
+systemd sur l'hôte ; on l'ajoute comme **un site du proxy**. Attention : la documentation de Coolify qualifie Caddy
+d'expérimental et prévient qu'une configuration de proxy invalide peut rendre **tous** les sites du serveur
+injoignables. Validez avant d'appliquer, et n'y déposez que le bloc de site ci-dessous.
+
+1. **Repérer l'hôte (lecture seule).**
+   ```
+   docker exec coolify-proxy grep host.docker.internal /etc/hosts      # IP de la passerelle Docker (ex. 172.17.0.1)
+   docker inspect coolify-proxy --format '{{range .Mounts}}{{.Source}} -> {{.Destination}}{{"\n"}}{{end}}' | grep -i dynamic
+   ss -tlnp | grep ':8080'                                              # le port doit être libre
+   ```
+   Le dossier dynamique est vu comme `/dynamic/` dans le conteneur ; sur l'hôte, c'est la source indiquée par la
+   2ᵉ commande (`/data/coolify/proxy/dynamic/` sur le serveur de référence ; la documentation de Coolify mentionne
+   `/data/coolify/proxy/caddy/dynamic/` : fiez-vous à `docker inspect`).
+2. **Installer** (`install.sh`), puis régler `/etc/etabli/env` :
+   ```
+   GW=172.17.0.1                                        # l'IP trouvée à l'étape 1
+   sudo sed -i "s|^HOST=.*|HOST=$GW|; s|^TRUST_PROXY=.*|TRUST_PROXY=cf|" /etc/etabli/env
+   ```
+   puis `LEGACY_URL=…` et `EDGE_SECRET` (section précédente), et `sudo systemctl restart etabli`. Dans un conteneur,
+   « 127.0.0.1 » désigne le conteneur lui-même : ÉTABLI doit écouter sur l'IP de la passerelle (jamais `0.0.0.0` : le
+   port serait ouvert sur Internet). L'unité `etabli.service` démarre après Docker et réessaie sans limite, car cette
+   IP n'existe qu'une fois Docker démarré. Contrôle : `curl -fsS http://$GW:8080/api/health`.
+3. **Cloudflare** : enregistrement A proxifié et règle « Modify Request Header » (section précédente).
+4. **Ajouter le site au proxy**, de préférence depuis le tableau de bord Coolify (*Servers → votre serveur → Proxy →
+   Dynamic Configurations*, fichier `etabli.caddy`), qui recharge le proxy lui-même ; sinon déposer le fichier dans le
+   dossier dynamique. Contenu **unique** du fichier :
+   ```
+   etabli.example.com {
+   	encode zstd gzip
+   	reverse_proxy host.docker.internal:8080
+   }
+   ```
+   (ou l'IP de la passerelle à la place de `host.docker.internal`). Si vous déposez le fichier à la main, validez-le
+   aussitôt, et supprimez-le s'il est invalide : `docker exec coolify-proxy caddy adapt --config /dynamic/etabli.caddy
+   --adapter caddyfile >/dev/null && echo OK`. Si le proxy ne le prend pas en compte seul, redémarrez-le depuis
+   Coolify (coupure de quelques secondes pour tous les sites).
+5. **Vérifier** : `curl -sI https://etabli.example.com/` → 200 ; accès direct sans le secret (depuis votre poste :
+   `curl -sk --resolve etabli.example.com:443:<IP-du-serveur> https://etabli.example.com/`) → 403
+   « Accès direct refusé » ; `curl -i http://$GW:8080/` sur le serveur → 403 également.
 
 ## Comptes
 
@@ -133,7 +192,8 @@ Restauration : `systemctl stop etabli`, extraire l'archive dans `/var/lib`, `cho
 
 **En place** : mots de passe hachés (scrypt, sel aléatoire), jamais écrits en clair ; session par cookie signé
 `HttpOnly` + `SameSite=Lax` + `Secure` ; 5 échecs de connexion = verrouillage 15 min (par IP+identifiant, et par IP) ;
-même message d'erreur pour un identifiant inconnu ou un mot de passe faux ; contrôle d'origine (anti-CSRF) ;
+même message d'erreur pour un identifiant inconnu ou un mot de passe faux ; contrôle d'origine (anti-CSRF) ; secret d'origine
+`EDGE_SECRET` (403 pour toute requête qui ne passe pas par Cloudflare) ;
 identifiants de fichiers validés (pas de traversée de répertoire) ; écritures atomiques ; en-têtes CSP, HSTS,
 anti-framing ; seuls `index.html`, `migrate.html` et `lib/*.js` sont servis ; service systemd durci
 (écriture limitée à `/var/lib/etabli`, 512 Mo de mémoire max).
@@ -156,7 +216,7 @@ la saisie reste à l'écran) ; deux appareils sur le même devis : le second est
 ## Tests
 
 ```bash
-cd server && npm test                              # serveur (30 tests, sans réseau)
+cd server && npm test                              # serveur (33 tests, sans réseau)
 cd site/devjs && npm run test:unit                 # noyau + couche de stockage (hors ligne)
 cd site/devjs && npm run test:ui                   # navigateur : mode local + mode serveur (Playwright)
 node --test deploy/test/*.test.js                  # update.sh / backup.sh (faux GitHub local) et cloudflare-ips.sh (Caddy si installé)

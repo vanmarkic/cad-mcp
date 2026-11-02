@@ -119,3 +119,36 @@ test("Caddy, comportement réel : hors plage Cloudflare → 403 sans atteindre �
   });
   backend.close();
 });
+
+test("garde-fou : refuse d'écrire le fragment dans un dossier « dynamic » (importé au niveau global du proxy Coolify)", () => {
+  const w = world();
+  for (const bad of ["/data/coolify/proxy/dynamic/etabli-cloudflare.caddy", "/x/dynamic/y.caddy", "/data/coolify/proxy/caddy/dynamic/etabli.Caddyfile"]) {
+    const r = spawnSync("bash", [SCRIPT], { encoding: "utf8", env: env({ OUT: bad, CF_IPS_V4_FILE: path.join(w.d, "v4"), CF_IPS_V6_FILE: path.join(w.d, "v6") }) });
+    assert.equal(r.status, 2, bad);
+    assert.match(r.stderr, /casserait tous vos sites/);
+    assert.match(r.stderr, /EDGE_SECRET/);
+    assert.ok(!fs.existsSync(bad), "rien n'est écrit");
+  }
+  // un autre emplacement (extension différente, ou dossier non dynamique) reste autorisé
+  const ok = world();
+  assert.equal(ok.run().status, 0);
+});
+
+test("Caddy, option C (Coolify) : le bloc « reverse_proxy host.docker.internal:8080 » est valide", { skip: !HAVE_CADDY && "caddy non installé" }, () => {
+  const ex = fs.readFileSync(path.join(__dirname, "..", "Caddyfile.example"), "utf8");
+  // le bloc de l'option C est en commentaire dans l'exemple : on le dé-commente
+  const m = /# etabli\.example\.com \{\n((?:# .*\n)+?)# \}/.exec(ex);
+  assert.ok(m, "bloc de l'option C présent");
+  const block = "http://etabli.example.com {\n" + m[1].replace(/^# /gm, "") + "}\n";
+  assert.match(block, /reverse_proxy host\.docker\.internal:8080/);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "etabli-cfc-"));
+  const f = path.join(dir, "etabli.caddy");
+  fs.writeFileSync(f, block);
+  const r = spawnSync("caddy", ["adapt", "--config", f, "--adapter", "caddyfile"], { encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr);
+  // et la preuve du piège : un FRAGMENT de site (comme celui de cloudflare-ips.sh) est invalide au niveau global
+  const w = world();
+  w.run();
+  const bad = spawnSync("caddy", ["adapt", "--config", w.out, "--adapter", "caddyfile"], { encoding: "utf8" });
+  assert.notEqual(bad.status, 0, "un fragment de bloc de site ne peut pas être importé au niveau global");
+});

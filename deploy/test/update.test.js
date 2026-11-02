@@ -214,3 +214,46 @@ test("backup.sh: archive des données en 600 / dossier 700, rotation, contenu co
   assert.match(list, /etabli\/users\.json/);
   assert.match(list, /etabli\/accounts\/paul\/quotes\/q1\.json/);
 });
+
+test("contrôle de santé: utilise HOST/PORT de l'environnement (ÉTABLI derrière Coolify n'écoute pas sur 127.0.0.1)", async () => {
+  const w = makeWorld();
+  let healthy = true, hits = 0;
+  const srv = http.createServer((req, res) => { hits++; res.statusCode = healthy ? 200 : 500; res.end("x"); });
+  await new Promise((r) => srv.listen(0, "127.0.0.1", r));
+  const port = String(srv.address().port);
+  try {
+    w.commit("v1");
+    const runAsync = () => new Promise((resolve) => {
+      const e = cleanEnv({ REPO_URL: "file://" + w.remote, BRANCH: "main", BASE_DIR: w.base, RESTART_CMD: `echo restart >> '${path.join(w.root, "restarts.log")}'`, HEALTH_TRIES: "2", TEST_CMD: "node --test server/test/x.test.js", HOST: "127.0.0.1", PORT: port });
+      delete e.HEALTH_URL; // → URL déduite de HOST/PORT
+      const p = spawn("bash", [UPDATE], { env: e });
+      let out = ""; p.stdout.on("data", (d) => (out += d)); p.stderr.on("data", (d) => (out += d));
+      p.on("close", (code) => resolve({ status: code, stdout: out }));
+    });
+    const r1 = await runAsync();
+    assert.equal(r1.status, 0, r1.stdout);
+    assert.ok(hits >= 1, "le contrôle a bien interrogé HOST:PORT");
+    const s1 = w.current();
+    w.commit("v2");
+    healthy = false;
+    const r2 = await runAsync();
+    assert.equal(r2.status, 1);
+    assert.match(r2.stdout, /RETOUR ARRIÈRE/, "service qui ne répond pas à HOST:PORT → retour arrière");
+    assert.equal(w.current(), s1);
+  } finally { srv.close(); }
+});
+
+test("contrôle de santé: HOST=0.0.0.0 est interrogé via 127.0.0.1", async () => {
+  const w = makeWorld();
+  let hits = 0;
+  const srv = http.createServer((req, res) => { hits++; res.end("ok"); });
+  await new Promise((r) => srv.listen(0, "127.0.0.1", r));
+  try {
+    w.commit("v1");
+    const e = cleanEnv({ REPO_URL: "file://" + w.remote, BRANCH: "main", BASE_DIR: w.base, RESTART_CMD: "true", HEALTH_TRIES: "2", TEST_CMD: "node --test server/test/x.test.js", HOST: "0.0.0.0", PORT: String(srv.address().port) });
+    delete e.HEALTH_URL;
+    const code = await new Promise((resolve) => spawn("bash", [UPDATE], { env: e }).on("close", resolve));
+    assert.equal(code, 0);
+    assert.ok(hits >= 1);
+  } finally { srv.close(); }
+});
