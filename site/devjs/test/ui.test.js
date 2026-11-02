@@ -1089,4 +1089,55 @@ test("UI", { skip: chromium ? false : "playwright not installed" }, async (t) =>
     assert.deepEqual(p._errors, []);
     await p.close();
   });
+
+  /* ======================= téléphone (390 px) ======================= */
+  await t.test("mobile: aucune vue ne déborde en largeur, champs ≥ 16 px (pas de zoom iOS), cibles tactiles ≥ 34 px", async () => {
+    const mctx = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    await mctx.addInitScript(() => { try { localStorage.clear(); } catch (e) {} });
+    const p = await mctx.newPage();
+    const errors = [];
+    p.on("pageerror", (e) => errors.push(e.message));
+    await p.goto(base, { waitUntil: "load", timeout: 45000 });
+    await p.waitForSelector(".brand-name");
+    const noOverflow = async (where) => {
+      const r = await p.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
+      assert.ok(r.sw <= r.cw, `${where} : la page déborde (${r.sw} > ${r.cw})`);
+    };
+    await p.click('button.add:has-text("Fourniture")');
+    await p.click('button.add:has-text("Main-d")');
+    await p.locator(".line").first().locator(".ml-toggle input").check();
+    await noOverflow("atelier");
+    // la désignation d'une ligne a toute la largeur (elle était écrasée par les icônes)
+    const tw = await p.locator(".line .line-title").first().evaluate((e) => e.getBoundingClientRect().width);
+    assert.ok(tw > 300, "désignation lisible : " + tw + " px");
+    // police des champs ≥ 16 px (sinon Safari iOS zoome à chaque saisie)
+    const small = await p.evaluate(() => [...document.querySelectorAll("input.in, textarea.in, select.in")]
+      .filter((e) => e.offsetParent && parseFloat(getComputedStyle(e).fontSize) < 16).length);
+    assert.equal(small, 0, "champs en moins de 16 px");
+    const tiny = await p.evaluate(() => [...document.querySelectorAll("button.ico, button.fmt-btn")]
+      .filter((e) => e.offsetParent && e.getBoundingClientRect().height < 34).length);
+    assert.equal(tiny, 0, "boutons trop petits pour un doigt");
+    // la barre du haut reste compacte (elle prenait ~180 px)
+    const barH = await p.locator("header.bar").evaluate((e) => e.getBoundingClientRect().height);
+    assert.ok(barH <= 110, "barre du haut : " + barH + " px");
+    // toutes les actions restent atteignables (rangée défilante)
+    await p.locator('.bar-actions button:has-text("Enregistrer")').scrollIntoViewIfNeeded();
+    await p.locator('.bar-actions button:has-text("Enregistrer")').click();
+    await p.waitForTimeout(150);
+    await p.click('button:has-text("Devis client")');
+    await p.waitForSelector(".sheet");
+    await noOverflow("devis client");
+    await p.locator('.bar-actions button:has-text("Calepinage")').click();
+    await p.waitForSelector(".cl");
+    await p.click('button.add:has-text("Ajouter une pièce")');
+    await noOverflow("calepinage");
+    const lw = await p.locator(".cl-prow:not(.cl-prow-head) .cl-swatch-wrap input").first().evaluate((e) => e.getBoundingClientRect().width);
+    assert.ok(lw > 250, "désignation de pièce lisible : " + lw + " px");
+    await p.keyboard.press("Escape");
+    await p.locator('.bar-actions button:has-text("Mes devis")').click();
+    await p.waitForSelector(".qrow");
+    await noOverflow("mes devis");
+    assert.deepEqual(errors, []);
+    await mctx.close();
+  });
 });

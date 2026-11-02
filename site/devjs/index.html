@@ -92,7 +92,7 @@ function TextIn({ value, onChange, placeholder, mono, readOnly }) {
 }
 function NumIn({ value, onChange, placeholder, suffix, readOnly }) {
   return (
-    <span className="numwrap">
+    <span className={"numwrap" + (suffix && String(suffix).length > 2 ? " sfx-long" : "")}>
       <input
         className={"in in-mono in-num" + (readOnly ? " in-ro" : "")}
         type="text"
@@ -2734,6 +2734,7 @@ const CSS = `
 .numwrap{position:relative; display:block}
 .numsfx{position:absolute; right:10px; top:50%; transform:translateY(-50%); font-size:11px; color:var(--ink-3); font-family:var(--mono); pointer-events:none}
 .numwrap .in{padding-right:26px}
+.numwrap.sfx-long .in{padding-right:46px}
 
 /* lines */
 .empty{padding:22px; text-align:center; color:var(--ink-3); border:1px dashed var(--line); border-radius:9px; font-size:13px}
@@ -2996,6 +2997,51 @@ const CSS = `
   .cl-prow{grid-template-columns:1fr 64px 64px 50px 28px; gap:6px}
   .cl-prow-lin{grid-template-columns:1fr 84px 50px 28px}
   .cl-sheet{max-width:none}
+}
+
+/* téléphone : barre compacte, champs à 16 px (pas de zoom iOS), cibles tactiles ≥ 36 px */
+@media (max-width:600px){
+  .bar{padding:8px 12px; gap:8px; row-gap:8px}
+  .brand{margin-right:0}
+  .brand-mark{font-size:17px; padding:3px 6px}
+  .brand-name{font-size:14px; letter-spacing:.16em}
+  .flip{margin-left:auto}
+  .flip-btn{padding:7px 11px; font-size:11.5px}
+  .bar-actions{flex:1 1 100%; flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; padding-bottom:2px}
+  .bar-actions::-webkit-scrollbar{display:none}
+  .bar-actions .btn{flex:none; white-space:nowrap}
+  .wrap{padding:14px 10px 60px; gap:14px}
+  .card{padding:14px 12px 16px}
+  .in, .in-sel, .ml-unit, textarea.in, .ml-row .in, .cl-prow .in, .line-title, .remise .in{font-size:16px}
+  .ico{width:36px; height:36px; font-size:15px}
+  .btn{min-height:36px}
+  .btn.sm{min-height:34px}
+  .fmt-btn{min-width:36px; height:34px}
+  .fmt-help{display:none}
+  .line-head{flex-wrap:wrap; row-gap:8px}
+  .line-title-wrap{order:3; flex:1 1 100%}
+  .line-ord{margin-left:auto}
+  .line-body{padding:12px 10px 4px}
+  .line-foot{flex-direction:column; align-items:flex-start}
+  .ml-row{grid-template-columns:1fr 80px 36px}
+  .ml-foot, .ml-sum{flex-direction:column; align-items:flex-start}
+  .sheet-stage{padding:14px 8px 60px}
+  .sheet{padding:20px 14px; font-size:12.5px}
+  .s-table th, .s-table td{padding:7px 5px}
+  .c-desc{width:auto}
+  .cl-prow{grid-template-columns:1fr 1fr 1fr 36px}
+  .cl-prow-lin{grid-template-columns:1fr 1fr 36px}
+  .cl-prow > .cl-swatch-wrap, .cl-prow-head > span:first-child{grid-column:1/-1}
+  .overlay{padding:0; align-items:stretch}
+  .modal, .modal-wide{max-width:none; border-radius:0; min-height:100%}
+  .modal-head{position:sticky; top:0; background:var(--card); z-index:2}
+  .modal-body{padding:14px 12px 40px}
+  .qrow{flex-direction:column; align-items:stretch}
+  .qrow-act{justify-content:flex-start}
+  .sum-grid{gap:8px}
+  .stat-val{font-size:16px}
+  .stat-big .stat-val{font-size:19px}
+  .toast{left:12px; right:12px; transform:none; text-align:center}
 }
 
 /* print */
