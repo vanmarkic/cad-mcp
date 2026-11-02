@@ -27,3 +27,18 @@ etabli.example.com {
 		reverse_proxy 127.0.0.1:8080
 	}
 }
+
+# ─── Option C : proxy Coolify (Caddy dans Docker, image lucaslorentz/caddy-docker-proxy) ─────────
+# Ici « 127.0.0.1 » désigne le CONTENEUR du proxy, pas le serveur : on vise l'hôte par host.docker.internal
+# (ou l'IP de la passerelle Docker). ÉTABLI doit donc écouter sur cette IP : HOST=<IP> dans /etc/etabli/env
+# (voir la section « Coolify » de deploy/README.md). Un fichier etabli.caddy dans le dossier dynamique du proxy
+# (sur l'hôte : /data/coolify/proxy/dynamic/, vu comme /dynamic/ dans le conteneur) contenant UNIQUEMENT :
+#
+# etabli.example.com {
+# 	encode zstd gzip
+# 	reverse_proxy host.docker.internal:8080
+# }
+#
+# ATTENTION : tout *.caddy de ce dossier est importé au niveau GLOBAL. N'y mettez JAMAIS de fragment
+# (cloudflare-ips.sh y est refusé) : une erreur de syntaxe met tous les sites du proxy hors ligne.
+# Protection « Cloudflare uniquement » : EDGE_SECRET (en-tête X-Etabli-Edge ajouté par Cloudflare), pas de plages d'IP.

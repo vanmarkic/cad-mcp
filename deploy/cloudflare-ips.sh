@@ -21,6 +21,15 @@ V6_URL="${CF_IPS_V6_URL:-https://www.cloudflare.com/ips-v6}"
 fetch() { # $1 = url, $2 = fichier local facultatif
   if [ -n "${2:-}" ]; then cat "$2"; else curl -fsS -m 20 "$1"; fi
 }
+# GARDE-FOU : un dossier « dynamic » (Coolify, caddy-docker-proxy…) importe tous ses *.caddy au niveau GLOBAL du
+# proxy. Ce fichier-ci est un FRAGMENT de bloc de site (« handle » hors d'un site est invalide) : l'y déposer ferait
+# échouer le rechargement et mettrait TOUS les sites du proxy hors ligne. Dans ce cas, utilisez EDGE_SECRET.
+case "$OUT" in
+  */dynamic/*.caddy|*/dynamic/*.Caddyfile)
+    echo "refus : « $OUT » serait importé au niveau global du proxy et casserait tous vos sites." >&2
+    echo "Avec Coolify / caddy-docker-proxy, protégez ÉTABLI avec EDGE_SECRET (voir deploy/README.md)." >&2
+    exit 2 ;;
+esac
 v4="$(fetch "$V4_URL" "${CF_IPS_V4_FILE:-}")"
 v6="$(fetch "$V6_URL" "${CF_IPS_V6_FILE:-}")"
 

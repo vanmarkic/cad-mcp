@@ -10,7 +10,7 @@
 #      tests rouges ou service qui ne démarre pas → on garde (ou rétablit) la version précédente
 #      et on note le commit comme mauvais (pas de nouvel essai tant qu'un nouveau commit n'arrive pas).
 #
-# Variables (toutes facultatives) : REPO_URL BRANCH BASE_DIR RESTART_CMD HEALTH_URL HEALTH_TRIES
+# Variables (toutes facultatives) : REPO_URL BRANCH BASE_DIR RESTART_CMD HEALTH_URL HEALTH_TRIES HOST PORT
 #                                   KEEP TEST_CMD
 set -euo pipefail
 
@@ -18,7 +18,10 @@ REPO_URL="${REPO_URL:-https://github.com/vanmarkic/cad-mcp.git}"
 BRANCH="${BRANCH:-main}"
 BASE_DIR="${BASE_DIR:-/opt/etabli}"
 RESTART_CMD="${RESTART_CMD:-sudo -n /usr/bin/systemctl restart etabli.service}"
-HEALTH_URL="${HEALTH_URL-http://127.0.0.1:8080/api/health}"   # vide = pas de contrôle
+# Contrôle de santé : là où ÉTABLI écoute réellement (HOST/PORT de /etc/etabli/env, ex. l'IP de la passerelle
+# Docker derrière Coolify — « 127.0.0.1 » y échouerait et ferait annuler chaque mise à jour). Vide = pas de contrôle.
+_hh="${HOST:-127.0.0.1}"; [ "$_hh" = "0.0.0.0" ] && _hh="127.0.0.1"
+HEALTH_URL="${HEALTH_URL-http://$_hh:${PORT:-8080}/api/health}"
 HEALTH_TRIES="${HEALTH_TRIES:-10}"
 KEEP="${KEEP:-3}"
 TEST_CMD="${TEST_CMD:-node --test server/test/*.test.js site/devjs/test/core.test.js site/devjs/test/store.test.js}"

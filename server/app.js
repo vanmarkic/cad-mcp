@@ -4,6 +4,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const net = require("node:net");
+const crypto = require("node:crypto");
 const { Store, ID_RE } = require("./lib/store.js");
 const Auth = require("./lib/auth.js");
 
@@ -55,6 +56,20 @@ function createApp(userCfg) {
     else if (cfg.trustProxy === "xff") h = String(req.headers["x-forwarded-for"] || "").split(",")[0];
     h = h ? String(h).trim() : "";
     return h && net.isIP(h) ? h : sock;
+  }
+
+  // Secret partagé avec le proxy (Cloudflare : règle « Modify Request Header » qui ajoute X-Etabli-Edge).
+  // S'il est configuré, toute requête qui ne le porte pas reçoit un 403 — sauf /api/health (contrôle de santé
+  // local, sans donnée). Un visiteur qui contourne le proxy en visitant l'IP du serveur ne peut ni forger
+  // CF-Connecting-IP ni même atteindre l'application. Indépendant des plages d'IP de Cloudflare et de la façon
+  // dont le proxy est installé (Caddy, Docker, Coolify…).
+  const edgeSecret = cfg.edgeSecret ? Buffer.from(String(cfg.edgeSecret)) : null;
+  function edgeOk(req) {
+    if (!edgeSecret) return true;
+    const h = req.headers["x-etabli-edge"];
+    if (typeof h !== "string") return false;
+    const got = Buffer.from(h);
+    return got.length === edgeSecret.length && crypto.timingSafeEqual(got, edgeSecret);
   }
 
   // Protection CSRF : requête du même site uniquement (en plus de SameSite=Lax et du Content-Type JSON).
@@ -198,6 +213,7 @@ function createApp(userCfg) {
       res.setHeader("X-Frame-Options", "DENY");
       res.setHeader("Content-Security-Policy", CSP);
       if (cfg.cookieSecure) res.setHeader("Strict-Transport-Security", "max-age=15552000");
+      if (!edgeOk(req) && url.pathname !== "/api/health") return send(res, 403, { error: "Accès direct refusé" });
       if (url.pathname.startsWith("/api/")) return await api(req, res, url);
       if (req.method !== "GET" && req.method !== "HEAD") return send(res, 405, { error: "Méthode non autorisée" });
       return serveStatic(req, res, url.pathname);

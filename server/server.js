@@ -4,12 +4,16 @@
      COOKIE_SECURE=1 (mettre 0 uniquement en test local sans HTTPS)
      TRUST_PROXY=0|xff|cf   (IP réelle du client derrière Caddy / Cloudflare)
      LEGACY_URL=https://…/devjs/   (ancienne adresse, pour la migration à la 1re connexion)
-     SESSION_DAYS=30 */
+     SESSION_DAYS=30
+     EDGE_SECRET=<24+ caractères>   secret partagé avec Cloudflare (en-tête X-Etabli-Edge) ; sans lui : 403 */
 const http = require("node:http");
 const path = require("node:path");
 const { createApp } = require("./app.js");
 
 function configFromEnv(env = process.env) {
+  if (env.EDGE_SECRET && env.EDGE_SECRET.length < 24) {
+    throw new Error("EDGE_SECRET trop court (24 caractères minimum) : générez-le avec « openssl rand -hex 32 »");
+  }
   return {
     port: Number(env.PORT) || 8080,
     host: env.HOST || "127.0.0.1",
@@ -19,6 +23,7 @@ function configFromEnv(env = process.env) {
     trustProxy: env.TRUST_PROXY || "0",
     legacyUrl: env.LEGACY_URL || "",
     sessionDays: Number(env.SESSION_DAYS) || 30,
+    edgeSecret: env.EDGE_SECRET || "",
   };
 }
 

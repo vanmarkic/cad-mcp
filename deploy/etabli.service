@@ -1,6 +1,9 @@
 [Unit]
 Description=ÉTABLI — serveur (devis de menuiserie)
-After=network.target
+# Après Docker : derrière Coolify, ÉTABLI écoute sur l'IP de la passerelle Docker, qui n'existe qu'une fois
+# Docker démarré. Sans limite de tentatives, le service finit de toute façon par démarrer au redémarrage du serveur.
+After=network-online.target docker.service
+StartLimitIntervalSec=0
 
 [Service]
 User=etabli
@@ -8,7 +11,7 @@ Group=etabli
 EnvironmentFile=/etc/etabli/env
 WorkingDirectory=/opt/etabli/current/server
 ExecStart=/usr/bin/node /opt/etabli/current/server/server.js
-Restart=on-failure
+Restart=always
 RestartSec=2
 
 # Durcissement : le processus ne peut écrire que dans le dossier des données

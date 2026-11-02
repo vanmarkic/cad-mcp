@@ -45,11 +45,17 @@ TRUST_PROXY=xff
 # Ancienne adresse d'ÉTABLI : à la 1re connexion, on propose d'en récupérer les devis (laisser vide sinon)
 LEGACY_URL=
 SESSION_DAYS=30
+# Derrière un proxy installé dans Docker (Coolify…) : adresse de l'HÔTE joignable depuis les conteneurs
+# (IP de la passerelle Docker, ex. 172.17.0.1 — voir deploy/README.md). Ne mettez PAS 0.0.0.0 sans EDGE_SECRET.
+#HOST=172.17.0.1
+# Secret partagé avec Cloudflare (règle « Modify Request Header » : X-Etabli-Edge = ce secret). Si défini,
+# toute requête sans lui reçoit un 403 : le serveur ne répond qu'à Cloudflare. Générer : openssl rand -hex 32
+#EDGE_SECRET=
 # Mises à jour : dépôt et branche suivis (défauts ci-dessous)
 #REPO_URL=$REPO_URL
 #BRANCH=$BRANCH
 ENV
-  chmod 644 "$CONF/env"
+  chmod 600 "$CONF/env"   # peut contenir EDGE_SECRET ; lu par systemd (root), pas par les autres utilisateurs
 fi
 
 say "Scripts et services (récupérés depuis $REPO_URL, branche $BRANCH)"
@@ -76,12 +82,13 @@ systemctl enable --now etabli.service etabli-update.timer etabli-backup.timer
 
 say "Terminé"
 cat <<NEXT
-ÉTABLI écoute sur 127.0.0.1:8080 (non exposé : il faut un reverse proxy HTTPS devant).
+ÉTABLI écoute sur HOST:PORT de $CONF/env (par défaut 127.0.0.1:8080, non exposé : il faut un reverse proxy HTTPS devant).
 
 Étapes suivantes :
   1. Créer le compte du client :   etabli-admin add <login>      (le mot de passe généré s'affiche une fois)
-  2. Ajouter le site à Caddy (voir $BASE/current/deploy/Caddyfile.example), puis : systemctl reload caddy
+  2. Ajouter le site au proxy : Caddy classique → $BASE/current/deploy/Caddyfile.example (options A/B) ;
+     proxy Coolify (Docker) → option C du même fichier et la section « Coolify » de deploy/README.md
   3. Renseigner LEGACY_URL dans $CONF/env (ancienne adresse), puis : systemctl restart etabli
-  4. Vérifier :   curl -fsS http://127.0.0.1:8080/api/health     ·     journalctl -u etabli -u etabli-update -n 30
+  4. Vérifier :   (. $CONF/env; curl -fsS http://\${HOST:-127.0.0.1}:\${PORT:-8080}/api/health)     ·     journalctl -u etabli -u etabli-update -n 30
 Mises à jour : automatiques toutes les 5 minutes (journalctl -u etabli-update).
 NEXT
