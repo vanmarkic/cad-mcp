@@ -1,0 +1,7 @@
+[Unit]
+Description=ÉTABLI — sauvegarde locale des données
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/etabli/env
+ExecStart=/opt/etabli/backup.sh

@@ -1,0 +1,6 @@
+#!/bin/sh
+# Gestion des comptes ÉTABLI :  etabli-admin add <login> | passwd <login> | revoke <login> | list
+set -a
+. /etc/etabli/env
+set +a
+exec runuser -u etabli -- env DATA_DIR="${DATA_DIR:-/var/lib/etabli}" /usr/bin/node /opt/etabli/current/server/admin.js "$@"

@@ -1,0 +1,29 @@
+# ÉTABLI — exemples de configuration Caddy. Ajoutez UN des blocs à votre Caddyfile (sans toucher aux
+# autres sites), puis :  systemctl reload caddy
+
+# ─── Option A : sslip.io, SANS Cloudflare ────────────────────────────────────────────────────────
+# sslip.io résout « 203-0-113-10.sslip.io » vers 203.0.113.10 : un nom d'hôte gratuit, sans zone DNS à gérer.
+# Caddy obtient et renouvelle tout seul le certificat Let's Encrypt (ports 80 et 443 joignables).
+# Dans /etc/etabli/env :  TRUST_PROXY=xff
+203-0-113-10.sslip.io {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:8080
+}
+
+# ─── Option B : un domaine à VOUS, géré par Cloudflare (nuage orange = proxifié) ─────────────────
+# « Derrière Cloudflare » exige un nom de domaine qui est une zone de VOTRE compte Cloudflare (impossible avec
+# sslip.io : la zone DNS n'est pas à vous). Côté Cloudflare : enregistrement A « etabli » → IP du serveur, proxifié ;
+# SSL/TLS en mode « Full (strict) ». Dans /etc/etabli/env :  TRUST_PROXY=cf
+#
+# Sécurité : le serveur ne doit répondre qu'à Cloudflare, sinon l'en-tête CF-Connecting-IP est falsifiable en
+# visitant l'IP directement (et la limitation des tentatives de connexion contournée). On le fait ICI, au niveau
+# du site, avec le fichier généré par cloudflare-ips.sh — sans toucher aux autres sites ni au pare-feu :
+#     sudo /opt/etabli/cloudflare-ips.sh          # écrit /etc/caddy/etabli-cloudflare.caddy
+#
+etabli.example.com {
+	encode zstd gzip
+	import /etc/caddy/etabli-cloudflare.caddy
+	handle {
+		reverse_proxy 127.0.0.1:8080
+	}
+}

@@ -5,8 +5,8 @@
   "description": "ÉTABLI — générateur de devis menuisier (+ calepinage de panneaux)",
   "scripts": {
     "test": "node --test",
-    "test:unit": "node --test test/core.test.js",
-    "test:ui": "node --test test/ui.test.js",
+    "test:unit": "node --test test/core.test.js test/store.test.js",
+    "test:ui": "node --test test/ui.test.js test/server-ui.test.js",
     "serve": "python3 -m http.server 8137"
   },
   "license": "ISC",
