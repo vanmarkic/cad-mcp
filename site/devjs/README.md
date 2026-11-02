@@ -175,6 +175,15 @@ Chaque fichier exporté **s'ouvre sur un en-tête destiné à l'IA**, avant les 
 *Mes devis → Importer un devis…*. Pour partir de zéro : *Nouveau*, puis *Exporter le devis
 en cours* — le modèle vide emporte les mêmes consignes.
 
+**Sans fichier :** dans « Mes devis », **« Copier pour une IA »** met le devis en cours (consignes + schéma +
+données) dans le presse-papiers, à coller dans la conversation ; **« Coller une réponse d'IA… »** importe la
+réponse telle quelle (texte autour et bloc de code acceptés), sans l'enregistrer d'abord dans un fichier.
+
+**À compléter :** le schéma contrôle la structure ; une IA qui respecte « n'invente aucun prix » laisse des champs
+vides. Après import, un cadre liste ces champs (prix d'achat, quantités, heures, taux, longueurs du mètre linéaire,
+unité incohérente avec `mlOn`, libellés vides…) avec leur chemin, sans bloquer l'import, et **« Copier pour l'IA »**
+lui demande de poser les questions nécessaires plutôt que d'inventer.
+
 **Contrôle à l'import** (le même schéma sert de validateur, sans dépendance) :
 
 - *Lecteur tolérant sur la syntaxe* : JSON lu en strict d'abord ; sinon on retire le bloc

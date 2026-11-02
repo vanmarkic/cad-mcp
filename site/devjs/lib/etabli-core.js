@@ -484,6 +484,7 @@
     "MÈTRE LINÉAIRE (fournitures : baguettes, profilés…) : si mlOn vaut true, ÉTABLI calcule la quantité à partir de mlItems (liste de { id, len, qty }) exprimés dans mlUnit (\"m\", \"cm\" ou \"mm\"), majorés de mlPerte (% de chute) ; unite vaut alors \"ml\" et pa est le prix d'achat au mètre. Sinon mlOn vaut false et mlItems vaut [].",
     "TEXTE MIS EN FORME (detail, chantier, conditions) : **gras**, *italique*, __souligné__ ; « - » en début de ligne = puce ; « 1. » = liste numérotée ; retour à la ligne = \\n ; jamais de HTML.",
     "IDENTIFIANTS : pour modifier ce devis, garde son id et son numero. Pour un autre devis, mets un nouvel id (texte unique) et un nouveau numero. L'import AJOUTE toujours le devis à la liste sans écraser l'existant.",
+    "CHAMPS LAISSÉS VIDES : c'est permis (\"\" = non renseigné). ÉTABLI les liste à l'import comme « à compléter » ; l'utilisateur te les collera peut-être : pose alors les questions, n'invente rien.",
     "SI L'IMPORT ÉCHOUE : ÉTABLI affiche la liste des erreurs avec leur chemin (ex. data.quotes[0].lines[2].type). L'utilisateur te la collera : corrige uniquement ces points et renvoie le fichier complet.",
   ];
 
@@ -664,6 +665,49 @@
       "\nCorrige uniquement ces points et renvoie le fichier JSON COMPLET : un seul objet JSON valide, mêmes clés app / kind / version / data.";
   }
 
+  /* ---------- « à compléter » : contrôle de FOND, non bloquant ----------
+     Le schéma garantit la structure ; une IA qui respecte « n'invente aucun prix » laisse des champs vides.
+     On les liste (chemin + explication) pour que l'utilisateur les complète — ou les redemande à l'IA —
+     sans refuser l'import. Rend un tableau de { path, message }. */
+  function lintQuote(q, base) {
+    base = base == null ? "data.quotes[0]" : base;
+    var out = [];
+    function add(path, message) { out.push({ path: path, message: message }); }
+    function empty(v) { return v == null || String(v).trim() === ""; }
+    q = q || {};
+    var lines = Array.isArray(q.lines) ? q.lines : [];
+    if (!lines.length) add(base + ".lines", "aucune ligne : le devis est vide");
+    if (empty(q.client && q.client.nom)) add(base + ".client.nom", "nom du client non renseigné");
+    for (var i = 0; i < lines.length; i++) {
+      var l = lines[i] || {}, p = base + ".lines[" + i + "]";
+      if (empty(l.designation)) add(p + ".designation", "libellé vide");
+      if (l.type === "fourniture") {
+        if (l.mlOn) {
+          var ok = Array.isArray(l.mlItems) && l.mlItems.some(function (it) { return it && num(it.len) > 0 && Math.floor(num(it.qty)) >= 1; });
+          if (!ok) add(p + ".mlItems", "mètre linéaire activé (mlOn) mais aucune longueur exploitable : quantité 0 ml");
+          if (!empty(l.unite) && l.unite !== "ml") add(p + ".unite", "« " + l.unite + " » alors que mlOn vaut true : la quantité sera comptée en ml");
+        } else {
+          if (empty(l.qte)) add(p + ".qte", "quantité non renseignée (comptée 0)");
+          if (Array.isArray(l.mlItems) && l.mlItems.length) add(p + ".mlItems", "longueurs ignorées car mlOn vaut false");
+        }
+        if (empty(l.pa)) add(p + ".pa", "prix d'achat non renseigné (compté 0 €)");
+        if (empty(l.marge)) add(p + ".marge", "marge non renseignée (comptée 0 %)");
+      } else if (l.type === "main") {
+        if (empty(l.heures)) add(p + ".heures", "nombre d'heures non renseigné (compté 0)");
+        if (empty(l.tauxVente)) add(p + ".tauxVente", "taux horaire facturé non renseigné (compté 0 €)");
+      } else if (l.type === "forfait") {
+        if (empty(l.pa)) add(p + ".pa", "montant du forfait non renseigné (compté 0 €)");
+      }
+    }
+    return out;
+  }
+
+  // Texte à coller à l'IA pour qu'elle demande les valeurs manquantes (sans les inventer).
+  function quoteTodoPrompt(todo) {
+    return "J'ai importé ton devis dans ÉTABLI. Ces champs sont vides :\n" + formatIssues(todo || []) +
+      "\nPose-moi les questions nécessaires pour les compléter (n'invente aucune valeur), puis renvoie le fichier JSON COMPLET.";
+  }
+
   // Valide la STRUCTURE d'un devis venu d'un fichier (pas ses montants) pour qu'il
   // ne puisse pas faire planter l'appli au chargement : client objet, identifiants
   // de lignes présents et uniques. Un devis bien formé (celui que produit l'export)
@@ -716,7 +760,8 @@
       throw err;
     }
     res.warnings.forEach(function (w) { warnings.push(w.path + " : " + w.message); });
-    return { quote: normalizeQuote(obj.data.quotes[0]), warnings: warnings };
+    var quote = normalizeQuote(obj.data.quotes[0]);
+    return { quote: quote, warnings: warnings, todo: lintQuote(quote) };
   }
   function readQuoteExport(input) { return readQuoteExportDetailed(input).quote; }
 
@@ -1550,6 +1595,8 @@
     validateQuoteFile: validateQuoteFile,
     parseJSONLenient: parseJSONLenient,
     quoteFeedbackPrompt: quoteFeedbackPrompt,
+    lintQuote: lintQuote,
+    quoteTodoPrompt: quoteTodoPrompt,
     quoteJsonSchema: QUOTE_JSON_SCHEMA,
     quoteAiInstructions: QUOTE_AI_INSTRUCTIONS,
     quoteFileName: quoteFileName,

@@ -35,7 +35,7 @@ window.storage = {
 <script type="text/babel" data-presets="react">
 const { useState, useEffect, useMemo, useRef } = React;
 const { createLocalStore, createServerStore, detectBackend } = window.EtabliStore;
-const { num, computeLine, tvaBreakdown, calculateCutlist, panelMetrics, cutListText, newQuoteId, upsertQuote, removeQuote, nextQuoteNumero, buildBackup, readBackup, mergeQuotes, catalogItemFromLine, upsertCatalogItem, removeCatalogItem, searchCatalog, applyCatalogItemToLine, mergeCatalog, linearLineQty, linearDetailText, calculateLinearCutlist, linearMetrics, linearCutListText, parseRichText, hasRichFormatting, applyTextFormat, buildQuoteExport, readQuoteExportDetailed, quoteFeedbackPrompt, quoteFileName, addImportedQuote } = window.EtabliCore;
+const { num, computeLine, tvaBreakdown, calculateCutlist, panelMetrics, cutListText, newQuoteId, upsertQuote, removeQuote, nextQuoteNumero, buildBackup, readBackup, mergeQuotes, catalogItemFromLine, upsertCatalogItem, removeCatalogItem, searchCatalog, applyCatalogItemToLine, mergeCatalog, linearLineQty, linearDetailText, calculateLinearCutlist, linearMetrics, linearCutListText, parseRichText, hasRichFormatting, applyTextFormat, buildQuoteExport, readQuoteExportDetailed, quoteFeedbackPrompt, quoteTodoPrompt, quoteFileName, addImportedQuote } = window.EtabliCore;
 
 /* =========================================================================
    ÉTABLI — Générateur de devis pour menuisier
@@ -644,6 +644,7 @@ function App({ store, me, onLogout }) {
   const [params, setParams] = useState(DEFAULT_PARAMS);
   const [devis, setDevis] = useState(() => newDevis(DEFAULT_COMPANY, DEFAULT_PARAMS));
   const [saved, setSaved] = useState([]);
+  const [importTodo, setImportTodo] = useState(null); // [{ path, message }] — champs laissés vides par l'IA
   const [importNotice, setImportNotice] = useState(null); // { level, title, body, feedback } — résultat de l'import d'un devis
   const savedRef = useRef([]); // dernier `saved` — lu par les callbacks asynchrones (FileReader)
   savedRef.current = saved;
@@ -932,14 +933,15 @@ function App({ store, me, onLogout }) {
   };
   // AJOUTE le devis du fichier à « Mes devis » : n'écrase rien, ne touche ni au devis
   // en cours, ni aux réglages, ni au catalogue (voir addImportedQuote dans le noyau).
-  const importQuote = (file) => {
-    if (!file) return;
+  // Importe un devis depuis du TEXTE : fichier lu, ou réponse d'IA collée telle quelle.
+  // Rend true si un devis a été ajouté.
+  const importQuoteText = (text) => {
     setImportNotice(null);
-    const reader = new FileReader();
-    reader.onload = () => {
+    setImportTodo(null);
+    {
       let read;
       try {
-        read = readQuoteExportDetailed(String(reader.result));
+        read = readQuoteExportDetailed(String(text));
       } catch (e) {
         const msg = e && e.message ? e.message : "fichier invalide";
         // Avis persistant (les erreurs sont longues) + texte prêt à coller à l'IA.
@@ -959,6 +961,7 @@ function App({ store, me, onLogout }) {
       }
       commitQuotes(() => res.list);
       setImportNotice(notice);
+      setImportTodo(read.todo && read.todo.length ? read.todo : null);
       if (res.status === "copy") {
         flash("Importé comme copie : un devis de même identifiant mais de contenu différent existe déjà (" + label + ")", 6000);
       } else if (res.numeroClash) {
@@ -966,9 +969,25 @@ function App({ store, me, onLogout }) {
       } else {
         flash("Devis importé : " + label);
       }
-    };
+      return true;
+    }
+  };
+  const importQuote = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => importQuoteText(String(reader.result));
     reader.onerror = () => flash("Échec de lecture du fichier");
     reader.readAsText(file);
+  };
+  // Copie le devis « prêt pour l'IA » (consignes + schéma + données) pour le coller dans une conversation.
+  const copyQuoteForAI = async (q) => {
+    const text = JSON.stringify(buildQuoteExport(q, { exportedAt: new Date().toISOString() }), null, 2);
+    try {
+      await navigator.clipboard.writeText(text);
+      flash("Devis copié avec ses consignes : collez-le dans la conversation avec l'IA, puis décrivez ce que vous voulez", 5000);
+    } catch (e) {
+      flash("Copie impossible : utilisez « Exporter le devis en cours » (fichier)", 4000);
+    }
   };
   // Copie le message d'erreur prêt à coller à l'IA (boucle « valider → renvoyer les erreurs »).
   const copyFeedback = async (text) => {
@@ -1072,7 +1091,7 @@ function App({ store, me, onLogout }) {
           <button className="btn ghost" onClick={() => setModal("reglages")}>
             Réglages
           </button>
-          <button className="btn ghost" onClick={() => { setImportNotice(null); setModal("mesdevis"); }}>
+          <button className="btn ghost" onClick={() => { setImportNotice(null); setImportTodo(null); setModal("mesdevis"); }}>
             Mes devis {saved.length ? `(${saved.length})` : ""}
           </button>
           <button className="btn ghost" onClick={resetQuote}>
@@ -1191,6 +1210,11 @@ function App({ store, me, onLogout }) {
             onExport={exportQuote}
             onExportCurrent={() => exportQuote(devis)}
             onImport={importQuote}
+            onImportText={importQuoteText}
+            onCopyCurrentForAI={() => copyQuoteForAI(devis)}
+            todo={importTodo}
+            onDismissTodo={() => setImportTodo(null)}
+            onCopyTodo={() => copyFeedback(quoteTodoPrompt(importTodo))}
             notice={importNotice}
             onDismissNotice={() => setImportNotice(null)}
             onCopyFeedback={copyFeedback}
@@ -1937,8 +1961,10 @@ function ClientSheet({ devis, company, calc, onPrint }) {
 /* =========================================================================
    MODAL Mes devis — liste + export / import d'un seul devis
    ========================================================================= */
-function MesDevis({ saved, onLoad, onDelete, onExport, onExportCurrent, onImport, notice, onDismissNotice, onCopyFeedback }) {
+function MesDevis({ saved, onLoad, onDelete, onExport, onExportCurrent, onImport, onImportText, onCopyCurrentForAI, todo, onDismissTodo, onCopyTodo, notice, onDismissNotice, onCopyFeedback }) {
   const fileRef = useRef(null);
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [pasted, setPasted] = useState("");
   return (
     <div>
       <div className="qtools">
@@ -1947,6 +1973,12 @@ function MesDevis({ saved, onLoad, onDelete, onExport, onExportCurrent, onImport
         </button>
         <button className="btn sm add" onClick={onExportCurrent}>
           Exporter le devis en cours
+        </button>
+        <button className="btn sm add" onClick={onCopyCurrentForAI} title="Consignes + schéma + devis, à coller dans ChatGPT, Claude…">
+          Copier pour une IA
+        </button>
+        <button className="btn sm add" onClick={() => setPasteOpen((o) => !o)} aria-expanded={pasteOpen}>
+          Coller une réponse d'IA…
         </button>
         <input
           ref={fileRef}
@@ -1971,6 +2003,39 @@ function MesDevis({ saved, onLoad, onDelete, onExport, onExportCurrent, onImport
         nouveau, puis enregistre la réponse en <code>.json</code> (ou <code>.txt</code>) et importe-la.
         Si elle est refusée, copie les erreurs pour l'IA depuis le cadre ci-dessous.
       </p>
+      {pasteOpen && (
+        <div className="qpaste">
+          <label className="fld-lab" htmlFor="qpaste-ta">Réponse de l'IA (JSON, bloc de code et texte autour acceptés)</label>
+          <textarea
+            id="qpaste-ta"
+            className="in in-area qpaste-ta"
+            rows={6}
+            value={pasted}
+            placeholder={'Collez ici la réponse complète : « Voici le devis… ```json { "app": "etabli", … } ``` »'}
+            onChange={(e) => setPasted(e.target.value)}
+          />
+          <div className="qnotice-act">
+            <button className="btn sm" disabled={!pasted.trim()} onClick={() => { if (onImportText(pasted)) { setPasted(""); setPasteOpen(false); } }}>
+              Importer ce texte
+            </button>
+            <button className="btn sm ghost-dark" onClick={() => { setPasted(""); setPasteOpen(false); }}>Annuler</button>
+          </div>
+        </div>
+      )}
+      {todo && todo.length ? (
+        <div className="qnotice qnotice-todo" role="status">
+          <div className="qnotice-head">
+            <strong>À compléter ({todo.length})</strong>
+            <button className="ico" aria-label="Fermer la liste à compléter" onClick={onDismissTodo}>✕</button>
+          </div>
+          <p className="muted qtodo-note">Le devis est importé. Ces champs sont vides : complétez-les dans l'atelier, ou demandez-les à l'IA.</p>
+          <pre className="qnotice-body">{todo.map((t) => "• " + t.path + " : " + t.message).join("\n")}</pre>
+          <div className="qnotice-act">
+            <button className="btn sm" onClick={onCopyTodo}>Copier pour l'IA</button>
+            <span className="muted">Elle vous posera les questions, sans inventer de valeurs.</span>
+          </div>
+        </div>
+      ) : null}
       {notice && (
         <div className={"qnotice qnotice-" + notice.level} role="alert">
           <div className="qnotice-head">
@@ -2900,6 +2965,10 @@ const CSS = `
 .qtools-note code{background:var(--paper-2,#efeae0); padding:1px 5px; border-radius:4px; font-size:.9em}
 .qnotice{border:1px solid var(--brick); background:#f6e9e2; border-radius:9px; padding:10px 12px; margin:0 0 14px}
 .qnotice-info{border-color:var(--amber); background:#f7efdc}
+.qnotice-todo{border-color:var(--ink-3); background:var(--line-2)}
+.qtodo-note{margin:0 0 6px; font-size:12px}
+.qpaste{border:1px solid var(--line); border-radius:9px; padding:10px 12px; margin:0 0 14px; background:#fff; display:flex; flex-direction:column; gap:8px}
+.qpaste-ta{font-family:var(--mono); font-size:12px}
 .qnotice-head{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px; font-size:13px}
 .qnotice-body{margin:0 0 8px; font-family:var(--mono); font-size:11.5px; line-height:1.5; white-space:pre-wrap; word-break:break-word; max-height:220px; overflow:auto; user-select:text}
 .qnotice-act{display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-size:11.5px}
