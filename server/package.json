@@ -1,0 +1,12 @@
+{
+  "name": "etabli-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ÉTABLI — petit serveur (sans base de données, sans dépendance) : authentification, devis en fichiers, migration",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": { "node": ">=20" },
+  "license": "ISC"
+}

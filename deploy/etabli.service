@@ -1,0 +1,30 @@
+[Unit]
+Description=ÉTABLI — serveur (devis de menuiserie)
+After=network.target
+
+[Service]
+User=etabli
+Group=etabli
+EnvironmentFile=/etc/etabli/env
+WorkingDirectory=/opt/etabli/current/server
+ExecStart=/usr/bin/node /opt/etabli/current/server/server.js
+Restart=on-failure
+RestartSec=2
+
+# Durcissement : le processus ne peut écrire que dans le dossier des données
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/etabli
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target

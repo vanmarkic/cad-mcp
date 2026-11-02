@@ -1,0 +1,12 @@
+[Unit]
+Description=ÉTABLI — mise à jour depuis GitHub (tirage)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=etabli
+Group=etabli
+EnvironmentFile=-/etc/etabli/env
+ExecStart=/opt/etabli/update.sh
+TimeoutStartSec=300

@@ -1,0 +1,35 @@
+#cloud-config
+# ÉTABLI — serveur DÉDIÉ prêt à l'emploi (Hetzner Cloud, Ubuntu 24.04). À coller dans « Cloud config » à la création
+# du serveur (ou via l'API : champ user_data). NON TESTÉ sur un vrai serveur : relisez-le avant usage.
+# Résultat : Caddy (HTTPS automatique sur <ip>.sslip.io), ÉTABLI installé et mis à jour toutes les 5 minutes,
+# pare-feu local (22, 80, 443). Il reste à créer le compte :  etabli-admin add <login>
+package_update: true
+packages: [git, curl, ca-certificates, ufw, caddy]
+write_files:
+  - path: /etc/etabli/env
+    permissions: "0644"
+    content: |
+      PORT=8080
+      HOST=127.0.0.1
+      DATA_DIR=/var/lib/etabli
+      COOKIE_SECURE=1
+      TRUST_PROXY=xff
+      # À VÉRIFIER : adresse actuelle d'ÉTABLI (GitHub Pages), d'où récupérer les devis à la 1re connexion
+      LEGACY_URL=https://vanmarkic.github.io/cad-mcp/devjs/
+      SESSION_DAYS=30
+  - path: /usr/local/sbin/etabli-bootstrap.sh
+    permissions: "0755"
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      curl -fsSL https://raw.githubusercontent.com/vanmarkic/cad-mcp/main/deploy/install.sh -o /root/install.sh
+      bash /root/install.sh
+      # Nom d'hôte sslip.io construit à partir de l'IP publique du serveur (service de métadonnées Hetzner)
+      IP="$(curl -fsS http://169.254.169.254/hetzner/v1/metadata/public-ipv4)"
+      HOST="${IP//./-}.sslip.io"
+      printf '%s {\n\tencode zstd gzip\n\treverse_proxy 127.0.0.1:8080\n}\n' "$HOST" > /etc/caddy/Caddyfile
+      systemctl enable --now caddy && systemctl reload caddy
+      ufw allow 22/tcp && ufw allow 80/tcp && ufw allow 443/tcp && ufw --force enable
+      echo "ÉTABLI prêt : https://$HOST/" > /root/ETABLI-PRET.txt
+runcmd:
+  - [bash, /usr/local/sbin/etabli-bootstrap.sh]

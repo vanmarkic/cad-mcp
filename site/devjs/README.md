@@ -224,6 +224,15 @@ L'algorithme est un *bin packing « guillotine »* tenant compte du trait de
 scie, porté depuis [bdfinst/cutlist](https://github.com/bdfinst/cutlist) (MIT)
 et adapté au **système métrique** (mm + €/m²).
 
+## Mode serveur (connexion + devis en fichiers)
+
+En plus du mode « navigateur seul » (GitHub Pages), ÉTABLI peut être servi par un **petit serveur Node sans
+dépendance ni base de données** (`/server`) : connexion par identifiant et mot de passe, un fichier JSON par
+devis, mise à jour automatique depuis GitHub, migration des devis de l'ancienne adresse. L'application choisit
+seule son mode au démarrage (`GET /api/me` : 200/401 JSON → serveur ; sinon navigateur seul), grâce à la couche
+`lib/etabli-store.js` (mêmes appels dans les deux cas). Exploitation, installation, sécurité et limites :
+**`deploy/README.md`**.
+
 ## Architecture
 
 - `index.html` — UI React (faces Atelier / Client + modales Réglages, Mes
