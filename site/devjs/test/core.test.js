@@ -1286,3 +1286,17 @@ test("mergeClients: additif — l'existant prime, les nouveaux s'ajoutent ; sauv
   const b = C.buildBackup({ settings: {}, quotes: [], calepinage: null, catalogue: [], clients: cur });
   assert.deepEqual(C.readBackup(JSON.stringify(b)).clients, cur);
 });
+
+/* ------------------------------------------- versions des fichiers (anti-cache périmé) */
+test("versions: chaque <script src=\"lib/…\"> porte ?v= = VERSION du service worker (Cloudflare met les .js en cache 4 h)", () => {
+  const fs = require("node:fs"), path = require("node:path");
+  const root = path.join(__dirname, "..");
+  const sw = fs.readFileSync(path.join(root, "sw.js"), "utf8");
+  const rev = /const VERSION = "etabli-v(\d+)"/.exec(sw)[1];
+  for (const f of ["index.html", "migrate.html"]) {
+    const html = fs.readFileSync(path.join(root, f), "utf8");
+    const tags = html.match(/<script src="lib\/[^"]+"/g) || [];
+    assert.ok(tags.length > 0, f);
+    for (const t of tags) assert.match(t, new RegExp("\\?v=" + rev + '"$'), f + " : " + t + " doit finir par ?v=" + rev);
+  }
+});
