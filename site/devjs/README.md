@@ -43,6 +43,21 @@ ensuite de trois façons :
 Le catalogue est stocké dans `etabli:catalogue` et **inclus dans la
 sauvegarde/restauration** (fusionné par désignation, sans perte).
 
+## Fiches clients (coordonnées pré-remplies)
+
+Pour refaire un devis au même client sans retaper ses coordonnées :
+
+- **Le carnet se remplit tout seul** : chaque devis enregistré crée la fiche de son client ou la *complète*
+  (un champ vide n'efface jamais une coordonnée connue). Au premier lancement de cette version, le carnet est
+  construit à partir des devis déjà enregistrés.
+- Dans un devis, **tapez le début du nom dans « Client »** : les fiches correspondantes sont proposées
+  (casse, espaces et accents ignorés ; recherche aussi par adresse, e-mail, chiffres du téléphone). En choisir
+  une remplit nom, adresse, e-mail, téléphone et type (particulier / pro).
+- Bouton **« Clients »** : rechercher, voir les devis d'un client (et les ouvrir), **« Nouveau devis »** pour
+  ce client (coordonnées pré-remplies), modifier, supprimer (ses devis restent), ajouter une fiche à la main.
+- Inclus dans la sauvegarde complète ; la restauration et la migration vers le serveur sont **additives**
+  (un client déjà présent n'est pas modifié). Mode serveur : document `clients.json` du compte (`/api/clients`).
+
 ## Sauvegarde / restauration de toutes les données
 
 Les données vivent dans le `localStorage` du navigateur — donc liées à ce poste
@@ -254,6 +269,14 @@ Android / Chrome / Edge → bouton **« Installer »** dans la barre (ou menu du
 - **Données** : le service worker ne met **jamais** en cache l'API (`/api/…`) ni les envois : les devis des clients
   ne sont pas stockés par lui. Fichiers de l'application : réseau d'abord (mises à jour vues tout de suite),
   bibliothèques et polices : copie locale rafraîchie en arrière-plan.
+
+**Expliqué dans l'application** : au téléphone, un bandeau (affiché une seule fois, masquable) propose
+« Comment ? » ; **Réglages → Application sur cet appareil** donne les consignes selon l'appareil — Android
+(Chrome ⋮ → « Installer l'application », Samsung Internet, Firefox), iPhone/iPad (Safari → Partager → « Sur
+l'écran d'accueil »), autres navigateurs — ou le bouton « Installer » quand le navigateur le permet, et
+« ✓ installée » une fois installée. En mode navigateur seul, l'aide prévient : sur **iPhone**, l'application
+installée a un stockage séparé de Safari (sauvegarder puis restaurer) ; sur **Android**, elle partage celui du
+navigateur où elle a été installée.
 
 Au téléphone : barre du bas avec le **total** (et la marge à l'atelier) et **« Enregistrer »** au pouce ;
 indicateur « • » tant que le devis n'est pas enregistré, avertissement avant de quitter et avant « Nouveau » /

@@ -261,6 +261,131 @@
   }
 
   /* =========================================================================
+     FICHES CLIENTS — pour refaire un devis au même client sans retaper ses coordonnées.
+     Le carnet se remplit tout seul (chaque devis enregistré met à jour la fiche de son client) et peut
+     être reconstruit à partir des devis existants. Identité : l'id, sinon le nom normalisé (« Dupont SA »
+     = « dupont  sa »). Une mise à jour ne remplace un champ que par une valeur NON vide : un devis où l'on
+     n'a pas retapé le téléphone n'efface pas celui de la fiche. Fonctions pures.
+     ========================================================================= */
+  var CLIENT_FIELDS = ["nom", "adresse", "email", "tel"];
+  var _cliSeq = 0;
+  function newClientId() {
+    _cliSeq += 1;
+    return "cl_" + Date.now().toString(36) + "_" + _cliSeq.toString(36) + Math.floor(Math.random() * 1e9).toString(36);
+  }
+  // Nom de client normalisé : casse, espaces ET accents ignorés (« Élise » = « elise »).
+  function normClientName(s) {
+    var t = normDesignation(s);
+    return t.normalize ? t.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : t;
+  }
+
+  // Fiche à partir d'un devis (ou d'un objet client) ; null si pas de nom.
+  function clientFromQuote(q) {
+    q = q || {};
+    var c = q.client && typeof q.client === "object" ? q.client : q;
+    var nom = String(c.nom == null ? "" : c.nom).trim();
+    if (!nom) return null;
+    var out = { id: newClientId() };
+    for (var i = 0; i < CLIENT_FIELDS.length; i++) out[CLIENT_FIELDS[i]] = String(c[CLIENT_FIELDS[i]] == null ? "" : c[CLIENT_FIELDS[i]]).trim();
+    out.nom = nom;
+    out.clientType = (q.clientType || c.clientType) === "pro" ? "pro" : "particulier";
+    return out;
+  }
+
+  function findClientIndex(list, c) {
+    var i;
+    if (c.id != null && c.id !== "") for (i = 0; i < list.length; i++) if (list[i] && list[i].id === c.id) return i;
+    var k = normClientName(c.nom);
+    if (!k) return -1;
+    for (i = 0; i < list.length; i++) if (list[i] && normClientName(list[i].nom) === k) return i;
+    return -1;
+  }
+
+  // Ajoute ou met à jour une fiche (le client touché passe en tête : le plus récent d'abord).
+  function upsertClient(list, c) {
+    list = Array.isArray(list) ? list.slice() : [];
+    if (!c || !String(c.nom == null ? "" : c.nom).trim()) return list;
+    var idx = findClientIndex(list, c);
+    if (idx < 0) {
+      var fresh = { id: c.id || newClientId(), nom: String(c.nom).trim(), adresse: c.adresse || "", email: c.email || "", tel: c.tel || "", clientType: c.clientType === "pro" ? "pro" : "particulier" };
+      return [fresh].concat(list);
+    }
+    var cur = list[idx], merged = {};
+    for (var k in cur) if (Object.prototype.hasOwnProperty.call(cur, k)) merged[k] = cur[k];
+    for (var i = 0; i < CLIENT_FIELDS.length; i++) {
+      var f = CLIENT_FIELDS[i], v = c[f] == null ? "" : String(c[f]).trim();
+      // retrouvé par le nom : on garde l'orthographe de la fiche (« Élise Dupont », pas « elise dupont »)
+      if (f === "nom" && cur.id !== c.id) continue;
+      if (v) merged[f] = v;
+    }
+    if (c.clientType === "pro" || c.clientType === "particulier") merged.clientType = c.clientType;
+    list.splice(idx, 1);
+    return [merged].concat(list);
+  }
+
+  // Remplace une fiche telle qu'éditée (ici, un champ vidé reste vide : c'est voulu).
+  function replaceClient(list, c) {
+    list = Array.isArray(list) ? list.slice() : [];
+    for (var i = 0; i < list.length; i++) if (list[i] && list[i].id === c.id) { list[i] = c; return list; }
+    return [c].concat(list);
+  }
+
+  function removeClient(list, id) {
+    return (Array.isArray(list) ? list : []).filter(function (c) { return c && c.id !== id; });
+  }
+
+  // Recherche dans nom, adresse, e-mail, téléphone ; noms commençant par la saisie d'abord.
+  function searchClients(list, query, limit) {
+    list = Array.isArray(list) ? list : [];
+    var q = normClientName(query);
+    limit = limit == null ? 8 : limit;
+    var digits = String(query == null ? "" : query).replace(/\D/g, "");
+    var hits = [];
+    for (var i = 0; i < list.length; i++) {
+      var c = list[i] || {}, nom = normClientName(c.nom), score = -1;
+      if (!q) score = 2;
+      else if (nom.indexOf(q) === 0) score = 0;
+      else if (nom.indexOf(q) > 0) score = 1;
+      else if (normClientName(c.adresse).indexOf(q) >= 0 || normClientName(c.email).indexOf(q) >= 0) score = 2;
+      else if (digits.length >= 3 && String(c.tel || "").replace(/\D/g, "").indexOf(digits) >= 0) score = 2;
+      if (score >= 0) hits.push({ c: c, s: score, o: i });
+    }
+    hits.sort(function (a, b) { return a.s - b.s || a.o - b.o; });
+    return hits.slice(0, limit).map(function (h) { return h.c; });
+  }
+
+  // Reconstruit le carnet à partir des devis (du plus ancien au plus récent : les coordonnées récentes priment).
+  function clientsFromQuotes(quotes, existing) {
+    var qs = (Array.isArray(quotes) ? quotes : []).slice().sort(function (a, b) {
+      return String((a && (a._savedAt || a.dateISO)) || "").localeCompare(String((b && (b._savedAt || b.dateISO)) || ""));
+    });
+    var list = Array.isArray(existing) ? existing.slice() : [];
+    for (var i = 0; i < qs.length; i++) { var c = clientFromQuote(qs[i]); if (c) list = upsertClient(list, c); }
+    return list;
+  }
+
+  // Devis d'un client (même nom normalisé), les plus récents d'abord.
+  function quotesForClient(quotes, client) {
+    var k = normClientName(client && client.nom);
+    if (!k) return [];
+    return (Array.isArray(quotes) ? quotes : []).filter(function (q) { return q && normClientName(q.client && q.client.nom) === k; });
+  }
+
+  // Fusion SANS perte (restauration / migration) : les fiches inconnues sont ajoutées, les connues complétées.
+  function mergeClients(current, incoming) {
+    var list = Array.isArray(current) ? current.slice() : [];
+    incoming = Array.isArray(incoming) ? incoming : [];
+    // ADDITIF (comme le serveur) : on ajoute les clients inconnus ; une fiche existante n'est jamais modifiée.
+    for (var i = incoming.length - 1; i >= 0; i--) {
+      var c = incoming[i];
+      if (!c || !normClientName(c.nom) || findClientIndex(list, { nom: c.nom }) >= 0) continue;
+      var id = c.id && !list.some(function (x) { return x && x.id === c.id; }) ? c.id : newClientId();
+      list = [Object.assign({}, c, { id: id })].concat(list);
+    }
+    return list;
+  }
+
+  /* =========================================================================
      SAUVEGARDE / RESTAURATION de TOUTES les données utilisateur.
      Un seul fichier .json (réglages + devis + calepinage) qu'on télécharge pour
      mettre à l'abri, et qu'on réimporte sur un autre navigateur / poste. Ces
@@ -284,6 +409,7 @@
         quotes: Array.isArray(data.quotes) ? data.quotes : [],
         calepinage: data.calepinage != null ? data.calepinage : null,
         catalogue: Array.isArray(data.catalogue) ? data.catalogue : [],
+        clients: Array.isArray(data.clients) ? data.clients : [],
       },
     };
   }
@@ -308,6 +434,7 @@
       quotes: Array.isArray(d.quotes) ? d.quotes : [],
       calepinage: d.calepinage != null ? d.calepinage : null,
       catalogue: Array.isArray(d.catalogue) ? d.catalogue : [],
+      clients: Array.isArray(d.clients) ? d.clients : [],
     };
   }
 
@@ -1608,5 +1735,14 @@
     searchCatalog: searchCatalog,
     applyCatalogItemToLine: applyCatalogItemToLine,
     mergeCatalog: mergeCatalog,
+    newClientId: newClientId,
+    clientFromQuote: clientFromQuote,
+    upsertClient: upsertClient,
+    replaceClient: replaceClient,
+    removeClient: removeClient,
+    searchClients: searchClients,
+    clientsFromQuotes: clientsFromQuotes,
+    quotesForClient: quotesForClient,
+    mergeClients: mergeClients,
   };
 });

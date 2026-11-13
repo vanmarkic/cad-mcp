@@ -1294,4 +1294,97 @@ test("UI", { skip: chromium ? false : "playwright not installed" }, async (t) =>
     assert.equal(await p.evaluate(() => document.activeElement && document.activeElement.classList.contains("line-title")), true);
     await mctx.close();
   });
+  /* ======================= fiches clients ======================= */
+  await t.test("fiches clients: créées en enregistrant ; suggestion dans « Client » pré-remplit les coordonnées ; « Nouveau devis » pour un client", async () => {
+    const p = await newPage();
+    const tel = p.locator('label.fld:has(span.fld-lab:text-is("Téléphone")) input').first();
+    await clientField(p).fill("Élise Dupont");
+    await tel.fill("0470 12 34 56");
+    await p.click('.bar-actions button:has-text("Enregistrer")');
+    await p.waitForSelector('button:has-text("Clients (1)")');
+    // nouveau devis : on tape le début du nom → la fiche est proposée
+    await p.click('button:has-text("Nouveau")');
+    await p.waitForTimeout(150);
+    assert.equal(await tel.inputValue(), "");
+    await clientField(p).fill("elise");
+    await p.waitForSelector(".client-ac .ac-item");
+    assert.match(await p.locator(".client-ac .ac-item").first().innerText(), /0470 12 34 56/);
+    await p.locator(".client-ac .ac-item").first().dispatchEvent("mousedown");
+    await p.waitForTimeout(100);
+    assert.equal(await clientField(p).inputValue(), "Élise Dupont", "orthographe de la fiche");
+    assert.equal(await tel.inputValue(), "0470 12 34 56", "coordonnées pré-remplies");
+    await p.click('.bar-actions button:has-text("Enregistrer")');
+    await p.waitForTimeout(150);
+    // le carnet : 1 fiche, 2 devis ; « Nouveau devis » repart avec ses coordonnées
+    await p.click('button:has-text("Clients (1)")');
+    await p.waitForSelector(".clients-list .crow");
+    assert.match(await p.locator(".clients-list .crow").innerText(), /2 devis/);
+    await p.click('.clients-list .btn:has-text("Nouveau devis")');
+    await p.waitForTimeout(150);
+    assert.equal(await p.locator(".modal").count(), 0);
+    assert.equal(await clientField(p).inputValue(), "Élise Dupont");
+    assert.equal(await tel.inputValue(), "0470 12 34 56");
+    // modifier / ajouter / supprimer
+    await p.click('button:has-text("Clients (1)")');
+    await p.click('.btn:has-text("+ Nouveau client")');
+    await p.locator('.cform label.fld:has(span.fld-lab:text-is("Nom / société")) input').fill("Menuiserie Martin");
+    await p.click('.cform button:has-text("Enregistrer la fiche")');
+    await p.waitForSelector('button:has-text("Clients (2)")');
+    await p.fill(".clients-search", "martin");
+    assert.equal(await p.locator(".clients-list .crow").count(), 1);
+    p.once("dialog", (d) => d.accept());
+    await p.click('.clients-list .btn:has-text("Suppr.")');
+    await p.waitForSelector('button:has-text("Clients (1)")');
+    assert.deepEqual(p._errors, []);
+    await p.close();
+  });
+
+  await t.test("fiches clients: au 1er lancement, le carnet est construit à partir des devis existants", async () => {
+    const p = await ctx.newPage();
+    await p.goto(base, { waitUntil: "load", timeout: 45000 });
+    await p.waitForSelector(".brand-name");
+    await p.evaluate(() => {
+      const q = (id, nom, tel) => ({ id, numero: id, dateISO: "2026-01-01", clientType: "particulier", client: { nom, adresse: "", email: "", tel }, lines: [] });
+      localStorage.setItem("etabli:quotes", JSON.stringify([q("D1", "Dupont", "0470"), q("D2", "DUPONT ", ""), q("D3", "Martin", "")]));
+      localStorage.removeItem("etabli:clients");
+    });
+    // recharge sans effacer le stockage (le contexte partagé vide localStorage à chaque page) : nouveau contexte avec le même stockage
+    const st = await p.context().storageState();
+    await p.close();
+    const p2c = await browser.newContext({ storageState: st });
+    const p2 = await p2c.newPage();
+    await p2.goto(base, { waitUntil: "load", timeout: 45000 });
+    await p2.waitForSelector('button:has-text("Clients (2)")');
+    const stored = await p2.evaluate(() => JSON.parse(localStorage.getItem("etabli:clients")));
+    assert.equal(stored.length, 2);
+    assert.equal(stored.find((c) => /dupont/i.test(c.nom)).tel, "0470");
+    await p2c.close();
+  });
+
+  /* ======================= explication de l'installation (PWA) ======================= */
+  await t.test("installation expliquée: bandeau mobile (une fois) + Réglages → consignes Android / iPhone", async () => {
+    const run = async (ua, expect) => {
+      const mctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, userAgent: ua });
+      const p = await mctx.newPage();
+      await p.goto(base, { waitUntil: "load", timeout: 45000 });
+      await p.waitForSelector(".brand-name");
+      assert.equal(await p.locator(".ihint").isVisible(), true, "bandeau visible au 1er passage");
+      await p.click('.ihint button:has-text("Comment ?")');
+      await p.waitForSelector(".install-help");
+      assert.match(await p.locator(".install-help").innerText(), expect);
+      await p.keyboard.press("Escape");
+      await p.reload({ waitUntil: "load" });
+      await p.waitForSelector(".brand-name");
+      assert.equal(await p.locator(".ihint").count(), 0, "bandeau masqué ensuite");
+      await mctx.close();
+    };
+    await run("Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Mobile Safari/537.36", /Installer l'application[\s\S]*Samsung Internet[\s\S]*même stockage/);
+    await run("Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1", /Partager[\s\S]*Sur l'écran d'accueil[\s\S]*stockage séparé/);
+    // bureau : section « Application » dans Réglages, pas de bandeau
+    const p = await newPage();
+    assert.equal(await p.locator(".ihint").isVisible(), false);
+    await p.click('button:has-text("Réglages")');
+    await p.waitForSelector(".install-help");
+    await p.close();
+  });
 });

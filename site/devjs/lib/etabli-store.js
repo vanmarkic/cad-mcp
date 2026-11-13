@@ -16,7 +16,7 @@
 })(typeof self !== "undefined" ? self : this, function () {
   "use strict";
 
-  var KEYS = { settings: "etabli:settings", quotes: "etabli:quotes", calepinage: "etabli:calepinage", catalogue: "etabli:catalogue" };
+  var KEYS = { settings: "etabli:settings", quotes: "etabli:quotes", calepinage: "etabli:calepinage", catalogue: "etabli:catalogue", clients: "etabli:clients" };
   var OK = { ok: true };
   function fail(kind, message, extra) {
     var r = { ok: false, kind: kind, message: message };
@@ -40,13 +40,14 @@
     return {
       mode: "local",
       loadAll: function () {
-        return Promise.all([read(KEYS.settings), read(KEYS.quotes), read(KEYS.calepinage), read(KEYS.catalogue)]).then(function (a) {
-          return { settings: a[0], quotes: Array.isArray(a[1]) ? a[1] : [], calepinage: a[2], catalogue: Array.isArray(a[3]) ? a[3] : [] };
+        return Promise.all([read(KEYS.settings), read(KEYS.quotes), read(KEYS.calepinage), read(KEYS.catalogue), read(KEYS.clients)]).then(function (a) {
+          return { settings: a[0], quotes: Array.isArray(a[1]) ? a[1] : [], calepinage: a[2], catalogue: Array.isArray(a[3]) ? a[3] : [], clients: Array.isArray(a[4]) ? a[4] : null };
         });
       },
       saveSettings: function (v) { return write(KEYS.settings, v); },
       saveCalepinage: function (v) { return write(KEYS.calepinage, v); },
       saveCatalog: function (list) { return write(KEYS.catalogue, list); },
+      saveClients: function (list) { return write(KEYS.clients, list); },
       syncQuotes: function (prev, next) { return write(KEYS.quotes, next); },
     };
   }
@@ -102,13 +103,14 @@
             revs[c.id] = q._rev;
             return c;
           });
-          return { settings: r.json.settings, quotes: quotes, calepinage: r.json.calepinage, catalogue: r.json.catalogue || [], migrated: !!r.json.migrated };
+          return { settings: r.json.settings, quotes: quotes, calepinage: r.json.calepinage, catalogue: r.json.catalogue || [], clients: Array.isArray(r.json.clients) ? r.json.clients : null, migrated: !!r.json.migrated };
         }, function (e) { throw toFailure(e); });
       },
 
       saveSettings: function (v) { return put("/api/settings", { value: v }); },
       saveCalepinage: function (v) { return put("/api/calepinage", { value: v }); },
       saveCatalog: function (list) { return put("/api/catalogue", { value: list }); },
+      saveClients: function (list) { return put("/api/clients", { value: list }); },
 
       // Reporte sur le serveur la DIFFÉRENCE entre deux listes de devis (ajout / modification / suppression).
       syncQuotes: function (prev, next) {

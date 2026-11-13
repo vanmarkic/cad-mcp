@@ -1218,3 +1218,71 @@ test("readQuoteExportDetailed: rend « todo » (lintQuote) ; quoteTodoPrompt dem
   assert.match(prompt, /data\.quotes\[0\]\.lines\[0\]\.pa/);
   assert.match(prompt, /n'invente aucune valeur/);
 });
+
+/* ---------------------------------------------------------------- fiches clients */
+const qc = (nom, extra) => ({ id: "q" + Math.random(), numero: "DEV", dateISO: "2026-01-01", clientType: "particulier", client: { nom, adresse: "", email: "", tel: "", ...(extra || {}) } });
+
+test("clientFromQuote: fiche depuis un devis ; pas de nom → null", () => {
+  const f = C.clientFromQuote({ ...qc("  Dupont ", { tel: "0470" }), clientType: "pro" });
+  assert.equal(f.nom, "Dupont");
+  assert.equal(f.tel, "0470");
+  assert.equal(f.clientType, "pro");
+  assert.equal(C.clientFromQuote(qc("   ")), null);
+  assert.equal(C.clientFromQuote({}), null);
+});
+
+test("upsertClient: même nom (casse/espaces/accents) → complète la fiche sans effacer, et la remonte en tête", () => {
+  let list = C.upsertClient([], { nom: "Élise Dupont", adresse: "Rue A 1", tel: "0470" });
+  list = C.upsertClient(list, { nom: "Martin" });
+  list = C.upsertClient(list, { nom: "elise  dupont", email: "e@x.be", tel: "" });
+  assert.equal(list.length, 2);
+  assert.equal(list[0].nom, "Élise Dupont", "remontée en tête");
+  assert.equal(list[0].adresse, "Rue A 1", "champ vide entrant : l'existant reste");
+  assert.equal(list[0].tel, "0470");
+  assert.equal(list[0].email, "e@x.be", "champ rempli : complète");
+  assert.ok(list[0].id && list[1].id);
+});
+
+test("replaceClient / removeClient: édition explicite (vider un champ est permis), suppression par id", () => {
+  let list = C.upsertClient([], { nom: "Dupont", tel: "0470" });
+  const id = list[0].id;
+  list = C.replaceClient(list, { ...list[0], tel: "" });
+  assert.equal(list[0].tel, "");
+  assert.equal(C.removeClient(list, id).length, 0);
+});
+
+test("searchClients: préfixe du nom d'abord, puis contenu, adresse, e-mail, chiffres du téléphone", () => {
+  const list = [
+    { id: "1", nom: "Atelier Dumont", adresse: "", email: "", tel: "" },
+    { id: "2", nom: "Dupont", adresse: "Rue du Moulin 4, Mons", email: "", tel: "0470 12 34 56" },
+    { id: "3", nom: "Lemaire", adresse: "", email: "contact@dumarais.be", tel: "" },
+  ];
+  assert.deepEqual(C.searchClients(list, "du").map((c) => c.id), ["2", "1", "3"]);
+  assert.deepEqual(C.searchClients(list, "mons").map((c) => c.id), ["2"]);
+  assert.deepEqual(C.searchClients(list, "123456").map((c) => c.id), ["2"]);
+  assert.equal(C.searchClients(list, "").length, 3);
+});
+
+test("clientsFromQuotes: carnet construit depuis les devis (le plus récent complète) ; quotesForClient retrouve ses devis", () => {
+  const quotes = [
+    { ...qc("Dupont", { tel: "0470" }), dateISO: "2026-01-01" },
+    { ...qc("DUPONT", { adresse: "Rue A" }), dateISO: "2026-02-01" },
+    { ...qc("Martin"), dateISO: "2026-03-01" },
+    qc(""),
+  ];
+  const book = C.clientsFromQuotes(quotes);
+  assert.equal(book.length, 2);
+  const d = book.find((c) => c.nom.toLowerCase() === "dupont");
+  assert.equal(d.tel, "0470");
+  assert.equal(d.adresse, "Rue A");
+  assert.equal(C.quotesForClient(quotes, d).length, 2);
+});
+
+test("mergeClients: additif — l'existant prime, les nouveaux s'ajoutent ; sauvegarde complète inclut les clients", () => {
+  const cur = [{ id: "k1", nom: "Dupont", tel: "0470" }];
+  const out = C.mergeClients(cur, [{ id: "k2", nom: "dupont", tel: "autre" }, { id: "k3", nom: "Martin" }]);
+  assert.equal(out.length, 2);
+  assert.equal(out.find((c) => c.id === "k1").tel, "0470");
+  const b = C.buildBackup({ settings: {}, quotes: [], calepinage: null, catalogue: [], clients: cur });
+  assert.deepEqual(C.readBackup(JSON.stringify(b)).clients, cur);
+});

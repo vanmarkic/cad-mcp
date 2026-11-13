@@ -55,7 +55,7 @@ if ("serviceWorker" in navigator && window.isSecureContext) {
 <script type="text/babel" data-presets="react">
 const { useState, useEffect, useMemo, useRef } = React;
 const { createLocalStore, createServerStore, detectBackend } = window.EtabliStore;
-const { num, computeLine, tvaBreakdown, calculateCutlist, panelMetrics, cutListText, newQuoteId, upsertQuote, removeQuote, nextQuoteNumero, buildBackup, readBackup, mergeQuotes, catalogItemFromLine, upsertCatalogItem, removeCatalogItem, searchCatalog, applyCatalogItemToLine, mergeCatalog, linearLineQty, linearDetailText, calculateLinearCutlist, linearMetrics, linearCutListText, parseRichText, hasRichFormatting, applyTextFormat, buildQuoteExport, readQuoteExportDetailed, quoteFeedbackPrompt, quoteTodoPrompt, quoteFileName, addImportedQuote } = window.EtabliCore;
+const { num, computeLine, tvaBreakdown, calculateCutlist, panelMetrics, cutListText, newQuoteId, upsertQuote, removeQuote, nextQuoteNumero, buildBackup, readBackup, mergeQuotes, catalogItemFromLine, upsertCatalogItem, removeCatalogItem, searchCatalog, applyCatalogItemToLine, mergeCatalog, clientFromQuote, upsertClient, replaceClient, removeClient, searchClients, clientsFromQuotes, quotesForClient, mergeClients, newClientId, linearLineQty, linearDetailText, calculateLinearCutlist, linearMetrics, linearCutListText, parseRichText, hasRichFormatting, applyTextFormat, buildQuoteExport, readQuoteExportDetailed, quoteFeedbackPrompt, quoteTodoPrompt, quoteFileName, addImportedQuote } = window.EtabliCore;
 
 /* =========================================================================
    ÉTABLI — Générateur de devis pour menuisier
@@ -669,6 +669,9 @@ function App({ store, me, onLogout }) {
   const savedRef = useRef([]); // dernier `saved` — lu par les callbacks asynchrones (FileReader)
   savedRef.current = saved;
   const [catalog, setCatalog] = useState([]); // fournitures réutilisables
+  const [clients, setClients] = useState([]); // fiches clients (coordonnées réutilisables)
+  const clientsRef = useRef([]);
+  clientsRef.current = clients;
   const [modal, setModal] = useState(null); // 'reglages' | 'mesdevis' | 'catalogue' | 'calepinage' | null
   const [toast, setToast] = useState("");
   // Devis « non enregistré » : comparaison avec la dernière version chargée / enregistrée.
@@ -686,6 +689,8 @@ function App({ store, me, onLogout }) {
     window.__etabliInstall = null;
     setInstallable(false);
   };
+  const [installHintSeen, setInstallHintSeen] = useState(() => { try { return localStorage.getItem("etabli:installHint") === "vu"; } catch (e) { return true; } });
+  const dismissInstallHint = () => { setInstallHintSeen(true); try { localStorage.setItem("etabli:installHint", "vu"); } catch (e) {} };
   const savedSnap = useRef(null);
   const devisJSON = JSON.stringify(devis);
   if (savedSnap.current === null) savedSnap.current = devisJSON;
@@ -720,6 +725,16 @@ function App({ store, me, onLogout }) {
       setCalep(m);
     }
     setCatalog(data.catalogue || []);
+    // Fiches clients : si le carnet n'a jamais été créé, on le construit à partir des devis existants.
+    if (Array.isArray(data.clients)) {
+      clientsRef.current = data.clients;
+      setClients(data.clients);
+    } else {
+      const built = clientsFromQuotes(withIds);
+      clientsRef.current = built;
+      setClients(built);
+      if (built.length) persistClients(built);
+    }
   };
 
   /* load persisted state (localStorage ou serveur, selon la couche de stockage) */
@@ -765,6 +780,20 @@ function App({ store, me, onLogout }) {
   // prev : liste avant modification (le mode serveur n'envoie que la différence)
   const persistQuotes = (list, prev) => track(store.syncQuotes(prev || [], list));
   const persistCatalog = (list) => track(store.saveCatalog(list));
+  // Fiches clients : écrites en même temps qu'un devis. Un succès ici ne doit PAS effacer
+  // l'alerte d'un enregistrement de devis qui, lui, a échoué (conflit, réseau) → on ne signale que les échecs.
+  const persistClients = async (list) => {
+    const r = await store.saveClients(list);
+    if (r && r.ok === false) setSyncError((cur) => (cur && cur.fatal ? cur : r));
+    return r;
+  };
+  const commitClients = (compute) => {
+    const next = compute(clientsRef.current);
+    clientsRef.current = next;
+    setClients(next);
+    persistClients(next);
+    return next;
+  };
   // Applique un changement de la liste des devis : état, puis écriture (sans effet de bord dans un updater React).
   const commitQuotes = (compute) => {
     const prev = savedRef.current;
@@ -931,6 +960,9 @@ function App({ store, me, onLogout }) {
     savedSnap.current = JSON.stringify(withId);
     const stamped = { ...withId, _savedAt: new Date().toISOString() };
     commitQuotes((list) => upsertQuote(list, stamped));
+    // la fiche du client se met à jour toute seule (seuls les champs remplis la complètent)
+    const fiche = clientFromQuote(stamped);
+    if (fiche) commitClients((list) => upsertClient(list, fiche));
     flash("Devis enregistré : " + devis.numero);
   };
   const loadQuote = (q) => {
@@ -951,6 +983,31 @@ function App({ store, me, onLogout }) {
     setModal(null);
     flash("Nouveau devis");
   };
+
+  /* ---------- fiches clients ---------- */
+  // Remplit le client du devis en cours depuis une fiche.
+  const pickClient = (c) =>
+    setDevis((d) => ({
+      ...d,
+      client: { ...d.client, nom: c.nom || "", adresse: c.adresse || "", email: c.email || "", tel: c.tel || "" },
+      clientType: c.clientType === "pro" ? "pro" : "particulier",
+    }));
+  // Nouveau devis pour ce client (coordonnées pré-remplies).
+  const newQuoteForClient = (c) => {
+    if (!confirmDiscard("Commencer un nouveau devis")) return;
+    const fresh = newDevis(company, params, saved);
+    savedSnap.current = JSON.stringify(fresh);
+    setDevis({
+      ...fresh,
+      client: { nom: c.nom || "", adresse: c.adresse || "", email: c.email || "", tel: c.tel || "" },
+      clientType: c.clientType === "pro" ? "pro" : "particulier",
+    });
+    setModal(null);
+    setView("atelier");
+    flash("Nouveau devis pour " + c.nom);
+  };
+  const saveClientCard = (c) => commitClients((list) => (c.id ? replaceClient(list, c) : upsertClient(list, { ...c, id: newClientId() })));
+  const deleteClientCard = (id) => commitClients((list) => removeClient(list, id));
 
   /* ---------- catalogue de fournitures réutilisables ---------- */
   // Enregistre une ligne fourniture dans le catalogue (dédoublonné par désignation).
@@ -1002,7 +1059,7 @@ function App({ store, me, onLogout }) {
   };
   const exportAll = () => {
     const bundle = buildBackup(
-      { settings: { company, params }, quotes: saved, calepinage: calep, catalogue: catalog },
+      { settings: { company, params }, quotes: saved, calepinage: calep, catalogue: catalog, clients },
       { exportedAt: new Date().toISOString() }
     );
     downloadJSON(bundle, "etabli-sauvegarde-" + todayISO() + ".json");
@@ -1110,6 +1167,7 @@ function App({ store, me, onLogout }) {
           return next;
         });
       }
+      if (restored.clients && restored.clients.length) commitClients((list) => mergeClients(list, restored.clients));
       if (restored.calepinage) setCalep(migrateCalep(restored.calepinage));
       setModal(null);
       flash("Sauvegarde restaurée (" + restored.quotes.length + " devis dans le fichier)");
@@ -1166,6 +1224,9 @@ function App({ store, me, onLogout }) {
         </div>
 
         <div className="bar-actions">
+          <button className="btn ghost" onClick={() => setModal("clients")}>
+            Clients {clients.length ? `(${clients.length})` : ""}
+          </button>
           <button className="btn ghost" onClick={() => setModal("catalogue")}>
             Catalogue {catalog.length ? `(${catalog.length})` : ""}
           </button>
@@ -1211,6 +1272,13 @@ function App({ store, me, onLogout }) {
         </div>
       ) : null}
 
+      {!isStandalone() && !installHintSeen ? (
+        <div className="ihint no-print" role="note">
+          <span>📲 Installez ÉTABLI sur l'écran d'accueil : icône, plein écran, ouverture même sans réseau.</span>
+          <button className="btn sm" onClick={() => { dismissInstallHint(); setModal("installer"); }}>Comment ?</button>
+          <button className="ico" aria-label="Masquer ce conseil" onClick={dismissInstallHint}>✕</button>
+        </div>
+      ) : null}
       {view === "atelier" ? (
         <Atelier
           devis={devis}
@@ -1223,6 +1291,9 @@ function App({ store, me, onLogout }) {
           moveLine={moveLine}
           margeColor={margeColor}
           catalog={catalog}
+          clients={clients}
+          onPickClient={pickClient}
+          onOpenClients={() => setModal("clients")}
           onApplyCatalogItem={applyCatalogToLine}
           onAddToCatalog={addLineToCatalog}
           onOpenCatalogue={() => setModal("catalogue")}
@@ -1246,6 +1317,23 @@ function App({ store, me, onLogout }) {
             onAddToDevis={addCalepToDevis}
             flash={flash}
           />
+        </Modal>
+      )}
+      {modal === "clients" && (
+        <Modal title="Clients" onClose={() => setModal(null)} wide>
+          <Clients
+            clients={clients}
+            quotes={saved}
+            onNewQuote={newQuoteForClient}
+            onSave={saveClientCard}
+            onDelete={deleteClientCard}
+            onLoadQuote={loadQuote}
+          />
+        </Modal>
+      )}
+      {modal === "installer" && (
+        <Modal title="Installer ÉTABLI" onClose={() => setModal(null)}>
+          <InstallHelp installable={installable} onInstall={installApp} serverMode={serverMode} />
         </Modal>
       )}
       {modal === "catalogue" && (
@@ -1276,6 +1364,7 @@ function App({ store, me, onLogout }) {
           <Reglages
             onMigrate={serverMode && me && me.legacyUrl ? () => setModal("migration") : null}
             onChangePassword={serverMode ? (cur, nxt) => store.changePassword(cur, nxt) : null}
+            installHelp={<InstallHelp installable={installable} onInstall={installApp} serverMode={serverMode} />}
             account={serverMode && me ? me.login : null}
             company={company}
             params={params}
@@ -1345,11 +1434,16 @@ function Atelier({
   moveLine,
   margeColor,
   catalog,
+  clients,
+  onPickClient,
+  onOpenClients,
   onApplyCatalogItem,
   onAddToCatalog,
   onOpenCatalogue,
 }) {
   const set = (patch) => setDevis((d) => ({ ...d, ...patch }));
+  const [clientAc, setClientAc] = useState(false);
+  const clientSuggestions = clientAc ? searchClients(clients || [], devis.client.nom, 6) : [];
   const setClient = (patch) =>
     setDevis((d) => ({ ...d, client: { ...d.client, ...patch } }));
 
@@ -1376,12 +1470,36 @@ function Atelier({
           <Field label="Validité (jours)">
             <NumIn value={devis.validite} onChange={(v) => set({ validite: v })} suffix="j" />
           </Field>
-          <Field label="Client">
-            <TextIn
-              value={devis.client.nom}
-              onChange={(v) => setClient({ nom: v })}
-              placeholder="Nom / société"
-            />
+          <Field label="Client" hint={clients && clients.length ? "tapez pour retrouver une fiche client" : undefined}>
+            <span className="client-ac-wrap">
+              <input
+                className="in"
+                type="text"
+                value={devis.client.nom ?? ""}
+                placeholder="Nom / société"
+                autoComplete="off"
+                onChange={(e) => setClient({ nom: e.target.value })}
+                onFocus={() => setClientAc(true)}
+                onBlur={() => setClientAc(false)}
+              />
+              {clientSuggestions.length > 0 && (
+                <ul className="ac client-ac" role="listbox" aria-label="Fiches clients">
+                  {clientSuggestions.map((c) => (
+                    <li key={c.id}>
+                      <button
+                        type="button"
+                        className="ac-item"
+                        // onMouseDown (avant le blur) : applique la fiche sans fermer la liste trop tôt
+                        onMouseDown={(e) => { e.preventDefault(); onPickClient(c); setClientAc(false); }}
+                      >
+                        <span className="ac-desig">{c.nom}</span>
+                        <span className="ac-meta">{[c.adresse, c.tel, c.email].filter(Boolean).join(" · ") || "—"}{c.clientType === "pro" ? " · pro" : ""}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </span>
           </Field>
           <Field label="Téléphone">
             <TextIn value={devis.client.tel} onChange={(v) => setClient({ tel: v })} />
@@ -2191,6 +2309,157 @@ function MesDevis({ saved, onLoad, onDelete, onExport, onExportCurrent, onImport
 }
 
 /* =========================================================================
+   MODAL Clients — fiches réutilisables (coordonnées pré-remplies)
+   ========================================================================= */
+const EMPTY_CLIENT = { nom: "", adresse: "", email: "", tel: "", clientType: "particulier" };
+function ClientForm({ initial, onSave, onCancel }) {
+  const [c, setC] = useState({ ...EMPTY_CLIENT, ...initial });
+  const f = (k) => (v) => setC((x) => ({ ...x, [k]: v }));
+  return (
+    <form className="cform" onSubmit={(e) => { e.preventDefault(); if (c.nom.trim()) onSave({ ...c, nom: c.nom.trim() }); }}>
+      <div className="grid">
+        <Field label="Nom / société" wide><TextIn value={c.nom} onChange={f("nom")} /></Field>
+        <Field label="Adresse" wide><TextIn value={c.adresse} onChange={f("adresse")} /></Field>
+        <Field label="Téléphone"><TextIn value={c.tel} onChange={f("tel")} /></Field>
+        <Field label="E-mail"><TextIn value={c.email} onChange={f("email")} /></Field>
+        <Field label="Type">
+          <select className="in in-sel" value={c.clientType} onChange={(e) => f("clientType")(e.target.value)}>
+            <option value="particulier">Particulier</option>
+            <option value="pro">Professionnel (cocontractant)</option>
+          </select>
+        </Field>
+      </div>
+      <div className="add-row">
+        <button className="btn" type="submit" disabled={!c.nom.trim()}>Enregistrer la fiche</button>
+        <button className="btn ghost-dark" type="button" onClick={onCancel}>Annuler</button>
+      </div>
+    </form>
+  );
+}
+
+function Clients({ clients, quotes, onNewQuote, onSave, onDelete, onLoadQuote }) {
+  const [q, setQ] = useState("");
+  const [editing, setEditing] = useState(null); // id, ou "new"
+  const [open, setOpen] = useState(null); // id dont on affiche les devis
+  const list = searchClients(clients || [], q, 500);
+  return (
+    <div>
+      <p className="muted reglages-backup-note">
+        Le carnet se remplit tout seul : chaque devis enregistré crée ou complète la fiche de son client. Dans un
+        devis, tapez le nom dans « Client » pour retrouver une fiche et pré-remplir ses coordonnées.
+      </p>
+      <div className="qtools">
+        <input className="in clients-search" type="search" placeholder="Rechercher (nom, adresse, téléphone, e-mail)…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Rechercher un client" />
+        <button className="btn sm" onClick={() => setEditing("new")}>+ Nouveau client</button>
+      </div>
+      {editing === "new" ? (
+        <ClientForm initial={{ nom: q }} onSave={(c) => { onSave(c); setEditing(null); setQ(""); }} onCancel={() => setEditing(null)} />
+      ) : null}
+      {(clients || []).length === 0 && editing !== "new" ? (
+        <p className="muted">Aucune fiche pour l'instant. Enregistrez un devis avec un nom de client, ou ajoutez-en une.</p>
+      ) : list.length === 0 && editing !== "new" ? (
+        <p className="muted">Aucun client ne correspond à « {q} ».</p>
+      ) : (
+        <ul className="qlist clients-list">
+          {list.map((c) => {
+            const qs = quotesForClient(quotes, c);
+            return (
+              <li key={c.id} className="qrow crow">
+                {editing === c.id ? (
+                  <ClientForm initial={c} onSave={(x) => { onSave({ ...c, ...x }); setEditing(null); }} onCancel={() => setEditing(null)} />
+                ) : (
+                  <>
+                    <div className="crow-main">
+                      <div className="qrow-num">{c.nom}{c.clientType === "pro" ? <span className="chip chip-pro">pro</span> : null}</div>
+                      <div className="qrow-meta">{[c.adresse, c.tel, c.email].filter(Boolean).join(" · ") || "Pas de coordonnées"}</div>
+                      {qs.length ? (
+                        <button className="linkish" onClick={() => setOpen(open === c.id ? null : c.id)} aria-expanded={open === c.id}>
+                          {qs.length} devis {open === c.id ? "▴" : "▾"}
+                        </button>
+                      ) : <span className="qrow-meta">aucun devis</span>}
+                      {open === c.id ? (
+                        <ul className="crow-quotes">
+                          {qs.map((x) => (
+                            <li key={x.id || x.numero}>
+                              <button className="linkish" onClick={() => onLoadQuote(x)}>{x.numero} · {frDate(x.dateISO)}</button>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </div>
+                    <div className="qrow-act">
+                      <button className="btn sm" onClick={() => onNewQuote(c)}>Nouveau devis</button>
+                      <button className="btn sm add" onClick={() => setEditing(c.id)}>Modifier</button>
+                      <button className="btn sm danger" onClick={() => { if (window.confirm("Supprimer la fiche de " + c.nom + " ? Ses devis ne sont pas supprimés.")) onDelete(c.id); }}>Suppr.</button>
+                    </div>
+                  </>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/* ---------- installation de l'application (PWA) : explication selon l'appareil ---------- */
+function isStandalone() {
+  try { return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true; } catch (e) { return false; }
+}
+function isIOS() {
+  const ua = navigator.userAgent || "";
+  return /iPhone|iPad|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+function isAndroid() {
+  return /Android/i.test(navigator.userAgent || "");
+}
+function InstallHelp({ installable, onInstall, serverMode }) {
+  if (isStandalone()) {
+    return <p className="muted reglages-backup-note install-state">✓ ÉTABLI est installée sur cet appareil et s'ouvre comme une application.</p>;
+  }
+  const ios = isIOS();
+  const android = !ios && isAndroid();
+  return (
+    <div className="install-help">
+      <p className="muted reglages-backup-note">
+        Installée, ÉTABLI a son icône sur l'écran d'accueil, s'ouvre en plein écran comme une application et
+        démarre même sans réseau. Rien à télécharger depuis un magasin d'applications.
+      </p>
+      {installable ? (
+        <div className="reglages-backup-act"><button className="btn" onClick={onInstall}>Installer ÉTABLI</button></div>
+      ) : ios ? (
+        <ol className="install-steps">
+          <li>Ouvrez cette page dans <strong>Safari</strong>.</li>
+          <li>Touchez <strong>Partager</strong> (le carré avec une flèche vers le haut).</li>
+          <li>Choisissez <strong>« Sur l'écran d'accueil »</strong>, puis « Ajouter ».</li>
+        </ol>
+      ) : android ? (
+        <ol className="install-steps">
+          <li><strong>Chrome</strong> : menu <strong>⋮</strong> (en haut à droite) → <strong>« Installer l'application »</strong> (ou « Ajouter à l'écran d'accueil » → « Installer »).</li>
+          <li><strong>Samsung Internet</strong> : menu <strong>≡</strong> (en bas) → « Ajouter la page à » → « Écran d'accueil ».</li>
+          <li><strong>Firefox</strong> : menu <strong>⋮</strong> → « Installer » / « Ajouter à l'écran d'accueil ».</li>
+          <li>L'icône ÉTABLI apparaît avec vos autres applications.</li>
+        </ol>
+      ) : (
+        <ol className="install-steps">
+          <li>Ouvrez le <strong>menu du navigateur</strong> (⋮ ou ⋯).</li>
+          <li>Choisissez <strong>« Installer l'application »</strong> ou <strong>« Ajouter à l'écran d'accueil »</strong>.</li>
+        </ol>
+      )}
+      {serverMode ? (
+        <p className="muted reglages-backup-note">Vos devis restent sur votre compte : l'application installée les retrouve dès la connexion.</p>
+      ) : (
+        <p className="muted reglages-backup-note">
+          <strong>Vos devis restent dans ce navigateur.</strong>{ios ? " Sur iPhone et iPad, l'application installée a un stockage séparé de Safari : avant d'installer, faites Réglages → « Sauvegarder (télécharger) » dans Safari, puis « Restaurer… » dans l'application." : android ? " Sur Android, l'application installée retrouve les devis déjà faits dans ce navigateur (même stockage). Installez-la depuis le navigateur où sont vos devis." : ""}
+        </p>
+      )}
+      <p className="muted reglages-backup-note">Hors connexion, l'application s'ouvre ; {serverMode ? "l'enregistrement attend le retour du réseau." : "tout fonctionne."}</p>
+    </div>
+  );
+}
+
+/* =========================================================================
    MODAL Catalogue — piocher / gérer les fournitures réutilisables
    ========================================================================= */
 function Catalogue({ catalog, onInsert, onDelete }) {
@@ -2294,7 +2563,7 @@ function PasswordForm({ account, onChange }) {
   );
 }
 
-function Reglages({ company, params, onSave, onExport, onImport, quoteCount, onMigrate, onChangePassword, account }) {
+function Reglages({ company, params, onSave, onExport, onImport, quoteCount, onMigrate, onChangePassword, account, installHelp }) {
   const [c, setC] = useState(company);
   const [p, setP] = useState(params);
   const fileRef = useRef(null);
@@ -2387,6 +2656,9 @@ function Reglages({ company, params, onSave, onExport, onImport, quoteCount, onM
       </div>
 
       {onChangePassword ? <PasswordForm account={account} onChange={onChangePassword} /> : null}
+
+      <div className="card-eyebrow mt">Application sur cet appareil</div>
+      {installHelp}
 
       {onMigrate ? (
         <>
@@ -3101,6 +3373,18 @@ const CSS = `
 .qtools{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px}
 .qtools-note{margin:0 0 14px; font-size:12px; line-height:1.5}
 .devis-file{display:none}
+.client-ac-wrap{position:relative; display:block}
+.client-ac{top:calc(100% + 2px)}
+.clients-search{flex:1 1 240px; min-width:0}
+.crow{align-items:flex-start}
+.crow-main{flex:1; min-width:0}
+.crow-quotes{list-style:none; margin:4px 0 0; padding:0; display:flex; flex-direction:column; gap:2px}
+.linkish{background:none; border:0; padding:2px 0; color:var(--oak-2); cursor:pointer; font:inherit; font-size:12px; text-decoration:underline}
+.chip-pro{margin-left:8px; background:#e2dae6; color:#5b4769; font-size:9.5px; vertical-align:middle}
+.cform{border:1px solid var(--line); border-radius:9px; padding:12px; margin:0 0 12px; background:#fff; width:100%}
+.ihint{display:none}
+.install-steps{margin:6px 0 10px 18px; padding:0; font-size:13px; line-height:1.6}
+.install-state{color:var(--green)}
 .pw-msg{margin:10px 0 0; padding:8px 10px; border-radius:7px; font-size:13px}
 .pw-ok{background:#e2eee5; color:#2d5238}
 .pw-err{background:#f6e9e2; color:#7c2a1d}
@@ -3277,6 +3561,8 @@ const CSS = `
   .stat-big .stat-val{font-size:19px}
   .toast{left:12px; right:12px; transform:none; text-align:center; bottom:calc(76px + env(safe-area-inset-bottom))}
   .bar{padding-top:max(8px, env(safe-area-inset-top)); padding-left:max(12px, env(safe-area-inset-left)); padding-right:max(12px, env(safe-area-inset-right))}
+  .ihint{display:flex; align-items:center; gap:8px; margin:10px 10px 0; padding:8px 10px; border:1px solid var(--oak); border-radius:9px; background:var(--oak-soft); font-size:12.5px; color:var(--oak-2)}
+  .ihint span{flex:1}
   .mbar{display:flex; align-items:center; gap:10px; position:fixed; left:0; right:0; bottom:0; z-index:40;
     padding:8px 12px calc(8px + env(safe-area-inset-bottom)); background:var(--ink); color:#f4efe6;
     border-top:3px solid var(--oak); box-shadow:0 -6px 18px rgba(0,0,0,.18)}
