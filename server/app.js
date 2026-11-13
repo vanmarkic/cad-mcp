@@ -8,9 +8,10 @@ const crypto = require("node:crypto");
 const { Store, ID_RE } = require("./lib/store.js");
 const Auth = require("./lib/auth.js");
 
-const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8" };
+const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".webmanifest": "application/manifest+json; charset=utf-8", ".png": "image/png" };
 // Seuls ces fichiers de l'application sont servis (ni tests, ni README, ni package.json).
-const STATIC_OK = [/^\/index\.html$/, /^\/migrate\.html$/, /^\/migrate-config\.js$/, /^\/lib\/[A-Za-z0-9_.-]+\.js$/];
+const STATIC_OK = [/^\/index\.html$/, /^\/migrate\.html$/, /^\/migrate-config\.js$/, /^\/lib\/[A-Za-z0-9_.-]+\.js$/,
+  /^\/manifest\.webmanifest$/, /^\/sw\.js$/, /^\/icons\/[A-Za-z0-9_-]+\.png$/]; // + application installable (PWA)
 const isObj = (v) => !!v && typeof v === "object" && !Array.isArray(v);
 
 // L'application charge React/Babel depuis unpkg et des polices Google ; Babel compile dans le
@@ -21,7 +22,11 @@ const CSP = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src https://fonts.gstatic.com",
   "img-src 'self' data:",
-  "connect-src 'self'",
+  // le service worker (sw.js) va chercher lui-même les bibliothèques et polices pour les garder hors ligne :
+  // son CSP doit autoriser ces hôtes en connexion
+  "connect-src 'self' https://unpkg.com https://fonts.googleapis.com https://fonts.gstatic.com",
+  "worker-src 'self'",
+  "manifest-src 'self'",
   "frame-ancestors 'none'",
   "base-uri 'none'",
   "form-action 'self'",

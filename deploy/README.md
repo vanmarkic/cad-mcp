@@ -22,7 +22,7 @@
 
 | Élément | Vérifié ? |
 |---|---|
-| Serveur : authentification, stockage, conflits, import additif, protections (traversée de répertoire, CSRF, limitation des tentatives, IP invalide, secret d'origine EDGE_SECRET, changement de mot de passe, 413) | Oui — 36 tests |
+| Serveur : authentification, stockage, conflits, import additif, protections (traversée de répertoire, CSRF, limitation des tentatives, IP invalide, secret d'origine EDGE_SECRET, changement de mot de passe, fichiers PWA, 413) | Oui — 37 tests |
 | Application en mode serveur dans un vrai navigateur : connexion, persistance, conflit entre 2 appareils, session expirée, réseau coupé, **migration entre 2 origines** | Oui — 11 tests Playwright |
 | `update.sh` (tirage, tests, bascule, retour arrière, nettoyage, verrou) et `backup.sh`, contre un faux GitHub local (dont le contrôle de santé sur HOST/PORT) | Oui — 11 tests |
 | Clone partiel + sparse checkout contre le **vrai** dépôt public | Oui (0,6 Mo au lieu de 527 Mo) |
@@ -217,7 +217,7 @@ la saisie reste à l'écran) ; deux appareils sur le même devis : le second est
 ## Tests
 
 ```bash
-cd server && npm test                              # serveur (36 tests, sans réseau)
+cd server && npm test                              # serveur (37 tests, sans réseau)
 cd site/devjs && npm run test:unit                 # noyau + couche de stockage (hors ligne)
 cd site/devjs && npm run test:ui                   # navigateur : mode local + mode serveur (Playwright)
 node --test deploy/test/*.test.js                  # update.sh / backup.sh (faux GitHub local) et cloudflare-ips.sh (Caddy si installé)

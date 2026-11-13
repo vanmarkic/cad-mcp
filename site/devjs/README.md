@@ -242,6 +242,24 @@ seule son mode au démarrage (`GET /api/me` : 200/401 JSON → serveur ; sinon n
 `lib/etabli-store.js` (mêmes appels dans les deux cas). Exploitation, installation, sécurité et limites :
 **`deploy/README.md`**.
 
+## Application installable (PWA) et usage au téléphone
+
+ÉTABLI s'installe comme une application (icône sur l'écran d'accueil, plein écran sans barre de navigateur) :
+Android / Chrome / Edge → bouton **« Installer »** dans la barre (ou menu du navigateur) ; iPhone / iPad → Safari,
+**Partager → « Sur l'écran d'accueil »**. Fonctionne à l'adresse GitHub Pages comme sur le serveur.
+
+- `manifest.webmanifest` (chemins relatifs), icônes 192 / 512 / « maskable » / Apple, `sw.js` (service worker).
+- **Hors ligne** : après une première visite, l'application s'ouvre sans réseau ; en mode navigateur seul tout
+  fonctionne, en mode serveur l'écran s'ouvre mais l'enregistrement exige le réseau (bandeau d'avertissement).
+- **Données** : le service worker ne met **jamais** en cache l'API (`/api/…`) ni les envois : les devis des clients
+  ne sont pas stockés par lui. Fichiers de l'application : réseau d'abord (mises à jour vues tout de suite),
+  bibliothèques et polices : copie locale rafraîchie en arrière-plan.
+
+Au téléphone : barre du bas avec le **total** (et la marge à l'atelier) et **« Enregistrer »** au pouce ;
+indicateur « • » tant que le devis n'est pas enregistré, avertissement avant de quitter et avant « Nouveau » /
+« Charger » ; le geste **retour** ferme la fenêtre ouverte au lieu de quitter l'application ; la nouvelle ligne
+ajoutée défile à l'écran, curseur dans la désignation ; marges d'encoche (iPhone) respectées.
+
 ## Architecture
 
 - `index.html` — UI React (faces Atelier / Client + modales Réglages, Mes

@@ -1121,10 +1121,13 @@ test("UI", { skip: chromium ? false : "playwright not installed" }, async (t) =>
     // la barre du haut reste compacte (elle prenait ~180 px)
     const barH = await p.locator("header.bar").evaluate((e) => e.getBoundingClientRect().height);
     assert.ok(barH <= 110, "barre du haut : " + barH + " px");
-    // toutes les actions restent atteignables (rangée défilante)
-    await p.locator('.bar-actions button:has-text("Enregistrer")').scrollIntoViewIfNeeded();
-    await p.locator('.bar-actions button:has-text("Enregistrer")').click();
+    // « Enregistrer » est au pouce, dans la barre du bas (avec le total), et signale un devis non enregistré
+    assert.equal(await p.locator(".mbar").isVisible(), true);
+    assert.match(await p.locator(".mbar-save").innerText(), /Enregistrer •/);
+    assert.match(await p.locator(".mbar-sum").innerText(), /TOTAL TVAC/i);
+    await p.locator(".mbar-save").click();
     await p.waitForTimeout(150);
+    assert.match(await p.locator(".mbar-save").innerText(), /Enregistré ✓/);
     await p.click('button:has-text("Devis client")');
     await p.waitForSelector(".sheet");
     await noOverflow("devis client");
@@ -1201,5 +1204,94 @@ test("UI", { skip: chromium ? false : "playwright not installed" }, async (t) =>
     assert.notEqual(await p.locator("#qpaste-ta").inputValue(), "", "le texte n'est pas perdu");
     assert.equal(await p.locator(".qrow").count(), 0);
     await p.close();
+  });
+
+  /* ======================= application installable (PWA) + ergonomie mobile ======================= */
+  await t.test("PWA: Chrome la juge installable (aucune erreur d'installabilité), manifeste et icônes conformes", async () => {
+    const p = await newPage();
+    const cdp = await p.context().newCDPSession(p);
+    let errors = null;
+    for (let i = 0; i < 20; i++) {
+      const r = await cdp.send("Page.getInstallabilityErrors");
+      errors = r.installabilityErrors || [];
+      if (!errors.length) break;
+      await p.waitForTimeout(300);
+    }
+    assert.deepEqual(errors, [], JSON.stringify(errors));
+    const man = JSON.parse(fs.readFileSync(path.join(ROOT, "manifest.webmanifest"), "utf8"));
+    assert.equal(man.display, "standalone");
+    assert.equal(man.start_url, "./", "chemins relatifs : marche sur GitHub Pages (sous-dossier) comme sur le serveur");
+    const png = (f) => { const b = fs.readFileSync(path.join(ROOT, f)); return [b.readUInt32BE(16), b.readUInt32BE(20)]; };
+    for (const ic of man.icons) assert.deepEqual(png(ic.src), ic.sizes.split("x").map(Number), ic.src);
+    assert.ok(man.icons.some((i) => i.purpose === "maskable"), "icône « maskable » pour Android");
+    assert.deepEqual(png("icons/apple-touch-icon.png"), [180, 180]);
+    await p.close();
+  });
+
+  await t.test("PWA: après une 1re visite, l'application s'ouvre SANS réseau (mode navigateur seul)", async () => {
+    const octx = await browser.newContext({ ignoreHTTPSErrors: true });
+    const p = await octx.newPage();
+    await p.goto(base, { waitUntil: "load", timeout: 45000 });
+    await p.waitForSelector(".brand-name");
+    await p.evaluate(async () => { await navigator.serviceWorker.ready; });
+    await p.waitForFunction(() => !!navigator.serviceWorker.controller, null, { timeout: 15000 });
+    await p.evaluate(async () => { // laisse le précache se terminer
+      for (let i = 0; i < 50; i++) { const c = await caches.open("etabli-v1"); const k = await c.keys(); if (k.some((r) => /babel/.test(r.url))) return; await new Promise((r) => setTimeout(r, 200)); }
+    });
+    await octx.setOffline(true);
+    await p.reload({ waitUntil: "load" });
+    await p.waitForSelector(".brand-name", { timeout: 20000 });
+    await p.click('button.add:has-text("Fourniture")');
+    await p.waitForSelector(".line");
+    await octx.setOffline(false);
+    await octx.close();
+  });
+
+  await t.test("mobile: retour (Android) ferme la fenêtre ouverte sans quitter ; « Nouveau » prévient si le devis n'est pas enregistré", async () => {
+    const p = await newPage();
+    await p.click('button:has-text("Calepinage")');
+    await p.waitForSelector(".cl");
+    await p.goBack();
+    await p.waitForSelector(".modal", { state: "detached" });
+    assert.equal(await p.locator(".brand-name").count(), 1, "toujours dans l'application");
+    // la fermeture par ✕ ne laisse pas d'entrée d'historique en trop
+    await p.click('button:has-text("Réglages")');
+    await p.waitForSelector(".modal");
+    await p.click(".modal-head .ico");
+    await p.waitForSelector(".modal", { state: "detached" });
+    // devis modifié → « Nouveau » demande confirmation ; refuser garde la saisie
+    await clientField(p).fill("En cours");
+    assert.match(await p.locator('.bar-actions button:has-text("Enregistrer")').innerText(), /•/, "indicateur « non enregistré »");
+    p.once("dialog", (d) => d.dismiss());
+    await p.click('button:has-text("Nouveau")');
+    await p.waitForTimeout(150);
+    assert.equal(await clientField(p).inputValue(), "En cours", "refus : rien n'est perdu");
+    p.once("dialog", (d) => d.accept());
+    await p.click('button:has-text("Nouveau")');
+    await p.waitForTimeout(150);
+    assert.equal(await clientField(p).inputValue(), "", "accepté : nouveau devis");
+    // après enregistrement, plus d'indicateur ni de question
+    await clientField(p).fill("Gardé");
+    await p.click('.bar-actions button:has-text("Enregistrer")');
+    await p.waitForTimeout(150);
+    assert.doesNotMatch(await p.locator('.bar-actions button:has-text("Enregistrer")').innerText(), /•/);
+    await p.click('button:has-text("Nouveau")'); // pas de dialogue attendu
+    await p.waitForTimeout(150);
+    assert.equal(await clientField(p).inputValue(), "");
+    assert.deepEqual(p._errors, []);
+    await p.close();
+  });
+
+  await t.test("mobile: « + Fourniture » amène la nouvelle ligne à l'écran, curseur dans la désignation", async () => {
+    const mctx = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    await mctx.addInitScript(() => { try { localStorage.clear(); } catch (e) {} });
+    const p = await mctx.newPage();
+    await p.goto(base, { waitUntil: "load", timeout: 45000 });
+    await p.waitForSelector(".brand-name");
+    for (let i = 0; i < 3; i++) { await p.click('button.add:has-text("Fourniture")'); await p.waitForTimeout(500); }
+    const box = await p.locator(".lines > .line").last().locator(".line-title").boundingBox();
+    assert.ok(box && box.y >= 0 && box.y < 844, "la nouvelle ligne est visible : y=" + (box && box.y));
+    assert.equal(await p.evaluate(() => document.activeElement && document.activeElement.classList.contains("line-title")), true);
+    await mctx.close();
   });
 });

@@ -487,4 +487,25 @@ test("UI serveur", { skip: !chromium ? "playwright non installé" : !createApp ?
       assert.deepEqual(p._errors, []);
     } finally { await s.close(); }
   });
+
+  await t.test("PWA en mode serveur: le service worker ne met JAMAIS l'API (données clients) en cache", async () => {
+    const s = await setup({ noLegacy: true });
+    try {
+      const p = await s.open();
+      await ready(p);
+      await p.waitForFunction(() => !!navigator.serviceWorker.controller, null, { timeout: 15000 }).catch(() => {});
+      await p.reload(); await ready(p);
+      await clientField(p).fill("Données privées");
+      await p.click('button:has-text("Enregistrer")');
+      await p.waitForTimeout(400);
+      await p.reload(); await ready(p);
+      const cached = await p.evaluate(async () => {
+        const out = [];
+        for (const k of await caches.keys()) for (const r of await (await caches.open(k)).keys()) out.push(r.url);
+        return out;
+      });
+      assert.ok(cached.length > 0, "l'application elle-même est bien en cache");
+      assert.deepEqual(cached.filter((u) => u.includes("/api/")), [], "aucune réponse /api/ en cache");
+    } finally { await s.close(); }
+  });
 });
