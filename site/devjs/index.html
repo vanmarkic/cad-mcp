@@ -702,7 +702,7 @@ function App({ store, me, onLogout }) {
   const serverMode = store.mode === "server";
 
   /* applique les données chargées (au démarrage, et après une migration) */
-  const applyData = (data) => {
+  const applyData = (data, opts) => {
     if (data.settings) {
       if (data.settings.company) setCompany((c) => ({ ...c, ...data.settings.company }));
       if (data.settings.params) setParams((p) => ({ ...p, ...data.settings.params }));
@@ -735,6 +735,17 @@ function App({ store, me, onLogout }) {
       setClients(built);
       if (built.length) persistClients(built);
     }
+    // Au démarrage, le devis vierge affiché a été créé AVANT le chargement : on le recrée avec
+    // le prochain numéro libre (pas « 001 » quand des devis existent) et les réglages enregistrés.
+    if (opts && opts.startup) {
+      const s = data.settings || {};
+      const fresh = newDevis({ ...DEFAULT_COMPANY, ...(s.company || {}) }, { ...DEFAULT_PARAMS, ...(s.params || {}) }, withIds);
+      setDevis((d) => {
+        if (JSON.stringify(d) !== savedSnap.current) return d; // l'utilisateur a déjà commencé : on ne touche à rien
+        savedSnap.current = JSON.stringify(fresh);
+        return fresh;
+      });
+    }
   };
 
   /* load persisted state (localStorage ou serveur, selon la couche de stockage) */
@@ -742,7 +753,7 @@ function App({ store, me, onLogout }) {
     (async () => {
       try {
         const data = await store.loadAll();
-        applyData(data);
+        applyData(data, { startup: true });
         // 1re connexion sur le serveur : proposer de récupérer les devis de l'ancienne adresse.
         if (serverMode && data.migrated === false && me && me.legacyUrl) setModal("migration");
         loaded.current = true;
@@ -1224,6 +1235,12 @@ function App({ store, me, onLogout }) {
         </div>
 
         <div className="bar-actions">
+          <button className="btn ghost" onClick={() => { setImportNotice(null); setImportTodo(null); setModal("mesdevis"); }}>
+            Mes devis {saved.length ? `(${saved.length})` : ""}
+          </button>
+          <button className="btn ghost" onClick={resetQuote}>
+            Nouveau
+          </button>
           <button className="btn ghost" onClick={() => setModal("clients")}>
             Clients {clients.length ? `(${clients.length})` : ""}
           </button>
@@ -1235,12 +1252,6 @@ function App({ store, me, onLogout }) {
           </button>
           <button className="btn ghost" onClick={() => setModal("reglages")}>
             Réglages
-          </button>
-          <button className="btn ghost" onClick={() => { setImportNotice(null); setImportTodo(null); setModal("mesdevis"); }}>
-            Mes devis {saved.length ? `(${saved.length})` : ""}
-          </button>
-          <button className="btn ghost" onClick={resetQuote}>
-            Nouveau
           </button>
           <button className={"btn" + (dirty ? " btn-dirty" : "")} onClick={saveQuote} title={dirty ? "Modifications non enregistrées" : "Devis enregistré"}>
             Enregistrer{dirty ? " •" : ""}
@@ -2337,6 +2348,11 @@ function ClientForm({ initial, onSave, onCancel }) {
   );
 }
 
+// Intitulé court des travaux (texte libre éventuellement formaté → texte brut, 60 car.)
+function chantierTitle(q) {
+  const t = String((q && q.chantier) || "").replace(/[*_~`#>]/g, "").replace(/\s+/g, " ").trim();
+  return t.length > 60 ? t.slice(0, 59) + "…" : t;
+}
 function Clients({ clients, quotes, onNewQuote, onSave, onDelete, onLoadQuote }) {
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState(null); // id, ou "new"
@@ -2371,7 +2387,16 @@ function Clients({ clients, quotes, onNewQuote, onSave, onDelete, onLoadQuote })
                   <>
                     <div className="crow-main">
                       <div className="qrow-num">{c.nom}{c.clientType === "pro" ? <span className="chip chip-pro">pro</span> : null}</div>
-                      <div className="qrow-meta">{[c.adresse, c.tel, c.email].filter(Boolean).join(" · ") || "Pas de coordonnées"}</div>
+                      <div className="qrow-meta">
+                        {c.adresse || c.tel || c.email ? (
+                          <>
+                            {c.adresse ? <span>{c.adresse}</span> : null}
+                            {/* au téléphone : toucher le numéro appelle, l'e-mail ouvre la messagerie */}
+                            {c.tel ? <a className="crow-link" href={"tel:" + c.tel.replace(/[^\d+]/g, "")}>{c.tel}</a> : null}
+                            {c.email ? <a className="crow-link" href={"mailto:" + c.email}>{c.email}</a> : null}
+                          </>
+                        ) : "Pas de coordonnées"}
+                      </div>
                       {qs.length ? (
                         <button className="linkish" onClick={() => setOpen(open === c.id ? null : c.id)} aria-expanded={open === c.id}>
                           {qs.length} devis {open === c.id ? "▴" : "▾"}
@@ -2381,7 +2406,10 @@ function Clients({ clients, quotes, onNewQuote, onSave, onDelete, onLoadQuote })
                         <ul className="crow-quotes">
                           {qs.map((x) => (
                             <li key={x.id || x.numero}>
-                              <button className="linkish" onClick={() => onLoadQuote(x)}>{x.numero} · {frDate(x.dateISO)}</button>
+                              <button className="linkish" onClick={() => onLoadQuote(x)}>
+                                {x.numero} · {frDate(x.dateISO)}
+                                {chantierTitle(x) ? " — " + chantierTitle(x) : ""}
+                              </button>
                             </li>
                           ))}
                         </ul>
@@ -2451,7 +2479,7 @@ function InstallHelp({ installable, onInstall, serverMode }) {
         <p className="muted reglages-backup-note">Vos devis restent sur votre compte : l'application installée les retrouve dès la connexion.</p>
       ) : (
         <p className="muted reglages-backup-note">
-          <strong>Vos devis restent dans ce navigateur.</strong>{ios ? " Sur iPhone et iPad, l'application installée a un stockage séparé de Safari : avant d'installer, faites Réglages → « Sauvegarder (télécharger) » dans Safari, puis « Restaurer… » dans l'application." : android ? " Sur Android, l'application installée retrouve les devis déjà faits dans ce navigateur (même stockage). Installez-la depuis le navigateur où sont vos devis." : ""}
+          {ios ? null : <strong>Vos devis restent dans ce navigateur.</strong>}{ios ? " Attention sur iPhone et iPad : l'application installée démarre VIDE (stockage séparé de Safari). Avant d'installer, faites Réglages → « Sauvegarder (télécharger) » ici dans Safari, puis Réglages → « Restaurer… » dans l'application installée." : android ? " Sur Android, l'application installée retrouve les devis déjà faits dans ce navigateur (même stockage). Installez-la depuis le navigateur où sont vos devis." : ""}
         </p>
       )}
       <p className="muted reglages-backup-note">Hors connexion, l'application s'ouvre ; {serverMode ? "l'enregistrement attend le retour du réseau." : "tout fonctionne."}</p>
@@ -3378,6 +3406,8 @@ const CSS = `
 .clients-search{flex:1 1 240px; min-width:0}
 .crow{align-items:flex-start}
 .crow-main{flex:1; min-width:0}
+.crow-link{color:var(--oak-2); text-decoration:underline; margin-left:0}
+.qrow-meta > * + *::before{content:" · "; color:var(--ink-3); text-decoration:none; display:inline-block; margin:0 4px}
 .crow-quotes{list-style:none; margin:4px 0 0; padding:0; display:flex; flex-direction:column; gap:2px}
 .linkish{background:none; border:0; padding:2px 0; color:var(--oak-2); cursor:pointer; font:inherit; font-size:12px; text-decoration:underline}
 .chip-pro{margin-left:8px; background:#e2dae6; color:#5b4769; font-size:9.5px; vertical-align:middle}
@@ -3550,7 +3580,7 @@ const CSS = `
   .cl-prow{grid-template-columns:1fr 1fr 1fr 36px}
   .cl-prow-lin{grid-template-columns:1fr 1fr 36px}
   .cl-prow > .cl-swatch-wrap, .cl-prow-head > span:first-child{grid-column:1/-1}
-  .overlay{padding:0; align-items:stretch}
+  .overlay{padding:0; display:block} /* bloc (pas flex) : la fenêtre grandit avec son contenu, fond compris */
   .modal, .modal-wide{max-width:none; border-radius:0; min-height:100%}
   .modal-head{position:sticky; top:0; background:var(--card); z-index:2}
   .modal-body{padding:14px 12px 40px}

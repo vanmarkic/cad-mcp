@@ -1387,4 +1387,34 @@ test("UI", { skip: chromium ? false : "playwright not installed" }, async (t) =>
     await p.waitForSelector(".install-help");
     await p.close();
   });
+  /* ======================= retours du test utilisateur synthétique ======================= */
+  await t.test("ouverture: le devis vierge prend le numéro suivant et les réglages enregistrés (pas « 001 » ni les valeurs par défaut)", async () => {
+    const c = await browser.newContext({ storageState: { cookies: [], origins: [{ origin: new URL(base).origin, localStorage: [
+      { name: "etabli:quotes", value: JSON.stringify([{ id: "q1", numero: "DEV-" + new Date().getFullYear() + "-022", dateISO: "2026-01-01", client: { nom: "X", adresse: "", email: "", tel: "" }, lines: [] }]) },
+      { name: "etabli:settings", value: JSON.stringify({ company: {}, params: { acompte: "40" } }) },
+    ] }] } });
+    const p = await c.newPage();
+    await p.goto(base, { waitUntil: "load", timeout: 45000 });
+    await p.waitForSelector(".brand-name");
+    await p.waitForFunction(() => /-023$/.test(document.querySelector('label.fld:has(span.fld-lab) input').value), null, { timeout: 5000 });
+    assert.doesNotMatch(await p.locator('.bar-actions button:has-text("Enregistr")').innerText(), /•/, "pas marqué « non enregistré »");
+    assert.equal(await p.locator('label.fld:has(span.fld-lab:text-is("Acompte à la commande")) input').first().inputValue(), "40");
+    await c.close();
+  });
+
+  await t.test("téléphone: le fond d'une longue fenêtre (Réglages) couvre tout son contenu ; numéro du client = lien d'appel", async () => {
+    const mctx = await browser.newContext({ viewport: { width: 390, height: 700 }, isMobile: true, hasTouch: true });
+    await mctx.addInitScript(() => { try { localStorage.clear(); localStorage.setItem("etabli:clients", JSON.stringify([{ id: "k1", nom: "Dupont", tel: "0470 12 34 56", adresse: "", email: "", clientType: "particulier" }])); } catch (e) {} });
+    const p = await mctx.newPage();
+    await p.goto(base, { waitUntil: "load", timeout: 45000 });
+    await p.waitForSelector(".brand-name");
+    await p.click('button:has-text("Réglages")');
+    await p.waitForSelector(".modal .install-help");
+    const r = await p.evaluate(() => { const m = document.querySelector(".modal"); return { modal: m.getBoundingClientRect().height, content: m.scrollHeight }; });
+    assert.ok(r.modal >= r.content - 1, "fond de la fenêtre = hauteur du contenu : " + JSON.stringify(r));
+    await p.keyboard.press("Escape");
+    await p.click('button:has-text("Clients")');
+    assert.equal(await p.locator('.clients-list a[href="tel:0470123456"]').count(), 1);
+    await mctx.close();
+  });
 });
