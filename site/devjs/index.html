@@ -2,7 +2,14 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#211D18">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ÉTABLI">
 <meta name="robots" content="noindex, nofollow">
 <title>ÉTABLI — Générateur de devis pour menuisier</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23E7E2D8'/%3E%3Crect x='4' y='4' width='24' height='24' fill='none' stroke='%23211D18' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Georgia' font-size='14' text-anchor='middle' fill='%23A8631F'%3E%E2%96%9F%E2%96%99%3C/text%3E%3C/svg%3E">
@@ -31,6 +38,19 @@ window.storage = {
 <script src="lib/etabli-core.js"></script>
 <!-- couche de stockage : localStorage (GitHub Pages) ou serveur ÉTABLI (connexion, fichiers) -->
 <script src="lib/etabli-store.js"></script>
+<!-- application installable : service worker (jamais de cache pour /api/, voir sw.js) + invite d'installation -->
+<script>
+window.__etabliInstall = null;
+window.addEventListener("beforeinstallprompt", function (e) {
+  e.preventDefault();
+  window.__etabliInstall = e;
+  window.dispatchEvent(new Event("etabli-installable"));
+});
+window.addEventListener("appinstalled", function () { window.__etabliInstall = null; window.dispatchEvent(new Event("etabli-installable")); });
+if ("serviceWorker" in navigator && window.isSecureContext) {
+  window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
+}
+</script>
 
 <script type="text/babel" data-presets="react">
 const { useState, useEffect, useMemo, useRef } = React;
@@ -651,6 +671,25 @@ function App({ store, me, onLogout }) {
   const [catalog, setCatalog] = useState([]); // fournitures réutilisables
   const [modal, setModal] = useState(null); // 'reglages' | 'mesdevis' | 'catalogue' | 'calepinage' | null
   const [toast, setToast] = useState("");
+  // Devis « non enregistré » : comparaison avec la dernière version chargée / enregistrée.
+  const [installable, setInstallable] = useState(!!window.__etabliInstall);
+  useEffect(() => {
+    const on = () => setInstallable(!!window.__etabliInstall);
+    window.addEventListener("etabli-installable", on);
+    return () => window.removeEventListener("etabli-installable", on);
+  }, []);
+  const installApp = async () => {
+    const ev = window.__etabliInstall;
+    if (!ev) return;
+    ev.prompt();
+    try { await ev.userChoice; } catch (e) {}
+    window.__etabliInstall = null;
+    setInstallable(false);
+  };
+  const savedSnap = useRef(null);
+  const devisJSON = JSON.stringify(devis);
+  if (savedSnap.current === null) savedSnap.current = devisJSON;
+  const dirty = devisJSON !== savedSnap.current;
   const [calep, setCalep] = useState(DEFAULT_CALEP);
   const loaded = useRef(false);
   const lastCalep = useRef(JSON.stringify(DEFAULT_CALEP)); // dernier calepinage enregistré (évite les écritures inutiles)
@@ -832,8 +871,46 @@ function App({ store, me, onLogout }) {
       ...d,
       lines: d.lines.map((l) => (l.id === id ? { ...l, ...patch } : l)),
     }));
-  const addLine = (type) =>
+  const focusNewLine = useRef(false);
+  const addLine = (type) => {
+    focusNewLine.current = true; // ligne ajoutée par l'utilisateur : la montrer et placer le curseur
     setDevis((d) => ({ ...d, lines: [...d.lines, newLine(type, params)] }));
+  };
+  // Nouvelle ligne : on la fait défiler à l'écran (sur téléphone elle apparaissait hors de vue).
+  const prevLines = useRef(devis.lines.length);
+  useEffect(() => {
+    if (devis.lines.length > prevLines.current) {
+      const all = document.querySelectorAll(".lines > .line");
+      const last = all[all.length - 1];
+      if (last && last.scrollIntoView) last.scrollIntoView({ block: "center", behavior: "smooth" });
+      if (focusNewLine.current && last) { const t = last.querySelector(".line-title"); if (t) t.focus({ preventScroll: true }); }
+    }
+    focusNewLine.current = false;
+    prevLines.current = devis.lines.length;
+  }, [devis.lines.length]);
+  // Prévenir avant de quitter avec un devis non enregistré.
+  useEffect(() => {
+    const onBefore = (e) => { if (dirty) { e.preventDefault(); e.returnValue = ""; } };
+    window.addEventListener("beforeunload", onBefore);
+    return () => window.removeEventListener("beforeunload", onBefore);
+  }, [dirty]);
+  // Bouton / geste « retour » (Android, application installée) : ferme la fenêtre ouverte au lieu de quitter.
+  const modalInHistory = useRef(false);
+  useEffect(() => {
+    if (modal && !modalInHistory.current) {
+      try { history.pushState({ etabliModal: true }, ""); modalInHistory.current = true; } catch (e) {}
+    } else if (!modal && modalInHistory.current) {
+      modalInHistory.current = false;
+      try { if (history.state && history.state.etabliModal) history.back(); } catch (e) {}
+    }
+  }, [modal]);
+  useEffect(() => {
+    const onPop = () => { if (modalInHistory.current) { modalInHistory.current = false; setModal(null); } };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+  const confirmDiscard = (what) =>
+    !dirty || window.confirm("Le devis en cours n'est pas enregistré. " + what + " quand même ? Ses modifications seront perdues.");
   const delLine = (id) =>
     setDevis((d) => ({ ...d, lines: d.lines.filter((l) => l.id !== id) }));
   const moveLine = (id, dir) =>
@@ -851,19 +928,26 @@ function App({ store, me, onLogout }) {
     // en attribue un à l'enregistrement pour qu'il ait une identité stable.
     const withId = devis.id ? devis : { ...devis, id: newQuoteId() };
     if (!devis.id) setDevis(withId);
+    savedSnap.current = JSON.stringify(withId);
     const stamped = { ...withId, _savedAt: new Date().toISOString() };
     commitQuotes((list) => upsertQuote(list, stamped));
     flash("Devis enregistré : " + devis.numero);
   };
   const loadQuote = (q) => {
-    setDevis(JSON.parse(JSON.stringify(q)));
+    if (!confirmDiscard("Ouvrir un autre devis")) return;
+    const copy = JSON.parse(JSON.stringify(q));
+    savedSnap.current = JSON.stringify(copy);
+    setDevis(copy);
     setModal(null);
     setView("atelier");
     flash("Devis chargé : " + q.numero);
   };
   const deleteQuote = (id) => commitQuotes((list) => removeQuote(list, id));
   const resetQuote = () => {
-    setDevis(newDevis(company, params, saved));
+    if (!confirmDiscard("Commencer un nouveau devis")) return;
+    const fresh = newDevis(company, params, saved);
+    savedSnap.current = JSON.stringify(fresh);
+    setDevis(fresh);
     setModal(null);
     flash("Nouveau devis");
   };
@@ -1097,9 +1181,14 @@ function App({ store, me, onLogout }) {
           <button className="btn ghost" onClick={resetQuote}>
             Nouveau
           </button>
-          <button className="btn" onClick={saveQuote}>
-            Enregistrer
+          <button className={"btn" + (dirty ? " btn-dirty" : "")} onClick={saveQuote} title={dirty ? "Modifications non enregistrées" : "Devis enregistré"}>
+            Enregistrer{dirty ? " •" : ""}
           </button>
+          {installable ? (
+            <button className="btn ghost" onClick={installApp} title="Installer ÉTABLI sur cet appareil">
+              Installer
+            </button>
+          ) : null}
           {serverMode && me ? (
             <>
               <span className="bar-user" title="Compte connecté">{me.login}</span>
@@ -1223,6 +1312,19 @@ function App({ store, me, onLogout }) {
           />
         </Modal>
       )}
+
+      <nav className="mbar no-print" aria-label="Actions rapides">
+        <div className="mbar-sum" onClick={() => { const el = document.querySelector(view === "atelier" ? ".summary" : ".s-totals"); if (el) el.scrollIntoView({ behavior: "smooth", block: "center" }); }}>
+          <span className="mbar-lab">Total {calc.coco ? "HTVA" : "TVAC"}</span>
+          <span className="mbar-val mono">{eur(calc.ttc)}</span>
+          {view === "atelier" ? (
+            <span className="mbar-marge mono" style={{ color: margeColor(calc.margePct) }}>marge {pct(calc.margePct)}</span>
+          ) : null}
+        </div>
+        <button className={"btn mbar-save" + (dirty ? " btn-dirty" : "")} onClick={saveQuote}>
+          {dirty ? "Enregistrer •" : "Enregistré ✓"}
+        </button>
+      </nav>
 
       {toast ? <div className="toast no-print">{toast}</div> : null}
     </div>
@@ -3126,6 +3228,11 @@ const CSS = `
   .cl-sheet{max-width:none}
 }
 
+/* barre d'actions du bas : téléphone uniquement */
+.mbar{display:none}
+.btn-dirty{box-shadow:inset 0 0 0 2px #f3c27e}
+.bar{padding-top:max(12px, env(safe-area-inset-top))}
+
 /* téléphone : barre compacte, champs à 16 px (pas de zoom iOS), cibles tactiles ≥ 36 px */
 @media (max-width:600px){
   .bar{padding:8px 12px; gap:8px; row-gap:8px}
@@ -3168,7 +3275,19 @@ const CSS = `
   .sum-grid{gap:8px}
   .stat-val{font-size:16px}
   .stat-big .stat-val{font-size:19px}
-  .toast{left:12px; right:12px; transform:none; text-align:center}
+  .toast{left:12px; right:12px; transform:none; text-align:center; bottom:calc(76px + env(safe-area-inset-bottom))}
+  .bar{padding-top:max(8px, env(safe-area-inset-top)); padding-left:max(12px, env(safe-area-inset-left)); padding-right:max(12px, env(safe-area-inset-right))}
+  .mbar{display:flex; align-items:center; gap:10px; position:fixed; left:0; right:0; bottom:0; z-index:40;
+    padding:8px 12px calc(8px + env(safe-area-inset-bottom)); background:var(--ink); color:#f4efe6;
+    border-top:3px solid var(--oak); box-shadow:0 -6px 18px rgba(0,0,0,.18)}
+  .mbar-sum{flex:1; min-width:0; display:flex; flex-direction:column; line-height:1.2; cursor:pointer}
+  .mbar-lab{font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:#b3a892}
+  .mbar-val{font-size:17px; font-weight:600; color:#fff}
+  .mbar-marge{font-size:11.5px; font-weight:600; filter:brightness(1.5)}
+  .mbar-save{flex:none; min-height:44px; padding:10px 16px; font-size:14px}
+  .bar-actions > .btn:not(.ghost){display:none}
+  .wrap, .sheet-stage{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
+  .modal-body{padding-bottom:calc(40px + env(safe-area-inset-bottom))}
 }
 
 /* print */

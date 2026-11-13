@@ -523,3 +523,21 @@ test("mot de passe: exige une session et respecte la protection CSRF", () => wit
   assert.equal((await a.post("/api/password", { current: "motdepasse-solide", next: "nouveau-secret-2026" }, { Origin: "http://evil.example" })).status, 403);
   assert.equal((await client(s.base).post("/api/login", { login: "paul", password: "motdepasse-solide" })).status, 200, "rien n'a changé");
 }));
+
+test("PWA: manifeste, service worker et icônes servis avec le bon type ; le reste de icons/ refusé", () => withServer(async (s) => {
+  const c = client(s.base);
+  const m = await c.get("/manifest.webmanifest");
+  assert.equal(m.status, 200);
+  assert.match(m.headers.get("content-type"), /application\/manifest\+json/);
+  assert.equal(JSON.parse(m.text).display, "standalone");
+  const sw = await c.get("/sw.js");
+  assert.equal(sw.status, 200);
+  assert.match(sw.headers.get("content-type"), /javascript/);
+  assert.equal(sw.headers.get("cache-control"), "no-cache", "le service worker est revalidé à chaque visite (mises à jour)");
+  const ic = await fetch(s.base + "/icons/icon-192.png");
+  assert.equal(ic.status, 200);
+  assert.equal(ic.headers.get("content-type"), "image/png");
+  assert.equal((await c.get("/icons/../server/app.js")).status, 404);
+  assert.equal((await c.get("/icons/x.svg")).status, 404);
+  assert.match(m.headers.get("content-security-policy"), /connect-src 'self' https:\/\/unpkg\.com/, "le service worker peut garder les bibliothèques hors ligne");
+}));
