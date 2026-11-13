@@ -4,9 +4,13 @@
    - Fichiers de l'application (même origine) : réseau d'abord — une mise à jour est vue dès qu'elle est en
      ligne — et copie de secours si le réseau manque.
    - Bibliothèques et polices (unpkg, Google Fonts) : copie en cache servie tout de suite, rafraîchie en fond.
-   Changer VERSION purge les anciens caches. */
-const VERSION = "etabli-v1";
-const SHELL = ["./", "./index.html", "./lib/etabli-core.js", "./lib/etabli-store.js", "./manifest.webmanifest", "./icons/icon-192.png"];
+   Changer VERSION purge les anciens caches.
+   ⚠ À CHAQUE modification de lib/*.js : incrémenter VERSION ET le « ?v= » des <script src="lib/…"> d'index.html et
+   migrate.html (un test le vérifie). Sinon un cache intermédiaire (Cloudflare impose 4 h de cache navigateur aux .js)
+   peut servir l'ancien moteur avec la nouvelle page → « … is not a function ». */
+const VERSION = "etabli-v2";
+const REV = VERSION.replace(/^etabli-v/, "");
+const SHELL = ["./", "./index.html", "./lib/etabli-core.js?v=" + REV, "./lib/etabli-store.js?v=" + REV, "./manifest.webmanifest", "./icons/icon-192.png"];
 // Mêmes adresses que les <script> d'index.html : préchargées pour que l'application s'ouvre hors ligne dès la 2ᵉ visite.
 const CDN = [
   "https://unpkg.com/react@18/umd/react.production.min.js",
@@ -16,7 +20,7 @@ const CDN = [
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(VERSION).then((c) => Promise.all(SHELL.concat(CDN).map((u) => c.add(u).catch(() => null)))).then(() => self.skipWaiting())
+    caches.open(VERSION).then((c) => Promise.all(SHELL.concat(CDN).map((u) => c.add(new Request(u, { cache: "reload" })).catch(() => null)))).then(() => self.skipWaiting())
   );
 });
 
@@ -34,7 +38,8 @@ self.addEventListener("fetch", (event) => {
   if (sameOrigin && url.pathname.includes("/api/")) return; // jamais de cache pour l'API
   if (sameOrigin) {
     event.respondWith(
-      fetch(req).then((res) => {
+      // « no-cache » : toujours revalider auprès du serveur (ne jamais servir un fichier périmé du cache HTTP du navigateur)
+      fetch(req, req.mode === "navigate" ? undefined : { cache: "no-cache" }).then((res) => {
         if (res.ok && res.type === "basic") { const copy = res.clone(); caches.open(VERSION).then((c) => c.put(req, copy)); }
         return res;
       }).catch(() =>
