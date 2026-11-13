@@ -56,7 +56,7 @@ test("local: lecture des quatre clés historiques, valeurs absentes ou corrompue
   assert.deepEqual(d.quotes, [q("a")]);
   assert.equal(d.calepinage, null);
   assert.deepEqual(d.catalogue, [], "JSON corrompu → liste vide, sans exception");
-  assert.deepEqual(await S.createLocalStore(fakeStorage()).loadAll(), { settings: null, quotes: [], calepinage: null, catalogue: [] });
+  assert.deepEqual(await S.createLocalStore(fakeStorage()).loadAll(), { settings: null, quotes: [], calepinage: null, catalogue: [], clients: null }, "clients null = carnet jamais créé");
 });
 
 test("local: écritures aux mêmes clés qu'avant (compatibilité des données existantes)", async () => {

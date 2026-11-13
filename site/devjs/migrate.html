@@ -39,7 +39,7 @@
    Les données ne partent jamais vers une origine absente de la liste, ni sans clic. */
 (function () {
   "use strict";
-  var KEYS = ["etabli:settings", "etabli:quotes", "etabli:calepinage", "etabli:catalogue"];
+  var KEYS = ["etabli:settings", "etabli:quotes", "etabli:calepinage", "etabli:catalogue", "etabli:clients"];
   var targets = Array.isArray(window.ETABLI_MIGRATE_TARGETS) ? window.ETABLI_MIGRATE_TARGETS : [];
   var msg = document.getElementById("msg"), act = document.getElementById("act");
   var pending = null; // { origin, source }
@@ -48,9 +48,9 @@
   function say(text, cls) { msg.className = cls || "muted"; msg.textContent = text; }
 
   function buildBundle() {
-    var settings = read(KEYS[0]), quotes = read(KEYS[1]), cal = read(KEYS[2]), cat = read(KEYS[3]);
+    var settings = read(KEYS[0]), quotes = read(KEYS[1]), cal = read(KEYS[2]), cat = read(KEYS[3]), cli = read(KEYS[4]);
     return window.EtabliCore.buildBackup(
-      { settings: settings, quotes: Array.isArray(quotes) ? quotes : [], calepinage: cal, catalogue: Array.isArray(cat) ? cat : [] },
+      { settings: settings, quotes: Array.isArray(quotes) ? quotes : [], calepinage: cal, catalogue: Array.isArray(cat) ? cat : [], clients: Array.isArray(cli) ? cli : [] },
       { exportedAt: new Date().toISOString() }
     );
   }

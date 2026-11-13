@@ -12,7 +12,7 @@ const Core = require("../../site/devjs/lib/etabli-core.js");
 // Doit commencer par un caractère « sûr » : exclut "." et ".." (traversée de répertoire).
 const ID_RE = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,79}$/;
 const LOGIN_RE = /^[a-z0-9][a-z0-9._-]{0,39}$/;
-const DOCS = { settings: "object", calepinage: "object", catalogue: "array" };
+const DOCS = { settings: "object", calepinage: "object", catalogue: "array", clients: "array" };
 
 const isObj = (v) => !!v && typeof v === "object" && !Array.isArray(v);
 
@@ -117,11 +117,12 @@ class Store {
   }
 
   async allData(login) {
-    const [settings, calepinage, catalogue, quotes, meta] = await Promise.all([
+    const [settings, calepinage, catalogue, quotes, meta, clients] = await Promise.all([
       this.getDoc(login, "settings"), this.getDoc(login, "calepinage"), this.getDoc(login, "catalogue"),
-      this.listQuotes(login), this.getMeta(login),
+      this.listQuotes(login), this.getMeta(login), this.getDoc(login, "clients"),
     ]);
-    return { settings, calepinage, catalogue: catalogue || [], quotes, migrated: !!meta.migrated };
+    // clients : null = carnet jamais créé (l'application le reconstruit alors à partir des devis)
+    return { settings, calepinage, catalogue: catalogue || [], clients, quotes, migrated: !!meta.migrated };
   }
 
   /* ---------- import ADDITIF (migration depuis l'ancienne adresse, ou sauvegarde) ----------
@@ -129,12 +130,13 @@ class Store {
        devis        — id inconnu → ajouté ; même id et même contenu → ignoré ; même id mais
                       contenu différent → ajouté comme copie (nouvel id) ;
        catalogue    — ajoute les désignations absentes ;
+       clients      — ajoute les fiches dont le nom est inconnu ;
        réglages / calepinage — repris seulement s'il n'y en a pas encore. */
   async importBackup(login, backup) {
     if (!isObj(backup)) throw new Error("Ce fichier n'est pas une sauvegarde Établi.");
     const r = Core.readBackup(backup); // lève une erreur claire si ce n'est pas une sauvegarde Établi
     return withLock(login + ":import", async () => {
-      const summary = { quotes: { added: 0, duplicates: 0, copies: 0, skipped: 0 }, catalogue: { added: 0 }, settings: false, calepinage: false };
+      const summary = { quotes: { added: 0, duplicates: 0, copies: 0, skipped: 0 }, catalogue: { added: 0 }, clients: { added: 0 }, settings: false, calepinage: false };
       let list = (await this.listQuotes(login)).map((q) => { const c = { ...q }; delete c._rev; return c; });
       for (const raw of r.quotes) {
         if (!isObj(raw) || !Array.isArray(raw.lines)) { summary.quotes.skipped++; continue; }
@@ -148,6 +150,7 @@ class Store {
         if (res.status === "copy") summary.quotes.copies++; else summary.quotes.added++;
       }
       const norm = (s) => String(s == null ? "" : s).trim().toLowerCase().replace(/\s+/g, " ");
+      const normName = (s) => norm(s).normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // clients : accents ignorés
       let cat = (await this.getDoc(login, "catalogue")) || [];
       const have = new Set(cat.map((x) => norm(x && x.designation)));
       const usedIds = new Set(cat.map((x) => x && x.id));
@@ -160,6 +163,16 @@ class Store {
         summary.catalogue.added++;
       }
       if (summary.catalogue.added) await this.setDoc(login, "catalogue", cat);
+      // fiches clients : on ajoute les clients inconnus (par nom), on ne modifie pas les fiches existantes
+      let cl = (await this.getDoc(login, "clients")) || [];
+      const knownClients = new Set(cl.map((c) => normName(c && c.nom)));
+      for (const c of (r.clients || [])) {
+        if (!isObj(c) || !normName(c.nom) || knownClients.has(normName(c.nom))) continue;
+        const item = { ...c };
+        if (!item.id || cl.some((x) => x && x.id === item.id)) item.id = Core.newClientId();
+        cl = [item].concat(cl); knownClients.add(normName(c.nom)); summary.clients.added++;
+      }
+      if (summary.clients.added) await this.setDoc(login, "clients", cl);
       if (isObj(r.settings) && (await this.getDoc(login, "settings")) === null) { await this.setDoc(login, "settings", r.settings); summary.settings = true; }
       if (isObj(r.calepinage) && (await this.getDoc(login, "calepinage")) === null) { await this.setDoc(login, "calepinage", r.calepinage); summary.calepinage = true; }
       await this.setMeta(login, { migrated: true, migratedAt: new Date().toISOString() });

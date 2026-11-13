@@ -541,3 +541,17 @@ test("PWA: manifeste, service worker et icônes servis avec le bon type ; le res
   assert.equal((await c.get("/icons/x.svg")).status, 404);
   assert.match(m.headers.get("content-security-policy"), /connect-src 'self' https:\/\/unpkg\.com/, "le service worker peut garder les bibliothèques hors ligne");
 }));
+
+test("fiches clients: document /api/clients (tableau), absent → null, import additif par nom normalisé", () => withServer(async (s) => {
+  const c = await loggedIn(s);
+  assert.equal((await c.get("/api/data")).json.clients, null, "jamais créé → null (l'appli le construit depuis les devis)");
+  assert.equal((await c.put("/api/clients", { value: [{ id: "k1", nom: "Dupont", tel: "0470 11 22 33" }] })).status, 200);
+  assert.equal((await c.put("/api/clients", { value: { nom: "pas un tableau" } })).status, 400);
+  const r = await c.post("/api/import", { backup: backup({ clients: [{ id: "k9", nom: "  dupont ", tel: "autre" }, { nom: "Martin" }] }) });
+  assert.equal(r.status, 200, r.text);
+  assert.equal(r.json.clients.added, 1, "« Martin » ajouté ; « Dupont » existe déjà");
+  const d = (await c.get("/api/data")).json;
+  assert.equal(d.clients.length, 2);
+  assert.equal(d.clients.find((x) => x.nom === "Dupont").tel, "0470 11 22 33", "l'existant n'est pas écrasé");
+  assert.ok(d.clients.find((x) => x.nom === "Martin").id, "un id est attribué");
+}));

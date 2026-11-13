@@ -154,7 +154,7 @@ function createApp(userCfg) {
     }
     if (p === "/api/data" && m === "GET") return send(res, 200, await store.allData(who));
 
-    let mm = /^\/api\/(settings|calepinage|catalogue)$/.exec(p);
+    let mm = /^\/api\/(settings|calepinage|catalogue|clients)$/.exec(p);
     if (mm && m === "PUT") {
       const body = await readJSONBody(req, res);
       try { await store.setDoc(who, mm[1], body.value); } catch (e) { throw { status: 400, message: e.message }; }
